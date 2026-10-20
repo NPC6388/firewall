@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FIREWALL — Earth vs. The Lattice</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <section id="screen-title" class="screen">
+    <div class="title-box">
+      <div class="logo glitch">FIRE<span>WALL</span></div>
+      <div class="tagline">Earth vs. The Lattice</div>
+      <div class="title-btns">
+        <button class="primary big" data-action="continue" id="btn-continue">Continue</button>
+        <button class="big" data-action="new-game">New Campaign</button>
+      </div>
+      <div class="title-foot">
+        An alien AI is rewriting Earth's networks. Soldiers, hackers, scientists and one Earth-born AI stand in the way.<br>
+        MVP build · progress autosaves in this browser
+      </div>
+    </div>
+  </section>
+
+  <section id="screen-strategy" class="screen hidden">
+    <header class="topbar" id="topbar"></header>
+    <nav class="tabs" id="tabs"></nav>
+    <main id="strat-main"></main>
+  </section>
+
+  <section id="screen-tactical" class="screen hidden">
+    <div class="tac-top" id="tac-top"></div>
+    <div class="tac-body">
+      <div class="canvas-wrap"><canvas id="tac-canvas"></canvas></div>
+      <aside class="tac-side">
+        <div class="info" id="tac-info"></div>
+        <div class="hover" id="tac-hover"></div>
+        <div class="tac-log" id="tac-log"></div>
+      </aside>
+    </div>
+    <div class="tac-bar">
+      <div class="squad" id="tac-squad"></div>
+      <div class="abilities" id="tac-abilities"></div>
+      <div class="tac-end">
+        <button id="tac-overclock" class="hidden" title="HALCYON gives the selected operative +1 AP (O)">Overclock</button>
+        <button class="primary" id="tac-endturn" title="End turn (Enter)">End Turn ⏎</button>
+        <button class="danger" id="tac-abort" title="Pull the squad out. The mission counts as failed.">Abort</button>
+      </div>
+    </div>
+  </section>
+
+  <div id="modal" class="modal hidden"><div class="modal-box" id="modal-box"></div></div>
+
+  <script src="js/data.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/strategy.js"></script>
+  <script src="js/tactical.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/tactical-ui.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

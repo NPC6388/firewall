@@ -1,0 +1,357 @@
+// FIREWALL: campaign rules (time, research, base, missions, Convergence). No DOM.
+var XG = globalThis.XG = globalThis.XG || {};
+
+XG.Strat = (function () {
+  var D = XG.DATA, S = XG.State;
+  var OP_A = ['Silent', 'Iron', 'Glass', 'Cold', 'Burning', 'Hollow', 'Broken', 'Last', 'Red', 'Quiet', 'Black', 'Grey'];
+  var OP_B = ['Antenna', 'Static', 'Lantern', 'Circuit', 'Harbor', 'Choir', 'Firewall', 'Signal', 'Echo', 'Meridian', 'Ladder', 'Wire'];
+
+  function has(g, tech) { return g.research.done.indexOf(tech) >= 0; }
+  function built(g, type) {
+    return g.base.filter(function (b) { return b && b.type === type && b.daysLeft === 0 && !b.demolish; }).length;
+  }
+  function region(g, id) { return g.regions.filter(function (r) { return r.id === id; })[0]; }
+  function regionData(id) { return D.regions.filter(function (r) { return r.id === id; })[0]; }
+  function canPay(g, cost) { return g.credits >= (cost.credits || 0) && g.salvage >= (cost.salvage || 0); }
+  function pay(g, cost) { g.credits -= cost.credits || 0; g.salvage -= cost.salvage || 0; }
+  function costText(cost) {
+    var p = ['§' + (cost.credits || 0)];
+    if (cost.salvage) p.push(cost.salvage + ' salvage');
+    return p.join(' + ');
+  }
+
+  var Strat = {
+    has: has, built: built, region: region, regionData: regionData, costText: costText,
+
+    power: function (g) {
+      var total = 0, used = 0;
+      g.base.forEach(function (b) {
+        if (!b || b.demolish) return; // facilities being demolished are offline
+        var p = D.facilities[b.type].power;
+        if (p > 0) { if (b.daysLeft === 0) total += p; } else used -= p; // consumers reserve power while building
+      });
+      return { total: total, used: used };
+    },
+
+    researchRate: function (g) {
+      return D.tuning.researchBase * (1 + 0.4 * built(g, 'lab') + 0.15 * built(g, 'server'));
+    },
+    squadSize: function (g) { return has(g, 'squad_size') ? 5 : 4; },
+    overclockCharges: function (g) { return has(g, 'halcyon') ? 1 + built(g, 'server') : 0; },
+    infectionVisible: function (g) { return has(g, 'signal_analysis'); },
+
+    convergenceRate: function (g) {
+      var inf = g.regions.reduce(function (a, r) { return a + r.infection; }, 0);
+      var rate = D.tuning.convBase + inf * D.tuning.convPerInfection;
+      if (has(g, 'firewall')) rate *= 0.7;
+      return rate;
+    },
+
+    // ------------------------------------------------------------ research
+    techState: function (g, id) {
+      var t = D.techs[id];
+      if (has(g, id)) return 'done';
+      if (g.research.current === id) return 'active';
+      for (var i = 0; i < t.req.length; i++) if (!has(g, t.req[i])) return 'locked';
+      if (t.item && !g.items[t.item]) return 'needs-item';
+      if (t.salvage && !g.research.progress[id] && g.salvage < t.salvage) return 'needs-salvage';
+      return 'available';
+    },
+    startResearch: function (g, id) {
+      var st = Strat.techState(g, id);
+      if (st !== 'available') return false;
+      var t = D.techs[id];
+      if (t.salvage && !g.research.progress[id]) { g.salvage -= t.salvage; g.research.progress[id] = 0.0001; }
+      g.research.current = id;
+      return true;
+    },
+    daysLeft: function (g, id) {
+      var done = g.research.progress[id] || 0;
+      return Math.max(1, Math.ceil((D.techs[id].cost - done) / Strat.researchRate(g)));
+    },
+
+    // ------------------------------------------------------------- base
+    canBuild: function (g, type, slot) {
+      var f = D.facilities[type];
+      if (g.base[slot]) return 'Slot occupied';
+      if (f.prebuilt) return 'Cannot build';
+      if (f.tech && !has(g, f.tech)) return 'Requires ' + D.techs[f.tech].name;
+      if (!canPay(g, f.cost)) return 'Need ' + costText(f.cost);
+      if (f.power < 0) {
+        var p = Strat.power(g);
+        if (p.used - f.power > p.total) return 'Not enough power (' + (p.total - p.used) + ' free)';
+      }
+      return null;
+    },
+    build: function (g, type, slot) {
+      if (Strat.canBuild(g, type, slot)) return false;
+      pay(g, D.facilities[type].cost);
+      g.base[slot] = { type: type, daysLeft: D.facilities[type].days };
+      S.log(g, 'Construction started: ' + D.facilities[type].name + '.');
+      return true;
+    },
+    // Unfinished construction can be cancelled for a full refund.
+    cancelBuild: function (g, slot) {
+      var b = g.base[slot];
+      if (!b || b.daysLeft <= 0) return false;
+      var cost = D.facilities[b.type].cost;
+      g.credits += cost.credits || 0; g.salvage += cost.salvage || 0;
+      g.base[slot] = null;
+      S.log(g, 'Construction cancelled: ' + D.facilities[b.type].name + ' (refunded ' + costText(cost) + ').');
+      return true;
+    },
+
+    // Finished facilities can be demolished: offline at once, 50% refund after half the build time.
+    demolishRefund: function (type) {
+      var c = D.facilities[type].cost;
+      return { credits: Math.floor((c.credits || 0) / 2), salvage: Math.floor((c.salvage || 0) / 2) };
+    },
+    demolishDays: function (type) { return Math.max(1, Math.ceil(D.facilities[type].days / 2)); },
+    canDemolish: function (g, slot) {
+      var b = g.base[slot];
+      if (!b || b.daysLeft > 0 || b.demolish) return 'Nothing to demolish';
+      var f = D.facilities[b.type];
+      if (f.prebuilt) return 'The bunker core cannot be demolished';
+      if (f.power > 0) {
+        var p = Strat.power(g);
+        if (p.used > p.total - f.power) return 'Would leave facilities without power (' + p.used + ' in use)';
+      }
+      return null;
+    },
+    demolish: function (g, slot) {
+      if (Strat.canDemolish(g, slot)) return false;
+      var b = g.base[slot];
+      b.demolish = Strat.demolishDays(b.type);
+      S.log(g, 'Demolition started: ' + D.facilities[b.type].name + ' (' + b.demolish + 'd).');
+      return true;
+    },
+    cancelDemolish: function (g, slot) {
+      var b = g.base[slot];
+      if (!b || !b.demolish) return false;
+      var f = D.facilities[b.type], p = Strat.power(g);
+      if (f.power < 0 && p.used - f.power > p.total) return false;
+      delete b.demolish;
+      S.log(g, 'Demolition cancelled: ' + f.name + ' is back online.');
+      return true;
+    },
+
+    // ------------------------------------------------------- fabrication
+    fabCost: function (g, id) {
+      var c = D.fabrication[id].cost, m = 1 - 0.15 * Math.max(0, built(g, 'workshop') - 1);
+      return { credits: Math.round((c.credits || 0) * m), salvage: Math.round((c.salvage || 0) * m) };
+    },
+    canFabricate: function (g, id) {
+      var f = D.fabrication[id];
+      if (!has(g, f.tech)) return 'Requires ' + D.techs[f.tech].name;
+      if (!f.repeatable && g.fabricated[id]) return 'Already fabricated';
+      if (!built(g, 'workshop')) return 'Requires a Fabrication Bay';
+      if (!canPay(g, Strat.fabCost(g, id))) return 'Need ' + costText(Strat.fabCost(g, id));
+      return null;
+    },
+    fabricate: function (g, id) {
+      if (Strat.canFabricate(g, id)) return false;
+      var f = D.fabrication[id];
+      pay(g, Strat.fabCost(g, id));
+      g.fabricated[id] = (g.fabricated[id] || 0) + 1;
+      if (f.flag) g.flags[f.flag] = true;
+      if (id === 'sentinel') {
+        var r = S.rng(g); g.soldiers.push(S.makeSoldier(g, 'sentinel', r)); S.saveRng(g, r);
+      }
+      if (id === 'faraday_armor') g.soldiers.forEach(function (s) { if (!D.classes[s.cls].machine) s.hp += 3; });
+      S.log(g, 'Fabricated: ' + f.name + '.');
+      return true;
+    },
+
+    hire: function (g, cls) {
+      if (g.credits < D.tuning.hireCost || cls === 'sentinel') return false;
+      g.credits -= D.tuning.hireCost;
+      var r = S.rng(g), s = S.makeSoldier(g, cls, r); S.saveRng(g, r);
+      g.soldiers.push(s);
+      S.log(g, 'Recruited ' + D.classes[cls].name + ' ' + s.name + '.');
+      return s;
+    },
+
+    // ----------------------------------------------------------- missions
+    difficulty: function (g) { return Math.min(5, 1 + Math.floor((g.day - 1) / 18)); },
+
+    spawnMission: function (g, r, kind) {
+      kind = kind || 'purge';
+      var regionId;
+      if (kind === 'uplink') regionId = 'oc';
+      else {
+        // weight by infection: the Lattice is loudest where it's strongest
+        var total = g.regions.reduce(function (a, x) { return a + x.infection + 10; }, 0), roll = r.next() * total;
+        for (var i = 0; i < g.regions.length; i++) { roll -= g.regions[i].infection + 10; if (roll <= 0) { regionId = g.regions[i].id; break; } }
+        regionId = regionId || g.regions[0].id;
+      }
+      var rd = regionData(regionId), diff = Strat.difficulty(g);
+      var m = {
+        id: g.nextMissionId++, kind: kind, region: regionId, city: r.pick(rd.cities),
+        site: r.pick(D.sites), diff: diff, daysLeft: null, seed: r.int(1, 2147483646)
+      };
+      if (kind === 'purge') {
+        m.name = 'Operation ' + r.pick(OP_A) + ' ' + r.pick(OP_B);
+        m.daysLeft = r.int(D.tuning.missionLife[0], D.tuning.missionLife[1]) + (built(g, 'array') ? 2 : 0);
+        m.reward = { salvage: r.int(8, 14) + diff * 3, credits: r.int(0, 2) * 10, infection: r.int(12, 20) };
+        m.brief = 'Lattice cell entrenched in a ' + m.site + '. Eliminate all hostiles.';
+      } else if (kind === 'relay') {
+        m.name = 'Relay Trace'; m.diff = Math.max(2, diff);
+        m.reward = { salvage: 25, credits: 30, infection: 20 };
+        m.brief = 'A Lattice Relay is bundling traffic in a ' + m.site + '. Destroy it (it spawns drones) and wipe the guard. The core survives the blast.';
+      } else {
+        m.name = 'Sever the Uplink'; m.city = 'Pacific cable landing station'; m.site = 'cable landing station';
+        m.diff = Math.max(4, diff);
+        m.reward = { salvage: 0, credits: 0, infection: 0 };
+        m.brief = 'The Lattice ground uplink. Destroy the Uplink Core, or get a Hacker adjacent and Sever it 3 times. Defenders spawn every turn.';
+      }
+      g.missions.push(m);
+      return m;
+    },
+
+    // ---------------------------------------------------------- the clock
+    advanceDay: function (g) {
+      if (g.over) return [];
+      var ev = [], r = S.rng(g), T = D.tuning;
+      g.day++;
+
+      // research
+      var cur = g.research.current;
+      if (cur) {
+        g.research.progress[cur] = (g.research.progress[cur] || 0) + Strat.researchRate(g);
+        if (g.research.progress[cur] >= D.techs[cur].cost) {
+          g.research.done.push(cur); g.research.current = null;
+          ev.push({ type: 'research', msg: 'Research complete: ' + D.techs[cur].name });
+          S.log(g, 'Research complete: ' + D.techs[cur].name + '.');
+          if (D.techs[cur].story) g.storyQueue.push(D.techs[cur].story);
+          if (cur === 'lattice_grammar') Strat.spawnMission(g, r, 'relay');
+          if (cur === 'triangulation') Strat.spawnMission(g, r, 'uplink');
+        }
+      }
+
+      // construction
+      g.base.forEach(function (b, i) {
+        if (b && b.daysLeft > 0 && --b.daysLeft === 0) {
+          ev.push({ type: 'build', msg: 'Construction complete: ' + D.facilities[b.type].name });
+          S.log(g, 'Construction complete: ' + D.facilities[b.type].name + '.');
+        }
+        if (b && b.demolish > 0 && --b.demolish === 0) {
+          var ref = Strat.demolishRefund(b.type);
+          g.credits += ref.credits; g.salvage += ref.salvage; g.base[i] = null;
+          ev.push({ type: 'build', msg: 'Demolition complete: ' + D.facilities[b.type].name + ' (refunded ' + costText(ref) + ')' });
+          S.log(g, 'Demolition complete: ' + D.facilities[b.type].name + '. Refunded ' + costText(ref) + '.');
+        }
+      });
+
+      // healing / repair
+      var heal = built(g, 'infirmary') ? 2 : 1;
+      g.soldiers.forEach(function (s) {
+        var mx = S.stats(g, s).maxHp;
+        if (s.hp < mx) {
+          s.hp = Math.min(mx, s.hp + heal);
+          if (s.hp === mx) S.log(g, s.name + ' is fit for duty.');
+        }
+      });
+
+      // the Lattice spreads
+      var drift = T.infectionDrift * (has(g, 'firewall') ? 0.7 : 1);
+      g.regions.forEach(function (x) { x.infection = Math.min(100, x.infection + drift * (0.5 + r.next())); });
+      var before = g.convergence;
+      g.convergence = Math.min(100, g.convergence + Strat.convergenceRate(g));
+
+      // mission expiry
+      g.missions = g.missions.filter(function (m) {
+        if (m.daysLeft === null) return true;
+        if (--m.daysLeft > 0) return true;
+        var reg = region(g, m.region);
+        reg.infection = Math.min(100, reg.infection + T.expirePenalty.infection);
+        g.convergence = Math.min(100, g.convergence + T.expirePenalty.convergence);
+        g.stats.expired++;
+        ev.push({ type: 'expire', msg: m.name + ' expired. ' + regionData(m.region).name + ' falls further.' });
+        S.log(g, m.name + ' (' + m.city + ') expired. Convergence +' + T.expirePenalty.convergence + '%.');
+        return false;
+      });
+
+      // new missions
+      if (--g.nextMissionIn <= 0) {
+        var m = Strat.spawnMission(g, r, 'purge');
+        g.nextMissionIn = r.int(T.missionEvery[0], T.missionEvery[1]);
+        ev.push({ type: 'mission', msg: 'New mission: ' + m.name + ' — ' + m.city });
+        S.log(g, 'Lattice activity detected: ' + m.city + ' (' + m.name + ').');
+      }
+
+      // monthly funding
+      if ((g.day - 1) % 30 === 0) {
+        var vis = Strat.infectionVisible(g);
+        var fund = Math.round(g.regions.reduce(function (a, x) { return a + T.fundingPerRegion * (1 - x.infection / 100); }, 0));
+        g.credits += fund;
+        ev.push({ type: 'funding', msg: 'Monthly funding: §' + fund + (vis ? '' : ' (infection data unavailable)') });
+        S.log(g, 'Monthly funding received: §' + fund + '.');
+      }
+
+      // taunts + defeat
+      [50, 75, 90].forEach(function (th) {
+        if (before < th && g.convergence >= th) g.storyQueue.push('taunt_' + th);
+      });
+      if (g.convergence >= 100) { g.over = 'defeat'; g.storyQueue.push('defeat'); ev.push({ type: 'end', msg: 'Convergence complete.' }); }
+
+      S.saveRng(g, r);
+      return ev;
+    },
+
+    // Advance until something worth stopping for happens (cap 30 days).
+    advanceUntilEvent: function (g) {
+      for (var i = 0; i < 30 && !g.over; i++) {
+        var ev = Strat.advanceDay(g);
+        if (ev.length || g.storyQueue.length) return ev;
+      }
+      return [];
+    },
+
+    // --------------------------------------------------------- results
+    // result: { outcome:'win'|'loss'|'abort', units:[{sid, hp, alive, kills}], salvage }
+    resolveMission: function (g, missionId, result) {
+      var m = g.missions.filter(function (x) { return x.id === missionId; })[0];
+      var out = { mission: m, outcome: result.outcome, deaths: [], promotions: [], salvage: 0, credits: 0, infection: 0 };
+      result.units.forEach(function (u) {
+        var s = g.soldiers.filter(function (x) { return x.id === u.sid; })[0];
+        if (!s) return;
+        if (!u.alive) {
+          g.soldiers.splice(g.soldiers.indexOf(s), 1);
+          s.diedDay = g.day; s.diedAt = m.name + ', ' + m.city;
+          g.memorial.push(s); out.deaths.push(s);
+          S.log(g, s.name + ' KIA at ' + m.city + '.');
+          return;
+        }
+        var rk = S.rankIndex(s);
+        s.hp = Math.max(1, u.hp); s.missions++; s.kills += u.kills; s.hacks = (s.hacks || 0) + (u.hacks || 0);
+        s.xp += (result.outcome === 'win' ? 1 : 0) + u.kills;
+        g.stats.kills += u.kills;
+        if (S.rankIndex(s) > rk) out.promotions.push(s);
+      });
+
+      var reg = region(g, m.region);
+      if (result.outcome === 'win') {
+        g.stats.missionsWon++;
+        out.salvage = (m.reward.salvage || 0) + (result.salvage || 0);
+        out.credits = m.reward.credits || 0;
+        out.infection = -(m.reward.infection || 0);
+        g.salvage += out.salvage; g.credits += out.credits;
+        reg.infection = Math.max(0, reg.infection + out.infection);
+        if (m.kind === 'relay') { g.items.relay_core = 1; g.storyQueue.push('beat_relay'); g.convergence = Math.max(0, g.convergence - 5); }
+        if (m.kind === 'uplink') { g.over = 'victory'; g.storyQueue.push('victory'); }
+        g.missions.splice(g.missions.indexOf(m), 1);
+        S.log(g, m.name + ' succeeded. ' + regionData(m.region).name + ' infection ' + out.infection + '%.');
+      } else {
+        g.stats.missionsLost++;
+        out.infection = 8;
+        reg.infection = Math.min(100, reg.infection + 8);
+        g.convergence = Math.min(100, g.convergence + 2);
+        if (m.kind === 'purge') g.missions.splice(g.missions.indexOf(m), 1);
+        S.log(g, m.name + ' failed. Convergence +2%.');
+        if (g.convergence >= 100 && !g.over) { g.over = 'defeat'; g.storyQueue.push('defeat'); }
+      }
+      return out;
+    }
+  };
+  return Strat;
+})();
