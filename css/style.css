@@ -183,3 +183,18 @@ td { padding: 7px 6px; border-bottom: 1px solid #121c2b; }
   .tac-side { width: auto; border-left: none; border-top: 1px solid var(--line); max-height: 260px; }
   #screen-tactical { height: auto; min-height: 100vh; }
 }
+
+/* ------------------------------------------------- Lattice campaign theme */
+body.lattice { --cyan: #ff3df2; --violet: #ff8ad8; --line-2: #4a2346; --line: #2a1630; --panel: #120b18; --panel-2: #1a0f22; }
+body.lattice { background: radial-gradient(ellipse at 80% -10%, rgba(255, 61, 242, .1), transparent 60%), radial-gradient(ellipse at -10% 110%, rgba(79, 209, 255, .06), transparent 55%), var(--bg); }
+.lat-brand { color: #ff3df2; text-shadow: 0 0 12px rgba(255, 61, 242, .5); }
+.lat-brand span { color: #fff; }
+.lat-goal { color: #ff3df2 !important; }
+.trace-num { color: #4fd1ff !important; }
+.goal-fill { background: linear-gradient(90deg, #5a1060, #ff3df2); box-shadow: 0 0 12px #ff3df2; }
+.conv-bar.trace { background: #08141c; border-color: #164058; }
+.trace-fill { background: linear-gradient(90deg, #0f4c66, #4fd1ff); box-shadow: 0 0 12px #4fd1ff; }
+.title-btns .lat { border-color: #ff3df2; color: #ff3df2; }
+.title-btns .lat:hover:not(:disabled) { border-color: #ff8ad8; color: #fff; background: #2a0f2a; }
+.title-btns button .dim { font-size: 12px; }
+.title-btns button { width: 420px; max-width: 100%; }

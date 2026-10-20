@@ -9,10 +9,12 @@ XG.TacUI = (function () {
   var DUR = { move: 85, shot: 260, dmg: 140, heal: 140, text: 110, death: 380, boom: 440, scan: 420, hack: 380, spawn: 280, pause: 1 };
   var THEME = { purge: '79,209,255', relay: '199,146,255', uplink: '255,42,85' };
 
-  function start(g, mission, squad, onDone) {
+  function start(g, mission, squad, onDone) { startWith(g, Tac.create(g, mission, squad), onDone); }
+  // Runs any prepared battle (FIREWALL or Lattice controlled). b.human says which side the person plays.
+  function startWith(g, b, onDone) {
     cv = $('tac-canvas'); ctx = cv.getContext('2d');
     st = {
-      g: g, b: Tac.create(g, mission, squad), onDone: onDone, sel: null, mode: null, aim: null, hover: null,
+      g: g, b: b, onDone: onDone, sel: null, mode: null, aim: null, hover: null,
       queue: [], cur: null, floaters: [], fx: [], displayPos: {}, displayHp: {}, dying: {}, hidden: {},
       reachCache: null, finished: false, lastLog: 0, dirty: true
     };
@@ -22,6 +24,7 @@ XG.TacUI = (function () {
     XG.UI.show('screen-tactical');
     bindOnce();
     resize();
+    if (b.side !== b.human) banner(lat() ? 'FIREWALL TURN' : 'LATTICE TURN', 'enemy');
     hud();
     requestAnimationFrame(frame);
   }
@@ -49,7 +52,9 @@ XG.TacUI = (function () {
     $('tac-overclock').onclick = overclock;
     $('tac-abort').onclick = function () {
       if (!canInput()) return;
-      XG.UI.modal('<h1>Abort mission?</h1><p>The squad extracts. The mission counts as a failure: regional infection rises and Convergence +2%.' +
+      XG.UI.modal(lat() ? '<h1>Withdraw?</h1><p>Your units pull back into the network. The mission counts as lost.</p>' +
+        '<div class="modal-actions"><button id="ab-no">Keep fighting</button><button class="danger" id="ab-yes">Withdraw</button></div>' :
+        '<h1>Abort mission?</h1><p>The squad extracts. The mission counts as a failure: regional infection rises and Convergence +2%.' +
         (st.b.mission.kind !== 'purge' ? ' Story missions stay available for another attempt.' : '') + '</p>' +
         '<div class="modal-actions"><button id="ab-no">Stay and fight</button><button class="danger" id="ab-yes">Abort</button></div>');
       $('ab-no').onclick = XG.UI.closeModal;
@@ -71,11 +76,14 @@ XG.TacUI = (function () {
   }
 
   // ----------------------------------------------------------- helpers
-  function selUnit() { var u = st.sel && Tac.unitById(st.b, st.sel); return u && u.alive && u.side === 'player' ? u : null; }
-  function squadUnits() { return st.b.units.filter(function (u) { return u.side === 'player' && (u.alive || u.sid); }); }
-  function firstReady() { var u = st.b.units.filter(function (x) { return x.alive && x.side === 'player' && x.ap > 0; })[0]; return u ? u.id : null; }
-  function canInput() { return st && !st.cur && !st.queue.length && st.b.side === 'player' && !st.b.outcome; }
-  function visibleUnit(u) { return u.side === 'player' || st.b.visible[u.y * W + u.x]; }
+  // HS(): the side the person controls ('player' = FIREWALL, 'enemy' = Lattice). lat(): playing the Lattice.
+  function HS() { return st.b.human; }
+  function lat() { return st.b.human === 'enemy'; }
+  function selUnit() { var u = st.sel && Tac.unitById(st.b, st.sel); return u && u.alive && u.side === HS() ? u : null; }
+  function squadUnits() { return st.b.units.filter(function (u) { return u.side === HS() && !u.isStatic && (u.alive || u.sid || u.deployed); }); }
+  function firstReady() { var u = st.b.units.filter(function (x) { return x.alive && x.side === HS() && x.ap > 0; })[0]; return u ? u.id : null; }
+  function canInput() { return st && !st.cur && !st.queue.length && st.b.side === st.b.human && !st.b.outcome; }
+  function visibleUnit(u) { return u.side === HS() || st.b.visible[u.y * W + u.x]; }
   function unitAtVisible(x, y) {
     var u = Tac.unitAt(st.b, x, y);
     return u && visibleUnit(u) && !st.hidden[u.id] ? u : null;
@@ -106,7 +114,7 @@ XG.TacUI = (function () {
         return;
       }
     }
-    if (at && at.side === 'player') { select(at.id); return; }
+    if (at && at.side === HS()) { select(at.id); return; }
     if (at && u && Tac.targets(b, u, 'shoot').indexOf(at) >= 0) { st.mode = 'shoot'; st.aim = at.id; hud(); return; }
     if (u && !at) {
       var r = getReach(u), d = r.d[t.y * W + t.x];
@@ -119,7 +127,7 @@ XG.TacUI = (function () {
   function select(id) { st.sel = id; st.mode = null; st.aim = null; hud(); hoverPanel(); }
   function cancel() { if (st.mode) { st.mode = null; st.aim = null; hud(); hoverPanel(); } }
   function cycle() {
-    var list = st.b.units.filter(function (u) { return u.alive && u.side === 'player' && u.ap > 0; });
+    var list = st.b.units.filter(function (u) { return u.alive && u.side === HS() && u.ap > 0; });
     if (!list.length) return;
     var i = list.map(function (u) { return u.id; }).indexOf(st.sel);
     select(list[(i + 1) % list.length].id);
@@ -188,8 +196,8 @@ XG.TacUI = (function () {
   function endTurn() {
     if (!canInput()) return;
     st.mode = null; st.aim = null;
-    banner('LATTICE TURN', 'enemy');
-    enqueue(Tac.endPlayerTurn(st.b));
+    banner(lat() ? 'FIREWALL TURN' : 'LATTICE TURN', 'enemy');
+    enqueue(Tac.endTurn(st.b));
     hud();
   }
 
@@ -209,11 +217,11 @@ XG.TacUI = (function () {
   function begin(e, now) {
     var dur = DUR[e.t] || 0, b = st.b, u = e.id && Tac.unitById(b, e.id);
     if (e.t === 'move') {
-      var shown = (u && u.side === 'player') || pathVisible(e.path);
+      var shown = (u && u.side === HS()) || pathVisible(e.path);
       dur = shown ? DUR.move * (e.path.length - 1) : 0;
     } else if (e.t === 'shot' || e.t === 'hack') {
       var from = Tac.unitById(b, e.from), to = Tac.unitById(b, e.to);
-      var seen = (from && from.side === 'player') || (to && to.side === 'player') || b.visible[e.fy * W + e.fx] || b.visible[e.ty * W + e.tx];
+      var seen = (from && from.side === HS()) || (to && to.side === HS()) || b.visible[e.fy * W + e.fx] || b.visible[e.ty * W + e.tx];
       if (!seen) dur = 0; else st.fx.push({ e: e, t0: now, dur: dur + 120 });
     } else if (e.t === 'dmg' || e.t === 'heal') {
       st.displayHp[e.id] = e.hpAfter;
@@ -243,15 +251,14 @@ XG.TacUI = (function () {
     st.displayPos = {}; st.displayHp = {};
     var b = st.b;
     if (b.outcome) { if (!st.finished) finishBattle(); return; }
-    if (b.side === 'enemy') {
-      var ev = Tac.enemyStep(b);
-      if (ev === null) {
+    if (b.side !== b.human) {
+      var ev = Tac.aiStep(b);
+      if (ev.some(function (x) { return x.t !== 'log'; })) ev.push({ t: 'pause', ms: 160 });
+      enqueue(ev);
+      if (b.side === b.human && !b.outcome) {
         banner('YOUR TURN', 'player');
         if (!selUnit() || selUnit().ap <= 0) st.sel = firstReady();
         hud();
-      } else {
-        if (ev.some(function (x) { return x.t !== 'log'; })) ev.push({ t: 'pause', ms: 160 });
-        enqueue(ev);
       }
       return;
     }
@@ -268,7 +275,10 @@ XG.TacUI = (function () {
     syncLog(); hud();
     var b = st.b, o = b.outcome;
     setTimeout(function () {
-      var head = o === 'win' ? '<h1 class="good">OBJECTIVE COMPLETE</h1>' : o === 'abort' ? '<h1 class="warn">EXTRACTION</h1>' : '<h1 class="bad">SQUAD LOST</h1>';
+      var head = lat()
+        ? (XG.Lat.latticeWon(b.mission.lkind, o) ? '<h1 class="good">' + (b.mission.lkind === 'breach' ? 'SYSTEM BREACHED' : b.mission.lkind === 'strike' ? 'SAFEHOUSE HARMONIZED' : b.mission.lkind === 'uplink' ? 'UPLINK HOLDS' : 'CELL HOLDS') + '</h1>'
+          : o === 'abort' ? '<h1 class="warn">WITHDRAWN</h1>' : '<h1 class="bad">FORCES LOST</h1>')
+        : o === 'win' ? '<h1 class="good">OBJECTIVE COMPLETE</h1>' : o === 'abort' ? '<h1 class="warn">EXTRACTION</h1>' : '<h1 class="bad">SQUAD LOST</h1>';
       XG.UI.modal(head + '<p>' + b.mission.name + ' · turn ' + b.turn + '</p><div class="modal-actions"><button class="primary" id="tac-done">Debrief ▸</button></div>');
       $('tac-done').onclick = function () { XG.UI.closeModal(); var cb = st.onDone, res = Tac.result(b); st = null; cb(res); };
     }, 650);
@@ -278,25 +288,29 @@ XG.TacUI = (function () {
   function banner(text, cls) {
     var el = $('tac-top').querySelector('.turn-banner');
     if (el) { el.textContent = text; el.className = 'turn-banner ' + cls; }
-    bannerEl = { text: text, cls: cls, t0: performance.now() };
+    var mine = cls === 'player';
+    bannerEl = { text: text, cls: cls, t0: performance.now(), color: lat() ? (mine ? '#ff3df2' : '#4fd1ff') : (mine ? '#4fd1ff' : '#ff2a55') };
   }
 
   // -------------------------------------------------------------- HUD
   function hud() {
     if (!st) return;
     var b = st.b, u = selUnit();
-    var obj = { purge: 'Eliminate all hostiles', relay: 'Destroy the Relay and all hostiles', uplink: 'Destroy the Uplink Core or Sever it (' + b.sever + '/3)' }[b.mission.kind];
-    var left = b.units.filter(function (x) { return x.alive && x.side === 'enemy' && visibleUnit(x); }).length;
+    var obj = lat()
+      ? { raid: 'Wipe the squad or hold until turn ' + b.turnLimit + ' ends', strike: 'Destroy the FIREWALL squad', breach: 'Purge the security software', uplink: 'Keep the Uplink Core alive' }[b.mission.lkind]
+      : { purge: 'Eliminate all hostiles', relay: 'Destroy the Relay and all hostiles', uplink: 'Destroy the Uplink Core or Sever it (' + b.sever + '/3)' }[b.mission.kind];
+    var left = b.units.filter(function (x) { return x.alive && x.side !== HS() && visibleUnit(x); }).length;
+    var mine = b.side === b.human;
     $('tac-top').innerHTML = '<b>' + b.mission.name + '</b><span class="dim">' + b.mission.city + '</span><span class="obj">◎ ' + obj + '</span>' +
-      '<span class="dim">Turn ' + b.turn + ' · ' + left + ' hostile(s) in sight</span>' +
-      '<span class="turn-banner ' + (b.side === 'player' ? 'player' : 'enemy') + '">' + (b.outcome ? b.outcome.toUpperCase() : b.side === 'player' ? 'YOUR TURN' : 'LATTICE TURN') + '</span>';
+      '<span class="dim">Turn ' + b.turn + (b.turnLimit ? '/' + b.turnLimit : '') + ' · ' + left + ' hostile(s) in sight</span>' +
+      '<span class="turn-banner ' + (mine ? 'player' : 'enemy') + '">' + (b.outcome ? 'BATTLE OVER' : mine ? 'YOUR TURN' : lat() ? 'FIREWALL TURN' : 'LATTICE TURN') + '</span>';
 
     $('tac-squad').innerHTML = squadUnits().map(function (x) {
       var pips = '';
       for (var i = 0; i < x.maxHp; i++) pips += '<i class="' + (i < x.hp ? '' : 'e') + '"></i>';
       for (var j = 0; j < x.shield; j++) pips += '<i class="s"></i>';
       var cls = !x.alive ? 'dead' : x.ap <= 0 ? 'spent' : '';
-      var tag = !x.alive ? 'KIA' : x.override ? '<span class="good">OVERRIDE ' + x.override + '</span>' : (x.overwatch ? 'OW · ' : '') + (x.hunker ? 'HNK · ' : '') + x.ap + ' AP';
+      var tag = !x.alive ? (lat() ? 'LOST' : 'KIA') : x.override ? '<span class="good">OVERRIDE ' + x.override + '</span>' : (x.overwatch ? 'OW · ' : '') + (x.hunker ? 'HNK · ' : '') + x.ap + ' AP';
       return '<div class="sq ' + cls + (x.id === st.sel ? ' on' : '') + '" data-unit="' + x.id + '"><div class="n"><span style="color:' + x.color + '">' + x.glyph + '</span> ' + (x.short || x.name) + '</div>' +
         '<div class="dim">' + tag + '</div><div class="pips">' + pips + '</div></div>';
     }).join('');
@@ -316,7 +330,7 @@ XG.TacUI = (function () {
     $('tac-abilities').querySelectorAll('[data-ab]').forEach(function (el) { el.onclick = function () { pickAbility(el.getAttribute('data-ab')); }; });
 
     var oc = $('tac-overclock');
-    oc.classList.toggle('hidden', !(b.overclock > 0 || XG.Strat.has(st.g, 'halcyon')));
+    oc.classList.toggle('hidden', lat() || !(b.overclock > 0 || XG.Strat.has(st.g, 'halcyon')));
     oc.textContent = 'Overclock (' + b.overclock + ')';
     oc.disabled = !canInput() || !u || !u.sid || b.overclock <= 0 || u.overclocked;
     $('tac-endturn').disabled = !canInput();
@@ -331,13 +345,13 @@ XG.TacUI = (function () {
     return 'Click a tile, or hover one and press ' + k + ' (range ' + A.range + '). Esc cancels.';
   }
   function infoPanel(u) {
-    if (!u) { $('tac-info').innerHTML = '<span class="dim">' + (st.b.side === 'enemy' ? 'The Lattice is moving…' : 'No operative selected.') + '</span>'; return; }
+    if (!u) { $('tac-info').innerHTML = '<span class="dim">' + (st.b.side !== st.b.human ? (lat() ? 'FIREWALL is moving…' : 'The Lattice is moving…') : 'No unit selected.') + '</span>'; return; }
     var st2 = [];
     if (u.overwatch) st2.push('Overwatch'); if (u.hunker) st2.push('Hunkered'); if (u.shield) st2.push('Aegis ' + u.shield);
     if (u.override) st2.push('<span class="good">Override: ' + u.override + ' turn(s) left</span>');
     var cds = Object.keys(u.cooldowns).filter(function (k) { return u.cooldowns[k] > 0; }).map(function (k) { return D.abilities[k] ? D.abilities[k].name + ' ' + u.cooldowns[k] : ''; });
-    $('tac-info').innerHTML = '<h3 style="color:' + u.color + '">' + (u.name) + '</h3>' +
-      '<div class="dim">' + (u.rank ? u.rank + ' ' : '') + (D.classes[u.kind] ? D.classes[u.kind].name : D.enemies[u.kind].name + ' (hijacked)') + '</div>' +
+    $('tac-info').innerHTML = '<h3 style="color:' + u.color + '">' + (u.deployed ? u.short : u.name) + '</h3>' +
+      ((D.classes[u.kind] || u.origSide || u.short) ? '<div class="dim">' + (u.rank ? u.rank + ' ' : '') + (D.classes[u.kind] ? D.classes[u.kind].name : D.enemies[u.kind].name + (u.origSide ? ' (hijacked)' : '')) + '</div>' : '') +
       '<div>HP ' + u.hp + '/' + u.maxHp + (u.armor ? ' · armor ' + u.armor : '') + ' · AP ' + u.ap + '</div>' +
       '<div>Aim ' + u.aim + ' · move ' + u.mobility + ' · dmg ' + u.dmg[0] + '–' + u.dmg[1] + (u.hackSkill ? ' · hack ' + u.hackSkill : '') + '</div>' +
       (u.abilities.indexOf('grenade') >= 0 || u.abilities.indexOf('medkit') >= 0 ? '<div class="dim">' + (u.abilities.indexOf('grenade') >= 0 ? 'Grenades ' + u.charges.grenade + ' ' : '') + (u.abilities.indexOf('medkit') >= 0 ? 'Medkits ' + u.charges.medkit : '') + '</div>' : '') +
@@ -351,12 +365,12 @@ XG.TacUI = (function () {
     var focus = st.aim ? Tac.unitById(b, st.aim) : h ? unitAtVisible(h.x, h.y) : null;
     if (focus && focus.alive) {
       html = '<b style="color:' + focus.color + '">' + focus.name + '</b><div>HP ' + focus.hp + '/' + focus.maxHp + (focus.armor ? ' · armor ' + focus.armor : '') + (focus.shield ? ' · shield ' + focus.shield : '') + '</div>';
-      if (focus.side === 'enemy') {
-        var E = D.enemies[focus.kind];
-        html += '<div class="dim">' + E.blurb + '</div>';
+      if (focus.side !== b.human) {
+        var E = D.enemies[focus.kind] || D.classes[focus.kind] || D.software[focus.kind];
+        html += (focus.rank ? '<div class="dim">' + focus.rank + ' ' + E.name + '</div>' : '') + '<div class="dim">' + E.blurb + '</div>';
         if (focus.stunned) html += '<div class="good">Stunned (' + focus.stunned + ')</div>';
         if (focus.marked) html += '<div class="good">Marked by scan (+15 aim)</div>';
-        if (!focus.alerted) html += '<div class="dim">Unaware of the squad.</div>';
+        if (focus.side === 'enemy' && !focus.alerted) html += '<div class="dim">Unaware of the squad.</div>';
         if (u) {
           var hi = Tac.hitInfo(b, u, focus);
           html += hi.ok ? '<div>' + (u.short || u.name) + ': <b>' + hi.chance + '%</b> to hit · ' + hi.crit + '% crit · ' + coverLabel(hi.cover) + ' · ' + hi.d.toFixed(1) + ' tiles</div>'
@@ -477,7 +491,7 @@ XG.TacUI = (function () {
       if (!x.alive && !st.dying[x.id] && !(st.cur && st.cur.e.t === 'death' && st.cur.e.id === x.id)) return;
       var pos = unitPos(x, now);
       var moving = st.cur && st.cur.e.t === 'move' && st.cur.e.id === x.id;
-      var seen = x.side === 'player' || b.visible[Math.round(pos[1]) * W + Math.round(pos[0])] || (moving && pathVisible(st.cur.e.path));
+      var seen = x.side === HS() || b.visible[Math.round(pos[1]) * W + Math.round(pos[0])] || (moving && pathVisible(st.cur.e.path));
       if (!seen) return;
       var alpha = 1;
       if (st.cur && st.cur.e.t === 'death' && st.cur.e.id === x.id) alpha = 1 - (now - st.cur.t0) / (st.cur.end - st.cur.t0);
@@ -500,7 +514,7 @@ XG.TacUI = (function () {
     if (bannerEl && now - bannerEl.t0 < 1100) {
       var a = 1 - (now - bannerEl.t0) / 1100;
       ctx.globalAlpha = a * .9; ctx.fillStyle = 'rgba(4,8,14,.75)'; ctx.fillRect(0, H * TS / 2 - 34, W * TS, 68);
-      ctx.fillStyle = bannerEl.cls === 'enemy' ? '#ff2a55' : '#4fd1ff'; ctx.font = 'bold 34px Rajdhani, sans-serif';
+      ctx.fillStyle = bannerEl.color; ctx.font = 'bold 34px Rajdhani, sans-serif';
       ctx.fillText(bannerEl.text, W * TS / 2, H * TS / 2 + 12); ctx.globalAlpha = 1;
     }
   }
@@ -513,7 +527,7 @@ XG.TacUI = (function () {
     var ox = u.x, oy = u.y, list = [];
     u.x = x; u.y = y;
     b.units.forEach(function (e) {
-      if (!e.alive || e.side === 'player' || st.hidden[e.id] || !b.visible[e.y * W + e.x]) return;
+      if (!e.alive || e.side === HS() || st.hidden[e.id] || !b.visible[e.y * W + e.x]) return;
       list.push({ e: e, hi: Tac.hitInfo(b, u, e) });
     });
     u.x = ox; u.y = oy;
@@ -620,7 +634,7 @@ XG.TacUI = (function () {
     if (x.stunned) { ctx.fillStyle = '#7dff9b'; ctx.fillText('zz', c[0] + 14, c[1] - 10); }
     if (x.override) { ctx.fillStyle = '#7dff9b'; ctx.fillText('⟲' + x.override, c[0] + 14, c[1] - 10); }
     if (x.side === 'enemy' && !x.alerted && !x.isStatic) { ctx.fillStyle = '#7d8ea5'; ctx.fillText('?', c[0] + 14, c[1] - 10); }
-    if (x.side === 'player' && x.ap <= 0 && x.alive && st.b.side === 'player') { ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.arc(c[0], c[1], 13, 0, 7); ctx.fill(); }
+    if (x.side === HS() && x.ap <= 0 && x.alive && st.b.side === HS() && !x.isStatic) { ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.arc(c[0], c[1], 13, 0, 7); ctx.fill(); }
     ctx.globalAlpha = 1;
   }
 
@@ -652,5 +666,5 @@ XG.TacUI = (function () {
     }
   }
 
-  return { start: start, debug: function () { return st; } };
+  return { start: start, startWith: startWith, debug: function () { return st; } };
 })();

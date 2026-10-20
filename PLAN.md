@@ -131,7 +131,44 @@ Each sprint ends with something playable. **Sprints 0–4 = the MVP.**
 
 ---
 
-## 7. Tech notes
+## 7. Versus track: play the Lattice
+End goal: **FIREWALL vs. LATTICE**, two people (hotseat, then online) fighting over one shared world.
+Step one is making the alien side a full single-player campaign against an AI FIREWALL, so both halves
+exist and can be balanced before they meet.
+
+### The Lattice campaign (mirror of FIREWALL)
+| FIREWALL | LATTICE |
+|---|---|
+| Credits (monthly funding, less with infection) | **Compute**: daily income, grows with infection |
+| Salvage (from dead machines) | **Substrate**: from dead humans and struck safehouses |
+| Convergence = the doom clock | Convergence = **your goal** (100% = the Array sings, you win) |
+| Research | **Protocols** tech tree (10 nodes: swarm upgrades, Wardens, Harmonics, stealth, detonation, shields, Overture) |
+| Bunker, 12 slots, power | **The Array**: 12 orbital slots. Nexus, Foundry (unit cap), Compute Core, Harmonic Choir, Signal Mask, Seed Spire |
+| Named soldiers, ranks, wounds | **Compiled forces**: drones, Wardens, Harmonics bought with compute; capped by bandwidth; losses are permanent, survivors come back repaired |
+| Missions appear and expire | **Breaches** (phase one: you attack Earth's security software), **Raids** (FIREWALL purges one of your cells; you defend), **Strikes** (you hit a FIREWALL safehouse), **Seed** (spend compute to push a region's infection) |
+| Uplink found = final assault | **Trace** = FIREWALL's hunt for your uplink. It rises every day; at 100% they assault the Uplink and you must hold it, or lose |
+
+**Two phases.** The invasion starts as a signal and a system infiltration, so Earth's first defenders are its
+own **security software**: Perimeter Firewalls, Antivirus Daemons, Intrusion Sentinels. Every breach raises
+**Detection**. At 20% (or day 21) the natives notice and form the human FIREWALL cell (named after the software
+you've been eating); from then on Detection is their **Trace**, and soldiers raid your cells.
+
+The AI FIREWALL gets stronger on its own: ranks rise with time, then coil weapons, Faraday armor and a fifth squad member arrive. Winning strikes knocks it back.
+
+### Versus sprints
+- **✅ V1: Side-agnostic tactics.** The battle engine takes `b.human` (which side the person controls); the AI can run either side. Lattice units get real abilities (Overwatch, Hunker, **Data Spike**, **Detonate**).
+- **✅ V2: Lattice strategy layer.** `js/lattice.js` rules (compute, protocols, Array, forces, Trace, raids, strikes, seeding, Uplink defense); data in `DATA.lattice`.
+- **✅ V2b: Infiltration phase.** Security-software defenders and Breach ops before FIREWALL exists; phase change story beat.
+- **✅ V3: Lattice UI and story.** Its own screens and magenta theme, a squad picker for compiled units, an alien-voice story with both endings, a separate save so both campaigns can run side by side.
+- **✅ V4: Tests and balance.** Smoke test auto-plays Lattice campaigns; browser scripts cover the new screens and a Lattice-controlled battle.
+- **V5: Smarter AI FIREWALL.** Uses grenades, medkits, hacks and overwatch; only targets what it can see (V1 lets it know where your units are, "satellite intel").
+- **V6: Hotseat versus.** One shared world state; FIREWALL and Lattice take strategy turns in alternating days on one machine; battles are person vs. person with a pass-the-device screen between turns.
+- **V7: Online versus.** Sync the shared state through a small server or a shared-state artifact; async strategy turns, live battles.
+- **V8: Asymmetric balance.** Tune both campaigns so each side wins about half the time between equal players; ranked tuning presets.
+
+---
+
+## 8. Tech notes
 - **Stack:** vanilla JS (classic `<script>` tags so it works from `file://`), Canvas 2D for tactical, DOM for strategy. No dependencies.
 - **Layout:** `js/data.js` content · `js/state.js` RNG/state/save · `js/strategy.js` campaign rules ·
   `js/tactical.js` pure battle engine (no DOM, testable in Node) · `js/tactical-ui.js` canvas and input ·

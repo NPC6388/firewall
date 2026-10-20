@@ -11,14 +11,16 @@ var XG = globalThis.XG = globalThis.XG || {};
     UI.playStory(function () { UI.render(); });
   }
   function commit(toast) {
-    S.save(UI.g); UI.render();
+    UI.save(UI.g); UI.render();
     if (toast && toast.length) UI.toast(toast);
     UI.playStory(function () { UI.render(); });
   }
   function titleScreen() {
     UI.g = null;
-    var saved = S.load();
+    document.body.classList.remove('lattice');
+    var saved = S.load(), lsaved = XG.Lat.load();
     document.getElementById('btn-continue').classList.toggle('hidden', !saved || !!saved.over);
+    document.getElementById('btn-l-continue').classList.toggle('hidden', !lsaved || !!lsaved.over);
     UI.show('screen-title');
   }
 
@@ -31,7 +33,7 @@ var XG = globalThis.XG = globalThis.XG || {};
       } else go();
     },
     'continue': function () { var g = S.load(); if (g) enterStrategy(g); },
-    'to-title': function () { if (UI.g && !UI.g.over) S.save(UI.g); UI.closeModal(); titleScreen(); },
+    'to-title': function () { if (UI.g && !UI.g.over) UI.save(UI.g); UI.closeModal(); titleScreen(); },
     'close': function () { UI.closeModal(); },
     'tab': function (arg) { UI.tab = arg; UI.slot = null; UI.render(); },
     'advance': function () {
@@ -58,7 +60,7 @@ var XG = globalThis.XG = globalThis.XG || {};
     'replay': function (key) { UI.storyModal(key, UI.closeModal); },
     'abandon': function () {
       UI.modal('<h1>Abandon campaign?</h1><p>The save is deleted. HALCYON will remember, even if you don\'t.</p><div class="modal-actions"><button data-action="close">Cancel</button><button class="danger" id="ab-yes">Abandon</button></div>');
-      document.getElementById('ab-yes').onclick = function () { S.clear(); UI.closeModal(); titleScreen(); };
+      document.getElementById('ab-yes').onclick = function () { if (UI.g.faction === 'lattice') XG.Lat.clear(); else S.clear(); UI.closeModal(); titleScreen(); };
     },
     'deploy': function (id) {
       var g = UI.g, m = g.missions.filter(function (x) { return x.id === +id; })[0];
@@ -75,6 +77,10 @@ var XG = globalThis.XG = globalThis.XG || {};
       });
     }
   };
+
+  // Lattice campaign actions live with its screens.
+  var latActions = XG.LUI.actions({ commit: commit, enterStrategy: enterStrategy, titleScreen: titleScreen });
+  Object.keys(latActions).forEach(function (k) { actions[k] = latActions[k]; });
 
   document.addEventListener('click', function (e) {
     var el = e.target.closest('[data-action]');

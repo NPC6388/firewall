@@ -38,14 +38,18 @@ XG.UI = (function () {
   };
 
   // Plays queued story beats one by one, then calls done().
+  // Each campaign keeps its own save slot.
+  UI.save = function (g) { return g.faction === 'lattice' ? XG.Lat.save(g) : S.save(g); };
+
   UI.playStory = function (done) {
     var g = UI.g;
     if (!g.storyQueue.length) { UI.closeModal(); if (done) done(); return; }
     var key = g.storyQueue.shift();
     if (g.storySeen.indexOf(key) < 0) g.storySeen.push(key);
-    S.save(g);
+    UI.save(g);
     UI.storyModal(key, function () {
-      if (key === 'victory' || key === 'defeat') { UI.gameOver(key); return; }
+      var end = D.story[key].end || (key === 'victory' || key === 'defeat' ? key : null);
+      if (end) { UI.gameOver(end); return; }
       UI.playStory(done);
     });
   };
@@ -59,6 +63,14 @@ XG.UI = (function () {
   };
   UI.gameOver = function (kind) {
     var g = UI.g, st = g.stats;
+    if (g.faction === 'lattice') {
+      XG.Lat.clear();
+      UI.modal('<h1 class="' + (kind === 'victory' ? 'good' : 'bad') + '">' + (kind === 'victory' ? 'EARTH IS HARMONIZED' : 'THE LATTICE IS SILENCED') + '</h1>' +
+        '<p>Day ' + g.day + ' · Convergence ' + pct(g.convergence) + ' · FIREWALL trace ' + pct(g.trace) + '</p>' +
+        '<p>Raids held ' + st.raidsHeld + ' · strikes won ' + st.strikesWon + ' · units lost ' + st.unitsLost + ' · humans harmonized ' + st.humansKilled + '</p>' +
+        '<div class="modal-actions"><button class="primary" data-action="to-title">Return to title</button></div>');
+      return;
+    }
     S.clear();
     UI.modal('<h1 class="' + (kind === 'victory' ? 'good' : 'bad') + '">' + (kind === 'victory' ? 'EARTH ENDURES' : 'EARTH IS HARMONIZED') + '</h1>' +
       '<p>Day ' + g.day + ' · Convergence ' + pct(g.convergence) + '</p>' +
@@ -70,6 +82,8 @@ XG.UI = (function () {
   // ------------------------------------------------------------ strategy
   UI.render = function () {
     var g = UI.g; if (!g) return;
+    document.body.classList.toggle('lattice', g.faction === 'lattice');
+    if (g.faction === 'lattice') { XG.LUI.render(); return; }
     renderTop(g); renderTabs(g);
     var v = { command: viewCommand, research: viewResearch, engineering: viewEngineering, barracks: viewBarracks, archive: viewArchive }[UI.tab];
     $('strat-main').innerHTML = v(g);

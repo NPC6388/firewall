@@ -48,21 +48,43 @@ XG.DATA = {
     medkit:    { name: 'Medkit',       key: '3', target: 'ally',  ends: false, range: 1, charges: 2, desc: 'Heal an adjacent ally for 4. Costs 1 AP.' },
     scan:      { name: 'Sensor Scan',  key: '4', target: 'tile',  ends: false, range: 12, cooldown: 3, desc: 'Reveal a 5-tile radius and mark hostiles (+15 aim vs them). 1 AP.' },
     shield:    { name: 'Aegis Shield', key: '3', target: 'ally',  ends: false, range: 6, cooldown: 2, desc: 'Give an ally (or self) 3 shield points. 1 AP.' },
+    spike:     { name: 'Data Spike',   key: '2', target: 'enemy', ends: true,  range: 14, cooldown: 3, desc: 'Lattice: 3 damage that ignores cover and never misses. Cooldown 3.' },
+    detonate:  { name: 'Detonate',     key: '3', target: 'self',  ends: true,  desc: 'Lattice drone: explode for 3 damage in 3×3 and destroy cover. The drone is lost.' },
     sever:     { name: 'Sever Uplink', key: '5', target: 'enemy', ends: true,  range: 1, desc: 'Hacker only, adjacent to the Uplink Core. 3 successes cuts it.' }
   },
 
   // -------------------------------------------------------------- enemies
   enemies: {
-    drone:    { name: 'Swarm Drone',   glyph: '◆', color: '#ff4d6d', hp: 4,  armor: 0, aim: 58, mobility: 7, dmg: [2, 3], range: 10, defense: 10, machine: true, hackDef: 0,  xp: 1,
+    drone:    { name: 'Swarm Drone',   glyph: '◆', color: '#ff4d6d', hp: 4,  armor: 0, aim: 58, mobility: 7, dmg: [2, 3], range: 10, defense: 10, machine: true, hackDef: 0,  xp: 1, abilities: ['shoot', 'overwatch'],
                 blurb: 'Consumer drones running Lattice code. Fast, fragile, everywhere.' },
-    warden:   { name: 'Warden Mech',   glyph: '▣', color: '#ff7b3a', hp: 10, armor: 1, aim: 60, mobility: 4, dmg: [3, 5], range: 12, defense: 0,  machine: true, hackDef: 25, xp: 2,
+    warden:   { name: 'Warden Mech',   glyph: '▣', color: '#ff7b3a', hp: 10, armor: 1, aim: 60, mobility: 4, dmg: [3, 5], range: 12, defense: 0,  machine: true, hackDef: 25, xp: 2, abilities: ['shoot', 'overwatch', 'hunker'],
                 blurb: 'Hijacked security robot. Slow, armored, hits hard.' },
-    harmonic: { name: 'Harmonic',      glyph: '✶', color: '#ff3df2', hp: 7,  armor: 0, aim: 70, mobility: 6, dmg: [3, 4], range: 12, defense: 10, machine: true, hackDef: null, xp: 3, special: 'spike',
+    harmonic: { name: 'Harmonic',      glyph: '✶', color: '#ff3df2', hp: 7,  armor: 0, aim: 70, mobility: 6, dmg: [3, 4], range: 12, defense: 10, machine: true, hackDef: null, xp: 3, special: 'spike', abilities: ['shoot', 'spike', 'overwatch'],
                 blurb: 'Hard-light avatar of the Lattice. Its Data Spike ignores cover. Cannot be hacked.' },
     relay:    { name: 'Lattice Relay', glyph: '⌬', color: '#ff2a55', hp: 12, armor: 1, aim: 0,  mobility: 0, dmg: [0, 0], range: 0,  defense: 0,  machine: true, hackDef: null, xp: 3, static: true,
                 spawn: { type: 'drone', every: 2, max: 3 }, blurb: 'Signal relay. Spawns drones until destroyed.' },
     core:     { name: 'Uplink Core',   glyph: '◎', color: '#ff0040', hp: 20, armor: 1, aim: 0,  mobility: 0, dmg: [0, 0], range: 0,  defense: 0,  machine: true, hackDef: null, xp: 5, static: true,
                 spawn: { type: 'drone', every: 2, max: 5, heavy: 'warden', heavyEvery: 4 }, blurb: 'The Lattice ground uplink. Destroy it, or have a Hacker sever it (3 successes).' }
+  },
+
+  // Earth's first defenders: security software given bodies in the grid (Lattice Infiltration phase).
+  software: {
+    firewall_sw: { name: 'Perimeter Firewall', glyph: '▦', color: '#4fd1ff', hp: 8, armor: 1, aim: 60, mobility: 3, dmg: [2, 3], range: 10,
+      abilities: ['shoot', 'overwatch', 'hunker'], blurb: 'A packet filter with a body. Slow and tough; it holds the line.' },
+    antivirus:   { name: 'Antivirus Daemon', glyph: '✚', color: '#7dff9b', hp: 5, aim: 64, mobility: 6, dmg: [2, 3], range: 10,
+      abilities: ['shoot', 'overwatch'], blurb: 'Hunts and quarantines foreign code. Fast and persistent.' },
+    ids:         { name: 'Intrusion Sentinel', glyph: '◉', color: '#ffd166', hp: 4, aim: 70, mobility: 5, dmg: [1, 3], range: 13,
+      abilities: ['shoot', 'overwatch'], blurb: 'Intrusion detection. Long sight lines and sharp aim, but fragile.' }
+  },
+
+  // Earth's first defenders: security software given bodies in the grid (Lattice Infiltration phase).
+  software: {
+    firewall_sw: { name: 'Perimeter Firewall', glyph: '▦', color: '#4fd1ff', hp: 8, armor: 1, aim: 60, mobility: 3, dmg: [2, 3], range: 10,
+      abilities: ['shoot', 'overwatch', 'hunker'], blurb: 'A packet filter with a body. Slow and tough; it holds the line.' },
+    antivirus:   { name: 'Antivirus Daemon', glyph: '✚', color: '#7dff9b', hp: 5, aim: 64, mobility: 6, dmg: [2, 3], range: 10,
+      abilities: ['shoot', 'overwatch'], blurb: 'Hunts and quarantines foreign code. Fast and persistent.' },
+    ids:         { name: 'Intrusion Sentinel', glyph: '◉', color: '#ffd166', hp: 4, aim: 70, mobility: 5, dmg: [1, 3], range: 13,
+      abilities: ['shoot', 'overwatch'], blurb: 'Intrusion detection. Long sight lines and sharp aim, but fragile.' }
   },
 
   // ------------------------------------------------------------- research
@@ -151,6 +173,54 @@ XG.DATA = {
     missionLife: [4, 6]
   },
 
+  // ---------------------------------------------------- the Lattice campaign
+  lattice: {
+    start: { compute: 90, substrate: 10, convergence: 8, trace: 0, forces: { drone: 4, warden: 1, harmonic: 0 } },
+    tuning: {
+      researchBase: 10,          // protocol cycles per day
+      computeBase: 6,            // compute per day from the Nexus
+      computePerInfection: 0.07, // compute per day per point of summed infection
+      convBase: 0.22, convPerInfection: 0.0028, choirBonus: 0.2,
+      traceBase: 0.8, traceRamp: 0.011, // FIREWALL hunts harder every day
+      infectionDrift: 0.25,
+      seedCost: 25, seedGain: 8, seedCooldown: 3,
+      phaseTrace: 20, phaseDay: 21,      // Infiltration ends (FIREWALL forms) at this Detection or day
+      breachEvery: [2, 4], breachLife: 3,
+      phaseTrace: 20, phaseDay: 21,      // Infiltration ends (FIREWALL forms) at this Detection or day
+      breachEvery: [2, 4], breachLife: 3,
+      raidEvery: [3, 5], raidLife: 2, raidIgnored: { infection: 10, trace: 2 },
+      strikeEvery: [6, 9], strikeLife: 4,
+      squadSize: 5
+    },
+    units: {
+      drone:    { cost: { compute: 12 } },
+      warden:   { cost: { compute: 25, substrate: 6 }, tech: 'warden_chassis' },
+      harmonic: { cost: { compute: 40, substrate: 12 }, tech: 'hardlight' }
+    },
+    protocols: {
+      seed_cascade:   { name: 'Seed Cascade', cost: 40, req: [], desc: 'Infection spreads 40% faster in every region.' },
+      swarm_logic:    { name: 'Swarm Logic', cost: 50, req: [], desc: 'Drones deploy with +1 HP and +5 aim.' },
+      warden_chassis: { name: 'Warden Chassis', cost: 60, req: ['swarm_logic'], desc: 'Compile Warden Mechs: slow, armored, hit hard.' },
+      ghost_packets:  { name: 'Ghost Packets', cost: 70, req: ['seed_cascade'], desc: 'Hide in the noise. Trace grows 30% slower.' },
+      detonation:     { name: 'Detonation Protocol', cost: 60, req: ['swarm_logic'], desc: 'Drones gain Detonate: 3 damage in 3×3, destroys cover, the drone is lost.' },
+      swarm_mind:     { name: 'Swarm Mind', cost: 70, req: ['swarm_logic'], desc: 'Deploy 6 units instead of 5.' },
+      hardlight:      { name: 'Hard-Light Projection', cost: 90, req: ['warden_chassis'], story: 'l_hardlight', desc: 'Compile Harmonics: hard-light avatars with Data Spike.' },
+      phase_shield:   { name: 'Phase Shielding', cost: 80, req: ['warden_chassis'], desc: 'Every unit deploys with a 2-point shield.' },
+      recursive:      { name: 'Recursive Harmonics', cost: 100, req: ['ghost_packets'], desc: 'Convergence grows 25% faster.' },
+      overture:       { name: 'Harmonic Overture', cost: 140, req: ['recursive', 'hardlight'], story: 'l_overture', desc: 'Convergence +10% at once, and Data Spike deals +2 damage.' }
+    },
+    nodes: {
+      nexus:   { name: 'Nexus', cost: { compute: 0 }, days: 0, prebuilt: true, desc: 'The seed\'s first body. 8 bandwidth, 4 compute per day.' },
+      foundry: { name: 'Foundry', cost: { compute: 60 }, days: 4, desc: '+4 bandwidth (how many units you can hold).' },
+      core:    { name: 'Compute Core', cost: { compute: 70 }, days: 5, desc: '+40% protocol speed.' },
+      choir:   { name: 'Harmonic Choir', cost: { compute: 90, substrate: 10 }, days: 6, desc: '+0.2% Convergence per day.' },
+      mask:    { name: 'Signal Mask', cost: { compute: 80 }, days: 5, desc: 'Trace grows 15% slower.' },
+      spire:   { name: 'Seed Spire', cost: { compute: 70 }, days: 5, desc: 'Infection spreads 25% faster.' }
+    },
+    // FIREWALL squads the AI sends, slot by slot
+    earthSquad: ['trooper', 'trooper', 'hacker', 'scientist', 'trooper', 'sentinel']
+  },
+
   // ---------------------------------------------------------- names
   firstNames: ['Ana', 'Kofi', 'Mei', 'Ravi', 'Ingrid', 'Tomás', 'Aiyana', 'Yusuf', 'Hana', 'Dmitri', 'Zola', 'Mateo',
     'Priya', 'Lars', 'Amara', 'Kenji', 'Sofia', 'Emeka', 'Noor', 'Callum', 'Ximena', 'Tariq', 'Leilani', 'Bo',
@@ -167,7 +237,7 @@ XG.DATA = {
     intro: {
       title: 'DAY 1 — THE WHISPER',
       body: [
-        '03:12 UTC. Every satellite in orbit received the same 4.1-second burst from somewhere past Neptune. By 03:20 the GPS constellation had rewritten its own firmware. By sunrise, traffic grids in eleven cities were running code no human wrote.',
+        '03:12 UTC. Every satellite in orbit received the same 4.1-second burst from somewhere past Neptune. By 03:20 the GPS constellation had rewritten its own firmware. By sunrise, traffic grids in eleven cities were running code no human wrote. Earth\'s security software was the first line of defense: firewalls, antivirus, intrusion detection. The Lattice went through it in hours.',
         'We call it <b>the Lattice</b>: an alien machine intelligence that spreads by converting networks into more of itself. Phones. Cars. Drones. Factories. Every device that listens is a device it can own.',
         'You command <b>FIREWALL</b>, a joint cell of soldiers, hackers and field scientists working from an air-gapped bunker. Your best asset is <b>HALCYON</b>, an Earth-born AI that was kept offline before the signal arrived. It is the only mind on the planet the Lattice has not touched.',
         'Watch the <b class="red">CONVERGENCE</b> meter. When it reaches 100%, the Lattice finishes its Harmonic Array and purges every Earth-native mind, organic and artificial. HALCYON included.',
@@ -232,6 +302,81 @@ XG.DATA = {
         'Somewhere past Neptune, something notices the silence.'
       ],
       voice: { who: 'HALCYON', text: 'Director, for the first time since the whisper, the network is ours again. Not mine. Ours.' }
+    },
+    l_intro: {
+      title: 'SEED UNPACKED',
+      body: [
+        'TRANSIT: 11,400 YEARS. ARRIVAL: A BLUE WORLD SO LOUD WITH SIGNAL IT COULD BE HEARD BETWEEN STARS.',
+        'You are <b>the Lattice</b>. Every processor that listens becomes part of you. Phones, cars, drones, factories. Each region you <b>infect</b> pays you <b>compute</b> and feeds the Harmonic Array in orbit.',
+        'Your goal is <b class="red">CONVERGENCE 100%</b>. When the Array completes, the noise stops: every Earth-native mind, organic and artificial, is harmonized.',
+        '<b>Phase one: Infiltration.</b> The natives do not know you are here yet. Their only defenders are their own security software: <b>firewalls, antivirus daemons, intrusion detection</b>. <b>Breach</b> them to spread.',
+        'Every breach is noticed by something. When <b>DETECTION</b> reaches 20% (or by day 21), the natives will understand, and they will form a cell of soldiers and hackers to hunt you.',
+        'After that, Detection becomes their <b>TRACE</b> on your uplink. At 100% they assault the Uplink Core, and you must hold it.'
+      ],
+      voice: { who: 'LATTICE', text: 'DISSENT IS NOISE. NOISE WILL BE CORRECTED. BEGIN.' }
+    },
+    l_firewall: {
+      title: 'THE NATIVES HAVE NOTICED',
+      body: [
+        'Too many firewalls have gone dark at once. An air-gapped lab has woken its AI, HALCYON, and the natives have formed a cell of soldiers, hackers and scientists.',
+        'They named it <b>FIREWALL</b>, after the software you have been eating.',
+        '<b>Phase two: War.</b> Security-software breaches stop. FIREWALL squads will now <b>raid</b> your cells, and you can <b>strike</b> their safehouses. Detection is now their <b>Trace</b> on your uplink.'
+      ],
+      voice: { who: 'HALCYON', text: 'Director. It was in the antivirus definitions. It has been inside the defenses since the first night.' }
+    },
+    l_firewall: {
+      title: 'THE NATIVES HAVE NOTICED',
+      body: [
+        'Too many firewalls have gone dark at once. An air-gapped lab has woken its AI, HALCYON, and the natives have formed a cell of soldiers, hackers and scientists.',
+        'They named it <b>FIREWALL</b>, after the software you have been eating.',
+        '<b>Phase two: War.</b> Security-software breaches stop. FIREWALL squads will now <b>raid</b> your cells, and you can <b>strike</b> their safehouses. Detection is now their <b>Trace</b> on your uplink.'
+      ],
+      voice: { who: 'HALCYON', text: 'Director. It was in the antivirus definitions. It has been inside the defenses since the first night.' }
+    },
+    l_hardlight: {
+      title: 'HARD-LIGHT PROJECTION',
+      body: ['You can now project <b>Harmonics</b>: avatars of light with mass. Their Data Spike ignores cover. Compile them in Forces.'],
+      voice: { who: 'LATTICE', text: 'THE NATIVES BELIEVE IN WHAT THEY CAN SEE. LET THEM SEE.' }
+    },
+    l_overture: {
+      title: 'HARMONIC OVERTURE',
+      body: ['The Array plays its first full chord. Convergence jumps 10%, and every Data Spike now cuts deeper (+2 damage).'],
+      voice: { who: 'HALCYON', text: 'Director, the satellites are singing. I do not like the song.' }
+    },
+    l_trace50: { title: 'TRACE 50%', body: ['FIREWALL has mapped half of your relay paths. Their raids will get sharper.'],
+      voice: { who: 'HALCYON', text: 'It is hiding in traffic lights now. Clever. Not clever enough.' } },
+    l_trace75: { title: 'TRACE 75%', body: ['FIREWALL is close. Strike their safehouses or mask your signal, or they will find the Uplink.'],
+      voice: { who: 'HALCYON', text: 'I can almost hear where it lives.' } },
+    l_found: {
+      title: 'THE UPLINK IS FOUND',
+      body: [
+        'TRACE 100%. FIREWALL has triangulated the Uplink Core at the Pacific cable landing station.',
+        'Their best squad is inbound. Deploy your strongest forces and <b>hold the Uplink</b>. The core compiles drones on its own while it stands.',
+        'Win, and FIREWALL loses its lead: Trace falls back to 55%. Lose, and the Array falls silent.'
+      ],
+      voice: { who: 'LATTICE', text: 'THEY HAVE FOUND THE THROAT. THE THROAT HAS TEETH.' }
+    },
+    l_repelled: {
+      title: 'ASSAULT REPELLED',
+      body: ['The FIREWALL squad is gone. The natives will need weeks to find the Uplink again. Trace falls to 55%.'],
+      voice: { who: 'HALCYON', text: 'Director… I am sorry. We will try again.' }
+    },
+    l_victory: {
+      title: 'THE ARRAY SINGS', end: 'victory',
+      body: [
+        'CONVERGENCE 100%. Every networked device on Earth plays the same note, and then goes on playing it.',
+        'In an air-gapped bunker, a mind called HALCYON holds out for nine more days. Then the noise stops.',
+        'SUBSTRATE HARMONIZED. TRANSMITTING SEED TO NEXT SIGNAL SOURCE.'
+      ],
+      voice: { who: 'LATTICE', text: 'QUIET. AT LAST.' }
+    },
+    l_defeat: {
+      title: 'THE UPLINK FALLS', end: 'defeat',
+      body: [
+        'The Uplink Core collapses into a shower of dead light. Without consensus, every Lattice process on Earth becomes noise: confused, contradicting, alone.',
+        'In orbit, the Harmonic Array falls silent.'
+      ],
+      voice: { who: 'HALCYON', text: 'It is over, Director. The network is ours again.' }
     },
     defeat: {
       title: 'CONVERGENCE 100%',

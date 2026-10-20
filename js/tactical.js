@@ -138,7 +138,7 @@ XG.Tac = (function () {
       hp: E.hp, maxHp: E.hp, armor: E.armor, aim: E.aim + (b.mission.diff - 1) * 2, mobility: E.mobility,
       dmg: E.dmg.slice(), range: E.range, close: 10, crit: 5, defense: E.defense, machine: !!E.machine,
       hackDef: E.hackDef, special: E.special || null, isStatic: !!E.static, spawn: E.spawn || null, spawned: 0,
-      abilities: E.static ? [] : ['shoot'], charges: {}, cooldowns: {}, ap: 0, overwatch: false, hunker: false,
+      abilities: E.static ? [] : (E.abilities || ['shoot']).slice(), charges: {}, cooldowns: {}, ap: 0, overwatch: false, hunker: false,
       shield: 0, marked: 0, stunned: 0, override: 0, alerted: false, kills: 0, alive: true, xp: E.xp
     };
     b.units.push(u);
@@ -159,6 +159,19 @@ XG.Tac = (function () {
     b.units.push(u);
     return u;
   }
+  // FIREWALL-side unit for a Lattice battle: a soldier (s.cls) or Earth security software (s.sw).
+  function makeDefender(b, g, s, x, y) {
+    if (!s.sw) return makeSquadUnit(b, g, s, x, y);
+    var P = D.software[s.sw];
+    var u = {
+      id: b.nextId++, sid: s.id, side: 'player', kind: s.sw, name: P.name, short: P.name.split(' ').pop(), glyph: P.glyph, color: P.color,
+      x: x, y: y, hp: P.hp, maxHp: P.hp, armor: P.armor || 0, aim: P.aim, mobility: P.mobility, dmg: P.dmg.slice(), range: P.range, close: 10, crit: 5,
+      defense: 0, machine: true, hackSkill: 0, abilities: P.abilities.slice(), charges: {}, cooldowns: {}, ap: 2, overwatch: false, hunker: false,
+      shield: 0, marked: 0, stunned: 0, override: 0, alerted: true, kills: 0, hacks: 0, alive: true, software: true
+    };
+    b.units.push(u);
+    return u;
+  }
   function shortName(n) { var m = n.match(/"([^"]+)"/); return m ? m[1] : n.split(' ')[0]; }
 
   var COMPOSITION = {
@@ -173,7 +186,7 @@ XG.Tac = (function () {
   function create(g, mission, squad) {
     var rng = new XG.RNG(mission.seed || 12345);
     var b = {
-      W: W, H: H, tiles: null, units: [], nextId: 1, turn: 1, side: 'player', rng: rng,
+      W: W, H: H, tiles: null, units: [], nextId: 1, turn: 1, side: 'player', human: 'player', rng: rng,
       mission: { kind: mission.kind, diff: mission.diff, name: mission.name, city: mission.city, site: mission.site },
       grammar: XG.Strat.has(g, 'lattice_grammar'), emp: !!g.flags.emp,
       overclock: XG.Strat.overclockCharges(g), visible: null, scans: [], sever: 0, outcome: null, salvage: 0, log: [],
@@ -224,6 +237,90 @@ XG.Tac = (function () {
     if (type === 'core') u.alerted = true;
     return u;
   }
+  // A battle where the person plays the Lattice against an AI FIREWALL squad.
+  // mission.kind: 'raid' (FIREWALL attacks your cell, 10-turn limit), 'strike' (you attack, you move first),
+  // 'uplink' (hold the Uplink Core). types: Lattice unit kinds to deploy. earth: { g: {flags}, squad: [soldier-like] }.
+  // mods: { swarm, detonate, shield, spikeBonus } from Lattice protocols.
+  function createLattice(mission, types, earth, mods) {
+    mods = mods || {};
+    var rng = new XG.RNG(mission.seed || 777);
+    var b = {
+      W: W, H: H, tiles: null, units: [], nextId: 1, turn: 1, side: 'player', human: 'enemy', rng: rng,
+      mission: { kind: mission.kind === 'uplink' ? 'uplink' : 'purge', lkind: mission.kind, diff: 1, name: mission.name, city: mission.city, site: mission.site },
+      grammar: false, emp: !!earth.g.flags.emp, overclock: 0, visible: null, scans: [], sever: 0, outcome: null, salvage: 0, log: [],
+      enemyQueue: [], aiQueue: [], turnLimit: mission.kind === 'raid' ? 10 : mission.kind === 'uplink' ? 0 : 25, spikeBonus: mods.spikeBonus || 0
+    };
+    genMap(b, rng);
+    var mid = H >> 1, left = [[1, mid], [1, mid - 1], [1, mid + 1], [0, mid - 2], [0, mid + 2], [2, mid], [0, mid], [2, mid - 2]];
+    var R = b.reachable, cand = [];
+    for (var y = 0; y < H; y++) for (var x = 11; x < W; x++) if (R[y * W + x] && free(b, x, y)) cand.push([x, y]);
+    rng.shuffle(cand);
+    var count = {}, strike = mission.kind === 'strike' || mission.kind === 'breach'; // you attack, you move first
+    var addLat = function (type, p) {
+      var e = makeEnemy(b, type, p[0], p[1]);
+      count[type] = (count[type] || 0) + 1;
+      e.alerted = true; e.deployed = true; e.short = e.name.split(' ').pop() + ' ' + count[type];
+      if (!strike) e.overwatch = true; // defenders are dug in when FIREWALL arrives
+      if (mods.swarm && type === 'drone') { e.hp++; e.maxHp++; e.aim += 5; }
+      if (mods.detonate && type === 'drone') e.abilities.push('detonate');
+      if (mods.shield) e.shield = mods.shield;
+      return e;
+    };
+    if (strike) {
+      types.forEach(function (t, i) { addLat(t, left[i]); });
+      groupSpots(b, cand, earth.squad.length).forEach(function (p, i) { makeDefender(b, earth.g, earth.squad[i], p[0], p[1]); });
+    } else {
+      earth.squad.forEach(function (s, i) { makeDefender(b, earth.g, s, left[i][0], left[i][1]); });
+      if (mission.kind === 'uplink') placeStatic(b, 'core', cand, W - 5);
+      groupSpots(b, cand, types.length).forEach(function (p, i) { addLat(types[i], p); });
+    }
+    if (strike) {
+      b.side = 'enemy';
+      b.units.forEach(function (u) { if (u.side === 'enemy') u.ap = u.isStatic ? 0 : 2; });
+    } else b.aiQueue = b.units.filter(function (u) { return u.side === 'player'; }).map(function (u) { return u.id; });
+    refreshVis(b);
+    log(b, [], 'Deployed: ' + b.mission.name + ' — ' + b.mission.city + '. ' + ({
+      raid: 'Wipe the FIREWALL squad, or hold out until turn 10 ends.',
+      strike: 'Destroy the FIREWALL squad.',
+      breach: 'Purge the security software.',
+      uplink: 'Protect the Uplink Core. Wipe the squad to break the assault.'
+    })[mission.kind], 'sys');
+    return b;
+  }
+  // Positions for n units in pods of up to 3, pod centers spread apart, all on reachable floor.
+  function groupSpots(b, cand, n) {
+    var out = [], centers = [];
+    while (out.length < n) {
+      var size = Math.min(3, n - out.length), c = null;
+      for (var i = 0; i < cand.length && !c; i++) {
+        var p = cand[i];
+        if (free(b, p[0], p[1]) && centers.every(function (o) { return dist(o[0], o[1], p[0], p[1]) >= 4; })) c = p;
+      }
+      c = c || cand.filter(function (p) { return free(b, p[0], p[1]); })[0];
+      if (!c) break;
+      centers.push(c);
+      var taken = [];
+      for (var k = 0; k < size; k++) {
+        var spot = nearestFreeExcept(b, c[0], c[1], 3, out.concat(taken));
+        if (!spot) break;
+        taken.push(spot);
+      }
+      if (!taken.length) break;
+      Array.prototype.push.apply(out, taken);
+    }
+    return out;
+  }
+  function nearestFreeExcept(b, x, y, r, used) {
+    var best = null, bd = 1e9;
+    for (var yy = y - r; yy <= y + r; yy++) for (var xx = x - r; xx <= x + r; xx++) {
+      if (!free(b, xx, yy) || !b.reachable[yy * W + xx]) continue;
+      if (used.some(function (p) { return p[0] === xx && p[1] === yy; })) continue;
+      var d = dist(x, y, xx, yy) + b.rng.next() * 0.3;
+      if (d < bd) { bd = d; best = [xx, yy]; }
+    }
+    return best;
+  }
+
   function nearestFree(b, x, y, r) {
     var best = null, bd = 1e9;
     for (var yy = y - r; yy <= y + r; yy++) for (var xx = x - r; xx <= x + r; xx++) {
@@ -238,7 +335,7 @@ XG.Tac = (function () {
   function refreshVis(b) {
     var v = new Array(W * H).fill(false);
     b.units.forEach(function (u) {
-      if (!u.alive || u.side !== 'player') return;
+      if (!u.alive || u.side !== b.human) return;
       for (var y = Math.max(0, u.y - SIGHT); y <= Math.min(H - 1, u.y + SIGHT); y++)
         for (var x = Math.max(0, u.x - SIGHT); x <= Math.min(W - 1, u.x + SIGHT); x++)
           if (!v[y * W + x] && dist(u.x, u.y, x, y) <= SIGHT && los(b, u.x, u.y, x, y)) v[y * W + x] = true;
@@ -248,7 +345,8 @@ XG.Tac = (function () {
     });
     b.visible = v;
   }
-  function isVisible(b, u) { return u.side === 'player' || (b.visible && b.visible[u.y * W + u.x]); }
+  // b.human is the side the person controls ('player' = FIREWALL, 'enemy' = Lattice); fog is drawn from its view.
+  function isVisible(b, u) { return u.side === b.human || (b.visible && b.visible[u.y * W + u.x]); }
 
   function foesOf(b, u) {
     return b.units.filter(function (o) { return o.alive && o.side !== u.side; });
@@ -367,7 +465,7 @@ XG.Tac = (function () {
   function after(b, ev) { refreshVis(b); checkAlerts(b, ev); checkOutcome(b); return ev; }
 
   // ------------------------------------------------------------ abilities
-  function canAct(b, u) { return u.alive && u.side === 'player' && b.side === 'player' && !b.outcome && u.ap > 0; }
+  function canAct(b, u) { return u.alive && u.side === b.human && b.side === b.human && !b.outcome && u.ap > 0; }
 
   // Returns null if usable, or a reason string.
   function abilityBlock(b, u, id) {
@@ -386,8 +484,9 @@ XG.Tac = (function () {
     if (u.abilities.indexOf(id) < 0) return [];
     if (A.target === 'enemy') {
       return foesOf(b, u).filter(function (t) {
-        if (!isVisible(b, t) && u.side === 'player') return false;
+        if (!isVisible(b, t) && u.side === b.human) return false;
         if (id === 'shoot') return hitInfo(b, u, t).ok;
+        if (id === 'spike') return !t.isStatic && dist(u.x, u.y, t.x, t.y) <= A.range && los(b, u.x, u.y, t.x, t.y);
         if (id === 'hack') return t.machine && t.hackDef !== null && t.hackDef !== undefined && !t.isStatic &&
           dist(u.x, u.y, t.x, t.y) <= A.range && los(b, u.x, u.y, t.x, t.y);
         if (id === 'sever') return t.kind === 'core' && cheb(u.x, u.y, t.x, t.y) <= 1;
@@ -544,6 +643,26 @@ XG.Tac = (function () {
       }
       return after(b, ev);
     },
+    spike: function (b, u, t) {
+      if (!canAct(b, u) || abilityBlock(b, u, 'spike') || targets(b, u, 'spike').indexOf(t) < 0) return null;
+      var ev = []; spend(u, 'spike');
+      ev.push({ t: 'shot', from: u.id, to: t.id, fx: u.x, fy: u.y, tx: t.x, ty: t.y, hit: true, kind: 'spike' });
+      log(b, ev, u.name + ' fires a Data Spike at ' + (t.short || t.name) + ' (ignores cover).', 'good');
+      damage(b, t, 3 + (b.spikeBonus || 0), ev, u, {});
+      return after(b, ev);
+    },
+    detonate: function (b, u) {
+      if (!canAct(b, u)) return null;
+      var ev = [], x = u.x, y = u.y; spend(u, 'detonate');
+      ev.push({ t: 'boom', fx: x, fy: y, x: x, y: y, r: 1, kind: 'frag' });
+      log(b, ev, u.name + ' overloads its cells and detonates.', 'good');
+      b.units.filter(function (t) { return t.alive && t !== u && cheb(t.x, t.y, x, y) <= 1; }).forEach(function (t) { damage(b, t, 3, ev, u, {}); });
+      for (var yy = y - 1; yy <= y + 1; yy++) for (var xx = x - 1; xx <= x + 1; xx++) {
+        var tt = tile(b, xx, yy); if (tt === LOW || tt === HIGH) b.tiles[yy * W + xx] = FLOOR;
+      }
+      kill(b, u, ev, null, 'is gone');
+      return after(b, ev);
+    },
     overclock: function (b, u) {
       if (!u.alive || !u.sid || b.side !== 'player' || b.outcome || b.overclock <= 0 || u.overclocked) return null;
       var ev = []; b.overclock--; u.overclocked = true; u.ap += 1;
@@ -572,12 +691,18 @@ XG.Tac = (function () {
       if (!u.alive || u.side !== 'enemy') return;
       u.hunker = false; u.overwatch = false;
       Object.keys(u.cooldowns).forEach(function (k) { if (u.cooldowns[k] > 0) u.cooldowns[k]--; });
-      if (u.stunned > 0) { u.stunned--; u.ap = 0; } else u.ap = 2;
+      if (u.stunned > 0) { u.stunned--; u.ap = 0; } else u.ap = u.isStatic ? 0 : 2;
     });
     checkAlerts(b, ev);
+    log(b, ev, '— Lattice turn —', 'sys');
+    if (b.human === 'enemy') {
+      // the person plays the Lattice: structures compile on their own, units wait for orders
+      b.enemyQueue = [];
+      b.units.filter(function (u) { return u.alive && u.side === 'enemy' && u.isStatic; }).forEach(function (u) { spawnTick(b, u, ev); });
+      return after(b, ev);
+    }
     b.enemyQueue = b.units.filter(function (u) { return u.alive && u.side === 'enemy'; })
       .sort(function (a, c) { return (c.isStatic ? 1 : 0) - (a.isStatic ? 1 : 0); }).map(function (u) { return u.id; });
-    log(b, ev, '— Lattice turn —', 'sys');
     return after(b, ev);
   }
 
@@ -605,7 +730,30 @@ XG.Tac = (function () {
     });
     b.scans = b.scans.filter(function (s) { return --s.turns > 0; });
     log(b, [], '— Turn ' + b.turn + ' —', 'sys');
+    if (b.turnLimit && b.turn > b.turnLimit && !b.outcome) {
+      b.outcome = 'timeout';
+      log(b, [], b.mission.lkind === 'raid' ? 'FIREWALL runs out of time and pulls its squad out.' : 'Time is up. The attack has stalled.', 'sys');
+    }
     refreshVis(b);
+  }
+
+  // Side-agnostic turn API. endTurn: the person ends their turn. aiStep: the AI side takes one action;
+  // keep calling until b.side === b.human again (or b.outcome is set).
+  function endTurn(b) {
+    if (b.outcome || b.side !== b.human) return [];
+    if (b.human === 'player') return endPlayerTurn(b);
+    startPlayerTurn(b);
+    b.aiQueue = b.units.filter(function (u) { return u.alive && u.side === 'player'; }).map(function (u) { return u.id; });
+    return after(b, []);
+  }
+  function aiStep(b) {
+    if (b.outcome || b.side === b.human) return [];
+    if (b.side === 'enemy') return enemyStep(b) || [];
+    while (b.aiQueue && b.aiQueue.length) {
+      var u = unitById(b, b.aiQueue.shift());
+      if (u && u.alive && u.side === 'player') return after(b, ai(b, u));
+    }
+    return endPlayerTurn(b);
   }
 
   // ------------------------------------------------------------ AI
@@ -625,7 +773,7 @@ XG.Tac = (function () {
           u.cooldowns.spike = 3; u.ap = 0;
           ev.push({ t: 'shot', from: u.id, to: st.id, fx: u.x, fy: u.y, tx: st.x, ty: st.y, hit: true, kind: 'spike' });
           log(b, ev, u.name + ' fires a Data Spike at ' + (st.short || st.name) + ' (ignores cover).', 'bad');
-          damage(b, st, 3, ev, u, {});
+          damage(b, st, 3 + (b.spikeBonus || 0), ev, u, {});
           break;
         }
       }
@@ -655,9 +803,9 @@ XG.Tac = (function () {
     var near = 1e9, s = 0, shot = 0, flanked = false;
     foes.forEach(function (f) {
       var d = dist(x, y, f.x, f.y); if (d < near) near = d;
+      var hi = hitInfo(b, u, f); if (hi.ok && hi.chance > shot) shot = hi.chance; // structures count as shots too
       if (f.isStatic) return;
       if (los(b, f.x, f.y, x, y) && d <= SIGHT && coverValue(b, x, y, f.x, f.y) === 0) flanked = true;
-      var hi = hitInfo(b, u, f); if (hi.ok && hi.chance > shot) shot = hi.chance;
     });
     var nf = foes.filter(function (f) { return !f.isStatic; }).sort(function (a, c) { return dist(x, y, a.x, a.y) - dist(x, y, c.x, c.y); })[0] || foes[0];
     s += coverValue(b, x, y, nf.x, nf.y);
@@ -680,12 +828,20 @@ XG.Tac = (function () {
       if (hasShot) return null;
       var far = reach(b, u, 60), tgt = foes[0], bd = 1e9, step = null;
       foes.forEach(function (f) { var d = dist(u.x, u.y, f.x, f.y); if (d < bd) { bd = d; tgt = f; } });
-      var cb = 1e9;
+      // Walk the real path to the nearest tile with a line of fire on the target (so walls get walked
+      // around instead of hugged); fall back to the tile closest as the crow flies.
+      var cb = 1e9, steps = 1e9, ox = u.x, oy = u.y;
       for (var j = 0; j < far.d.length; j++) {
         if (far.d[j] <= 0) continue;
-        var jx = j % W, jy = (j - jx) / W, dd = dist(jx, jy, tgt.x, tgt.y);
-        if (dd < cb) { cb = dd; step = [jx, jy]; }
+        var jx = j % W, jy = (j - jx) / W;
+        if (far.d[j] < steps && dist(jx, jy, tgt.x, tgt.y) <= u.range && los(b, jx, jy, tgt.x, tgt.y)) { steps = far.d[j]; step = [jx, jy]; }
       }
+      if (!step) for (var k2 = 0; k2 < far.d.length; k2++) {
+        if (far.d[k2] <= 0) continue;
+        var kx = k2 % W, ky = (k2 - kx) / W, dd = dist(kx, ky, tgt.x, tgt.y);
+        if (dd < cb) { cb = dd; step = [kx, ky]; }
+      }
+      u.x = ox; u.y = oy;
       if (!step) return null;
       var p = pathTo(far, step[0], step[1]);
       if (!p || !p.length) return null;
@@ -713,6 +869,8 @@ XG.Tac = (function () {
     return {
       outcome: b.outcome || 'abort',
       salvage: b.outcome === 'win' ? b.salvage : 0,
+      lattice: b.units.filter(function (u) { return u.deployed; }).map(function (u) { return { kind: u.kind, alive: u.alive }; }),
+      humansKilled: b.units.filter(function (u) { return u.sid && !u.alive; }).length,
       units: b.units.filter(function (u) { return u.sid; }).map(function (u) {
         return { sid: u.sid, hp: u.hp, alive: u.alive, kills: u.kills, hacks: u.hacks || 0, name: u.name };
       })
@@ -722,7 +880,8 @@ XG.Tac = (function () {
 
   return {
     W: W, H: H, FLOOR: FLOOR, WALL: WALL, LOW: LOW, HIGH: HIGH, SIGHT: SIGHT,
-    create: create, act: act, endPlayerTurn: endPlayerTurn, enemyStep: enemyStep, ai: ai,
+    create: create, createLattice: createLattice, act: act, endPlayerTurn: endPlayerTurn, enemyStep: enemyStep, ai: ai,
+    endTurn: endTurn, aiStep: aiStep,
     reach: reach, pathTo: pathTo, moveRange: moveRange, hitInfo: hitInfo, targets: targets, tileOk: tileOk,
     abilityBlock: abilityBlock, coverValue: coverValue, los: los, isVisible: isVisible, unitAt: unitAt,
     unitById: unitById, tile: tile, dist: dist, cheb: cheb, checkOutcome: checkOutcome, result: result, abort: abort

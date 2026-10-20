@@ -2,7 +2,7 @@
 // Loads the game scripts into a sandbox, plays AI-vs-AI battles and auto-plays campaigns.
 var fs = require('fs'), path = require('path'), vm = require('vm');
 var ctx = vm.createContext({ console: console, Math: Math, Date: Date, JSON: JSON });
-['data.js', 'state.js', 'strategy.js', 'tactical.js'].forEach(function (f) {
+['data.js', 'state.js', 'strategy.js', 'tactical.js', 'lattice.js'].forEach(function (f) {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', f), 'utf8'), ctx, { filename: f });
 });
 var XG = ctx.XG, Tac = XG.Tac, Strat = XG.Strat, S = XG.State, D = XG.DATA;
@@ -168,5 +168,135 @@ for (var c = 0; c < nc; c++) {
     '%, won ' + gc.stats.missionsWon + ' lost ' + gc.stats.missionsLost + ' expired ' + gc.stats.expired + ', KIA ' + gc.memorial.length + ', techs ' + gc.research.done.length);
 }
 console.log('Campaigns: ' + JSON.stringify(ends) + '  avg end day ' + (days.reduce(function (a, x) { return a + x; }, 0) / days.length).toFixed(0));
+
+// ================================================================ LATTICE side
+var Lat = XG.Lat;
+
+// Plays a Lattice-controlled battle: the shared AI drives the Lattice "human" side too.
+function autoLattice(g, m, types) {
+  var b = Tac.createLattice(m, types, Lat.earthSquad(g, m), Lat.mods(g));
+  check(b.human === 'enemy', 'lattice battle is human-controlled on the Lattice side');
+  for (var guard = 0; guard < 400 && !b.outcome; guard++) {
+    if (b.side === b.human) {
+      b.units.filter(function (u) { return u.alive && u.side === 'enemy' && !u.isStatic; }).forEach(function (u) {
+        if (b.outcome) return;
+        if (u.abilities.indexOf('spike') >= 0) { var t = Tac.targets(b, u, 'spike')[0]; if (t && Tac.act.spike(b, u, t)) return; }
+        if (u.abilities.indexOf('detonate') >= 0 && u.hp <= 2 && b.units.some(function (o) { return o.alive && o.side === 'player' && Tac.cheb(o.x, o.y, u.x, u.y) <= 1; }) && Tac.act.detonate(b, u)) return;
+        Tac.ai(b, u);
+      });
+      if (!b.outcome) Tac.endTurn(b);
+    } else {
+      var n = 0;
+      while (!b.outcome && b.side !== b.human && n++ < 60) Tac.aiStep(b);
+      check(n < 60, 'AI FIREWALL turn terminates');
+    }
+  }
+  check(!!b.outcome, 'lattice battle ends');
+  if (!b.outcome) console.log('    stalled:', m.kind, 'turn', b.turn, b.units.filter(function (u) { return u.alive; }).map(function (u) { return u.side[0] + ':' + u.kind + '@' + u.x + ',' + u.y + ' ap' + u.ap; }).join(' '));
+  b.units.forEach(function (u) {
+    if (!u.alive) return;
+    b.units.forEach(function (o) { if (o !== u && o.alive && o.x === u.x && o.y === u.y) check(false, 'lattice battle units overlap'); });
+  });
+  return b;
+}
+
+(function () {
+  var g = Lat.newGame(77);
+  check(Lat.bandwidth(g) === 8 && Lat.forceCount(g) === 5, 'lattice starts with 5 units and 8 bandwidth');
+  check(!!Lat.canCompile(g, 'warden'), 'wardens need Warden Chassis');
+  check(Lat.compile(g, 'drone') && g.forces.drone === 5, 'compile a drone');
+  var c0 = g.compute;
+  check(Lat.seed(g, 'eu') && g.compute === c0 - XG.DATA.lattice.tuning.seedCost && !!Lat.canSeed(g, 'eu'), 'seeding costs compute and goes on cooldown');
+  g.compute = 200;
+  check(Lat.build(g, 'foundry', 1), 'foundry starts');
+  check(Lat.cancelBuild(g, 1) && g.array[1] === null, 'node compile can be cancelled');
+  g.compute = 999; Lat.build(g, 'foundry', 1); g.array[1].daysLeft = 0;
+  check(Lat.bandwidth(g) === 12, 'foundry adds bandwidth');
+  for (var i = 0; i < 6; i++) Lat.compile(g, 'drone');
+  check(!!Lat.canDemolish(g, 1), 'cannot dismantle a foundry your forces depend on');
+  // engine: Data Spike and Detonate
+  var r = rng0(g), m = Lat.spawnMission(g, r, 'strike');
+  g.research.done.push('detonation');
+  var b = Tac.createLattice(m, ['harmonic', 'drone', 'drone'], Lat.earthSquad(g, m), Lat.mods(g));
+  check(b.side === 'enemy' && b.human === 'enemy', 'strike: the Lattice moves first');
+  var h = b.units.filter(function (u) { return u.kind === 'harmonic'; })[0], foe = b.units.filter(function (u) { return u.sid; })[0];
+  foe.x = h.x + 4; foe.y = h.y; for (var x = h.x + 1; x <= foe.x; x++) b.tiles[h.y * Tac.W + x] = Tac.FLOOR;
+  b.visible[foe.y * Tac.W + foe.x] = true;
+  var hp0 = foe.hp + foe.shield;
+  check(!!Tac.act.spike(b, h, foe) && foe.hp + foe.shield <= hp0 - 1 && h.cooldowns.spike === 3, 'Data Spike hits and goes on cooldown');
+  var d = b.units.filter(function (u) { return u.kind === 'drone'; })[0];
+  check(d.abilities.indexOf('detonate') >= 0 && !!Tac.act.detonate(b, d) && !d.alive, 'drone detonates and is lost');
+  check(Tac.act.shoot(b, foe, h) === null, 'person cannot order FIREWALL units in a Lattice battle');
+  // raid time limit
+  var mr = Lat.spawnMission(g, r, 'raid'), br = Tac.createLattice(mr, ['warden'], Lat.earthSquad(g, mr), {});
+  check(br.side === 'player' && br.turnLimit === 10, 'raid: FIREWALL moves first, 10-turn limit');
+  while (br.side !== br.human && !br.outcome) Tac.aiStep(br);
+  br.turn = 10; Tac.endTurn(br);
+  check(br.outcome === 'timeout', 'surviving a raid to the limit ends it as a timeout');
+  var out = Lat.resolveMission(g, mr.id, Tac.result(br));
+  check(out.won && g.stats.raidsHeld === 1, 'timeout counts as a Lattice win');
+})();
+function rng0(g) { var r = new XG.RNG(1); r.s = g.rngState || 1; return r; }
+
+// Infiltration: security software first, FIREWALL forms later, then raids
+(function () {
+  var g = Lat.newGame(31), T = XG.DATA.lattice.tuning;
+  check(g.phase === 'infiltration', 'lattice campaign opens in Infiltration');
+  for (var d = 0; d < 6; d++) { Lat.advanceDay(g); }
+  check(g.missions.length > 0 && g.missions.every(function (m) { return m.kind === 'breach'; }), 'only breach ops during Infiltration');
+  var m = g.missions[0], es = Lat.earthSquad(g, m);
+  check(es.software && es.squad.every(function (s) { return !!XG.DATA.software[s.sw]; }), 'breach defenders are security software');
+  var b = Tac.createLattice(m, ['warden', 'drone', 'drone'], es, Lat.mods(g));
+  check(b.side === 'enemy' && b.units.some(function (u) { return u.kind === 'firewall_sw' && u.side === 'player' && u.software; }), 'breach: you move first against a Perimeter Firewall');
+  var r = Tac.result(b); r.outcome = 'loss'; r.humansKilled = 3;
+  var inf0 = Lat.region(g, m.region).infection, out = Lat.resolveMission(g, m.id, r);
+  check(out.won && Lat.region(g, m.region).infection > inf0 && g.stats.breaches === 1, 'winning a breach spreads infection');
+  while (g.phase === 'infiltration' && g.day < 40) Lat.advanceDay(g);
+  check(g.phase === 'war' && g.day <= T.phaseDay && g.storyQueue.indexOf('l_firewall') >= 0, 'FIREWALL forms by the phase day (or Detection threshold)');
+  var raids = 0;
+  for (var k = 0; k < 10; k++) Lat.advanceDay(g).forEach(function (e) { if (/raid/.test(e.msg)) raids++; });
+  check(raids > 0, 'raids begin once the war starts');
+})();
+
+var lt = {};
+for (var li = 0; li < (+process.argv[4] || 30); li++) {
+  var lg = Lat.newGame(300 + li), kinds2 = ['raid', 'strike', 'uplink'], lk = kinds2[li % 3];
+  lg.day = 1 + (li % 5) * 12; lg.forces = { drone: 4, warden: 2, harmonic: 1 };
+  var lm = Lat.spawnMission(lg, rng0(lg), lk);
+  var lb = autoLattice(lg, lm, ['warden', 'harmonic', 'drone', 'drone', 'warden']);
+  var key2 = lk + ' day' + lg.day, won2 = Lat.latticeWon(lk, lb.outcome);
+  lt[key2] = lt[key2] || { win: 0, loss: 0 }; lt[key2][won2 ? 'win' : 'loss']++;
+}
+console.log('Lattice battles (Lattice wins / losses, both sides AI):');
+Object.keys(lt).sort().forEach(function (k) { console.log('  ' + k.padEnd(12) + ' win ' + lt[k].win + '  loss ' + lt[k].loss); });
+
+var lends = { victory: 0, defeat: 0, none: 0 }, ldays = [];
+var porder = ['swarm_logic', 'seed_cascade', 'warden_chassis', 'ghost_packets', 'detonation', 'hardlight', 'swarm_mind', 'phase_shield', 'recursive', 'overture'];
+for (var lc = 0; lc < (+process.argv[5] || 10); lc++) {
+  var G = Lat.newGame(9000 + lc);
+  for (var dd = 0; dd < 300 && !G.over; dd++) {
+    if (!G.research.current) porder.some(function (p) { return Lat.startProtocol(G, p); });
+    var free = G.array.indexOf(null);
+    ['foundry', 'core', 'choir', 'mask', 'spire', 'choir', 'foundry'].some(function (n) {
+      return free >= 0 && G.array.filter(function (x) { return x && x.type === n; }).length < (n === 'choir' || n === 'foundry' ? 2 : 1) && Lat.build(G, n, free);
+    });
+    ['harmonic', 'warden', 'drone', 'drone'].forEach(function (t) { if (G.compute > 40) Lat.compile(G, t); });
+    G.regions.slice().sort(function (a, b2) { return b2.infection - a.infection; }).forEach(function (x) { if (G.compute > 70) Lat.seed(G, x.id); });
+    var pick = G.missions.slice().sort(function (a, b2) { return (a.kind === 'uplink' ? -1 : a.daysLeft) - (b2.kind === 'uplink' ? -1 : b2.daysLeft); })[0];
+    if (pick && Lat.forceCount(G) >= 3) {
+      var pool = [];
+      ['harmonic', 'warden', 'drone'].forEach(function (t) { for (var k = 0; k < G.forces[t]; k++) pool.push(t); });
+      var lbb = autoLattice(G, pick, pool.slice(0, Lat.squadSize(G)));
+      Lat.resolveMission(G, pick.id, Tac.result(lbb));
+    }
+    Lat.advanceDay(G);
+    G.storyQueue.length = 0;
+  }
+  lends[G.over || 'none']++; ldays.push(G.day);
+  console.log('  lattice campaign ' + lc + ': ' + (G.over || 'unfinished') + ' on day ' + G.day + ', conv ' + G.convergence.toFixed(1) + '%, trace ' + G.trace.toFixed(0) +
+    '%, raids ' + G.stats.raidsHeld + '/' + (G.stats.raidsHeld + G.stats.raidsLost) + ', strikes ' + G.stats.strikesWon + '/' + (G.stats.strikesWon + G.stats.strikesLost) +
+    ', ignored ' + G.stats.ignored + ', units lost ' + G.stats.unitsLost + ', protocols ' + G.research.done.length);
+}
+console.log('Lattice campaigns: ' + JSON.stringify(lends) + '  avg end day ' + (ldays.reduce(function (a, x) { return a + x; }, 0) / ldays.length).toFixed(0));
 console.log(fails ? fails + ' check(s) FAILED' : 'All checks passed.');
 process.exit(fails ? 1 : 0);
