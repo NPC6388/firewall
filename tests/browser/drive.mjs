@@ -9,7 +9,8 @@ import os from 'node:os';
 const HERE = path.dirname(new URL(import.meta.url).pathname).replace(/^\/([A-Za-z]:)/, '$1');
 const SCR = path.join(HERE, 'shots'); fs.mkdirSync(SCR, { recursive: true });
 const EDGE = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe';
-const PAGE = 'file:///' + path.resolve(HERE, '..', '..', 'index.html').replace(/\\/g, '/');
+// Set PAGE_URL=https://npc6388.github.io/firewall/ to test the live site instead of the local file.
+const PAGE = process.env.PAGE_URL || 'file:///' + path.resolve(HERE, '..', '..', 'index.html').replace(/\\/g, '/');
 const port = 9333;
 const proc = spawn(EDGE, ['--headless=new', '--remote-debugging-port=' + port, '--user-data-dir=' + path.join(os.tmpdir(), 'firewall-edge-profile'),
   '--window-size=1500,950', '--no-first-run', '--disable-gpu', 'about:blank'], { stdio: 'ignore' });

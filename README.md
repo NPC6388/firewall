@@ -6,7 +6,9 @@ itself. Soldiers, hackers, field scientists and **HALCYON**, an Earth-born AI, f
 **Status: MVP (Sprints 0–4 complete).** Full campaign is playable start to finish. See [PLAN.md](PLAN.md) for the design and sprint roadmap.
 
 ## Play
-Double-click `index.html` (any modern browser). No install, no server, no build step.
+**▶ Play in your browser: https://npc6388.github.io/firewall/**
+
+Or run it locally: double-click `index.html` (any modern browser). No install, no server, no build step.
 Progress autosaves in the browser (localStorage) whenever you're on the strategy screen.
 
 ## How to win
@@ -51,6 +53,7 @@ Browser check (drives the real page in headless Edge, reports page errors):
 node tests/browser/drive.mjs tests/browser/playthrough.mjs
 node tests/browser/drive.mjs tests/browser/finale.mjs
 ```
+Add `PAGE_URL=https://npc6388.github.io/firewall/` in front of either command to test the live site.
 The smoke test prints win/loss per mission type and difficulty, and how each simulated campaign ended. Exit code 1 means a check failed.
 The bot plays worse than a person would (no deliberate flanking or overwatch), so read its win rates as a floor.
 Last run: dumb-bot campaigns won about 5 of 8, with losses coming from the squad-wipe death spiral.
