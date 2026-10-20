@@ -411,6 +411,15 @@ XG.Gfx = (function () {
     badges(c, u, cx, cy, o);
     c.restore();
   }
+  // A unit's sprite alone, facing up, drawn into a small canvas (squad cards, pickers).
+  function icon(cv, u) {
+    var dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1, w = cv.clientWidth || cv.width, h = cv.clientHeight || cv.height;
+    cv.width = w * dpr; cv.height = h * dpr;
+    var c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, w, h);
+    c.translate(w / 2, h / 2); c.scale(w / 34, h / 34);
+    var draw = SPRITES[u.kind];
+    if (draw) draw(c, u.color, -Math.PI / 2, 0, u); else fallback(c, u, 13);
+  }
   function fallback(c, u, R) {
     c.fillStyle = '#10141c'; c.strokeStyle = u.color; c.lineWidth = 2; circle(c, 0, 0, R); c.fill(); c.stroke();
     c.fillStyle = u.color; c.font = 'bold 14px "Share Tech Mono", monospace'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(u.glyph, 0, 1); c.textBaseline = 'alphabetic';
@@ -763,6 +772,6 @@ XG.Gfx = (function () {
   return {
     TS: TS, REDUCED: REDUCED, hash: hash, rgbOf: rgbOf, biomeOf: biomeOf, BIOMES: BIOMES,
     terrain: terrain, decal: decal, ambient: ambient, motes: motes, fog: fog, lights: lights, vignette: vignette,
-    unit: unit, emit: emit, particles: particles, FX: FX, bolt: bolt, tracer: tracer, banner: banner, sweep: sweep
+    unit: unit, icon: icon, emit: emit, particles: particles, FX: FX, bolt: bolt, tracer: tracer, banner: banner, sweep: sweep
   };
 })();

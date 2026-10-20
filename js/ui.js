@@ -30,7 +30,7 @@ XG.UI = (function () {
   UI.toast = function (lines) {
     if (!lines.length) return;
     var t = document.createElement('div');
-    t.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:60;background:#0c131e;border:1px solid #2a3d57;padding:10px 14px;max-width:360px;font-size:13px;line-height:1.6;box-shadow:0 0 24px rgba(0,0,0,.5)';
+    t.className = 'toast';
     t.innerHTML = lines.map(function (l) { return '<div>' + l + '</div>'; }).join('');
     document.body.appendChild(t);
     setTimeout(function () { t.style.transition = 'opacity .5s'; t.style.opacity = '0'; }, 3800);

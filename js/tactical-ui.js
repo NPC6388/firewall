@@ -313,9 +313,10 @@ XG.TacUI = (function () {
       for (var j = 0; j < x.shield; j++) pips += '<i class="s"></i>';
       var cls = !x.alive ? 'dead' : x.ap <= 0 ? 'spent' : '';
       var tag = !x.alive ? (lat() ? 'LOST' : 'KIA') : x.override ? '<span class="good">OVERRIDE ' + x.override + '</span>' : (x.overwatch ? 'OW · ' : '') + (x.hunker ? 'HNK · ' : '') + x.ap + ' AP';
-      return '<div class="sq ' + cls + (x.id === st.sel ? ' on' : '') + '" data-unit="' + x.id + '"><div class="n"><span style="color:' + x.color + '">' + x.glyph + '</span> ' + (x.short || x.name) + '</div>' +
+      return '<div class="sq ' + cls + (x.id === st.sel ? ' on' : '') + '" data-unit="' + x.id + '"><canvas class="sq-ico" data-ico="' + x.id + '"></canvas><div class="n">' + (x.short || x.name) + '</div>' +
         '<div class="dim">' + tag + '</div><div class="pips">' + pips + '</div></div>';
     }).join('');
+    $('tac-squad').querySelectorAll('[data-ico]').forEach(function (cv) { XG.Gfx.icon(cv, Tac.unitById(st.b, +cv.getAttribute('data-ico'))); });
     $('tac-squad').querySelectorAll('[data-unit]').forEach(function (el) {
       el.onclick = function () { var x = Tac.unitById(st.b, +el.getAttribute('data-unit')); if (x && x.alive && canInput()) select(x.id); };
     });
