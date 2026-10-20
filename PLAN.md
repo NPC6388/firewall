@@ -74,7 +74,7 @@ Each sprint ends with something playable. **Sprints 0–4 = the MVP.**
 ### ✅ Sprint 1: Tactical core
 - Procedural map (buildings with doors, cover clusters, spawn zones, connectivity check).
 - BFS movement range and paths, Bresenham LOS (walls and tall cover block; peeking allowed).
-- Directional half/full cover, flanking, hit-chance formula, damage, armor, crits.
+- Directional half/full cover scaled by the viewing angle (full within 30°, half at ~63°, then flanked), hit-chance formula, damage, armor, crits.
 - Generic AI (works for either side): shoot if odds are good, else pick a covered tile with LOS.
 - Win/loss detection. Canvas renderer, click-to-move, click-to-shoot, hover hit chance.
 - **Done when:** a 4-v-4 skirmish can be played start to finish.

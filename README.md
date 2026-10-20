@@ -36,7 +36,7 @@ they assault the Uplink: hold it or lose.
 | `Enter` | End turn |
 | `Esc` / right-click | Cancel |
 
-Hover a tile to see its cover (shield icons: filled = full, hollow = half). Hover an enemy to see hit %, crit % and whether it's flanked.
+Hover a tile to see its cover (shield icons: filled = full, hollow = half). Hover an enemy to see hit %, crit % and its cover from your angle: cover counts in full within 30° of head-on, fades to half by about 63°, and past that the target is flanked.
 
 ## Project layout
 | Path | What |

@@ -98,6 +98,17 @@ function autoBattle(g, m, squad) {
   check(!!Tac.act.grenade(b2, t2, gx, gy), 'grenade throws');
   check(Tac.tile(b2, gx, gy) === Tac.FLOOR, 'frag grenade destroys cover');
   check(t2.ap === 0 && t2.charges.grenade === 0, 'grenade spends AP and charge');
+  // cover depends on the viewing angle: target at (10,10) behind high cover to the east
+  var bc = Tac.create(g, Object.assign({}, m, { kind: 'purge', diff: 1 }), g.soldiers.slice(0, 4));
+  for (var cy = 0; cy < Tac.H; cy++) for (var cx = 0; cx < Tac.W; cx++) bc.tiles[cy * Tac.W + cx] = Tac.FLOOR;
+  bc.tiles[10 * Tac.W + 11] = Tac.HIGH;
+  check(Tac.coverValue(bc, 10, 10, 18, 10) === 40, 'head-on full cover is 40');
+  check(Tac.coverValue(bc, 10, 10, 18, 13) === 40, 'shot 21° off-axis keeps full cover');
+  var c45 = Tac.coverDetail(bc, 10, 10, 15, 15);
+  check(c45.value > 20 && c45.value < 40 && c45.base === 40 && c45.angle === 45, '45° shot gets partial full cover (' + c45.value + ')');
+  check(Tac.coverValue(bc, 10, 10, 13, 18) === 0, 'steep shot past 63° flanks the cover');
+  bc.tiles[10 * Tac.W + 11] = Tac.LOW;
+  check(Tac.coverValue(bc, 10, 10, 15, 15) < 20 && Tac.coverValue(bc, 10, 10, 15, 15) > 10, 'half cover also fades with angle');
   // override flips sides then purges
   var b3 = Tac.create(g, Object.assign({}, m, { kind: 'purge', diff: 1, seed: 7 }), g.soldiers.slice(0, 4));
   var h3 = b3.units.filter(function (u) { return u.kind === 'hacker'; })[0], d3 = b3.units.filter(function (u) { return u.kind === 'drone'; })[0];

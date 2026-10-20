@@ -38,13 +38,28 @@ XG.Tac = (function () {
   }
   function los(b, ax, ay, bx, by) { return lineClear(b, ax, ay, bx, by) || lineClear(b, bx, by, ax, ay); }
 
-  // Directional cover: the cover tile on the side facing the attacker counts.
-  function coverValue(b, tx, ty, fx, fy) {
-    var ddx = fx - tx, ddy = fy - ty, best = 0;
-    if (ddx !== 0 && Math.abs(ddx) >= Math.abs(ddy) / 2) best = Math.max(best, coverOf(tile(b, tx + sign(ddx), ty)));
-    if (ddy !== 0 && Math.abs(ddy) >= Math.abs(ddx) / 2) best = Math.max(best, coverOf(tile(b, tx, ty + sign(ddy))));
+  // Directional cover: the cover tile on the side facing the attacker counts, scaled by the viewing angle.
+  // Head-on (up to 30° off the cover's axis) gives full value, fading to half at the flank cutoff
+  // (about 63°, where one axis is less than half the other); past that the side gives nothing.
+  var COVER_FULL_ANGLE = 30, COVER_CUTOFF = Math.atan(2) * 180 / Math.PI;
+  function coverAngled(base, along, across) {
+    var ang = Math.atan2(Math.abs(across), Math.abs(along)) * 180 / Math.PI;
+    var f = ang <= COVER_FULL_ANGLE ? 1 : 1 - 0.5 * (ang - COVER_FULL_ANGLE) / (COVER_CUTOFF - COVER_FULL_ANGLE);
+    return { value: Math.round(base * f), base: base, angle: Math.round(ang) };
+  }
+  function coverDetail(b, tx, ty, fx, fy) {
+    var ddx = fx - tx, ddy = fy - ty, best = { value: 0, base: 0, angle: 0 }, c;
+    if (ddx !== 0 && Math.abs(ddx) >= Math.abs(ddy) / 2) {
+      c = coverAngled(coverOf(tile(b, tx + sign(ddx), ty)), ddx, ddy);
+      if (c.value > best.value) best = c;
+    }
+    if (ddy !== 0 && Math.abs(ddy) >= Math.abs(ddx) / 2) {
+      c = coverAngled(coverOf(tile(b, tx, ty + sign(ddy))), ddy, ddx);
+      if (c.value > best.value) best = c;
+    }
     return best;
   }
+  function coverValue(b, tx, ty, fx, fy) { return coverDetail(b, tx, ty, fx, fy).value; }
 
   // BFS over 8 directions, no corner cutting. Returns dist array + prev for paths.
   function reach(b, u, maxSteps) {
@@ -374,8 +389,8 @@ XG.Tac = (function () {
   function hitInfo(b, a, t, opts) {
     opts = opts || {};
     var d = dist(a.x, a.y, t.x, t.y);
-    if (d > a.range || !los(b, a.x, a.y, t.x, t.y)) return { chance: 0, crit: 0, cover: 0, d: d, ok: false };
-    var cov = coverValue(b, t.x, t.y, a.x, a.y);
+    if (d > a.range || !los(b, a.x, a.y, t.x, t.y)) return { chance: 0, crit: 0, cover: 0, coverBase: 0, coverAngle: 0, d: d, ok: false };
+    var cd = coverDetail(b, t.x, t.y, a.x, a.y), cov = cd.value;
     var ch = a.aim - cov - (t.defense || 0) - (t.hunker ? 25 : 0);
     if (d <= 3) ch += a.close || 0;
     if (t.marked > 0) ch += 15;
@@ -384,7 +399,7 @@ XG.Tac = (function () {
     if (t.isStatic) ch = Math.max(ch, 85);
     ch = Math.max(5, Math.min(95, Math.round(ch)));
     var crit = (a.crit || 0) + (cov === 0 && !t.isStatic ? 25 : 0);
-    return { chance: ch, crit: Math.min(100, crit), cover: cov, d: d, ok: true };
+    return { chance: ch, crit: Math.min(100, crit), cover: cov, coverBase: cd.base, coverAngle: cd.angle, d: d, ok: true };
   }
 
   function log(b, ev, msg, cls) {
@@ -883,7 +898,7 @@ XG.Tac = (function () {
     create: create, createLattice: createLattice, act: act, endPlayerTurn: endPlayerTurn, enemyStep: enemyStep, ai: ai,
     endTurn: endTurn, aiStep: aiStep,
     reach: reach, pathTo: pathTo, moveRange: moveRange, hitInfo: hitInfo, targets: targets, tileOk: tileOk,
-    abilityBlock: abilityBlock, coverValue: coverValue, los: los, isVisible: isVisible, unitAt: unitAt,
+    abilityBlock: abilityBlock, coverValue: coverValue, coverDetail: coverDetail, los: los, isVisible: isVisible, unitAt: unitAt,
     unitById: unitById, tile: tile, dist: dist, cheb: cheb, checkOutcome: checkOutcome, result: result, abort: abort
   };
 })();

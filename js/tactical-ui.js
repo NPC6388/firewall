@@ -358,7 +358,11 @@ XG.TacUI = (function () {
       (cds.length ? '<div class="dim">Cooldown: ' + cds.join(', ') + '</div>' : '') +
       (st2.length ? '<div class="violet">' + st2.join(' · ') + '</div>' : '');
   }
-  function coverLabel(c) { return c >= 40 ? 'full cover' : c >= 20 ? 'half cover' : '<span class="warn">FLANKED / exposed</span>'; }
+  function coverLabel(hi) {
+    if (!hi.cover) return '<span class="warn">FLANKED / exposed</span>';
+    var kind = hi.coverBase >= 40 ? 'full cover' : 'half cover';
+    return hi.cover < hi.coverBase ? kind + ' at ' + hi.coverAngle + '° (−' + hi.cover + ' of ' + hi.coverBase + ')' : kind + ' (−' + hi.cover + ')';
+  }
   function hoverPanel() {
     if (!st) return;
     var b = st.b, h = st.hover, u = selUnit(), html = '';
@@ -373,7 +377,7 @@ XG.TacUI = (function () {
         if (focus.side === 'enemy' && !focus.alerted) html += '<div class="dim">Unaware of the squad.</div>';
         if (u) {
           var hi = Tac.hitInfo(b, u, focus);
-          html += hi.ok ? '<div>' + (u.short || u.name) + ': <b>' + hi.chance + '%</b> to hit · ' + hi.crit + '% crit · ' + coverLabel(hi.cover) + ' · ' + hi.d.toFixed(1) + ' tiles</div>'
+          html += hi.ok ? '<div>' + (u.short || u.name) + ': <b>' + hi.chance + '%</b> to hit · ' + hi.crit + '% crit · ' + coverLabel(hi) + ' · ' + hi.d.toFixed(1) + ' tiles</div>'
             : '<div class="dim">No line of fire from ' + (u.short || u.name) + '.</div>';
           if (u.hackSkill && focus.hackDef !== null && focus.hackDef !== undefined && !focus.isStatic)
             html += '<div class="good">Hack chance ' + Math.max(10, Math.min(90, u.hackSkill - focus.hackDef)) + '%' + (b.grammar ? ' (override)' : ' (stun)') + '</div>';
@@ -392,7 +396,7 @@ XG.TacUI = (function () {
           var o = moveOdds(u, h.x, h.y);
           if (o.list.length) html += '<div>' + (o.dash ? '<span class="warn">' + o.why + ': no shot after this move</span><br>' : '') + 'Odds from here:' +
             o.list.map(function (it) {
-              return '<br>· ' + it.e.name + ': ' + (it.hi.ok ? '<b>' + it.hi.chance + '%</b> (' + coverLabel(it.hi.cover) + ')' : '<span class="dim">no line of fire</span>');
+              return '<br>· ' + it.e.name + ': ' + (it.hi.ok ? '<b>' + it.hi.chance + '%</b> (' + coverLabel(it.hi) + ')' : '<span class="dim">no line of fire</span>');
             }).join('') + '</div>';
         }
       }

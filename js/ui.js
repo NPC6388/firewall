@@ -254,7 +254,7 @@ XG.UI = (function () {
       '<div class="panel"><h2>Field manual</h2>' +
       '<p><b>Goal:</b> research your way to the Lattice uplink and sever it before Convergence hits 100%. Skipped missions and infected regions speed the clock up.</p>' +
       '<p><b>Combat:</b> each operative has 2 AP. Moving costs 1 (blue range) or 2 (amber dash range). Shooting and most abilities end the turn. Medkit, Scan, Shield cost 1 AP.</p>' +
-      '<p><b>Cover:</b> half cover −20 aim, full cover −40, judged from the side facing the shooter. No cover means you\'re flanked: easier to hit, +25 crit.</p>' +
+      '<p><b>Cover:</b> half cover −20 aim, full cover −40, judged from the side facing the shooter. Cover only counts in full when the shot comes in within 30° of head-on; it fades to half value as the angle steepens to about 63°, and past that the side gives nothing. No cover means you\'re flanked: easier to hit, +25 crit.</p>' +
       '<p><b>Controls:</b> click an operative to select (or Tab; with an ability armed, Tab cycles its targets). Click a tile to move. Click an enemy to aim, click again to fire. Keys 1–5 pick abilities (press the same key again to fire), O = Overclock, Enter = end turn, Esc / right-click = cancel.</p>' +
       '<p><b>Hacking:</b> drones are easy, Wardens hard, Harmonics impossible. With Lattice Grammar, a successful hack hands you the machine for 2 turns.</p></div></div>';
   }
