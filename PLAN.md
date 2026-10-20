@@ -104,8 +104,20 @@ Each sprint ends with something playable. **Sprints 0–4 = the MVP.**
 ---
 
 ### Post-MVP roadmap
+✅ **Sprint 5G: Graphics** (done 2026-10-20; all drawing stays in `js/gfx.js` / `js/backdrop.js`, no image files)
+- G1 Terrain: baked offscreen layer per battle with four biomes (city, relay site, uplink, and *cyberspace* for breach
+  missions). Seeded floor detail, ambient occlusion, cast shadows, 3/4-view walls with facades, crates/barriers, server racks
+  with blinking LEDs, doors, rubble where cover was destroyed, scorch decals.
+- G2 Units: procedural vector sprites for every class, enemy and program, with facing, idle motion, team rings,
+  status icons and a hit flash.
+- G3 Effects: particle system (muzzle flash, glowing tracers, sparks, ricochets, fireballs, smoke, EMP arcs, shards,
+  derez pixels, heal pluses, hack data streams), radar-sweep scans, warp-in spawns, screen shake.
+- G4 Atmosphere: soft fog of war, unit light pools, drifting motes, vignette, glitch turn banners.
+- G5 Strategy and title: continents on the world map, data packets along links, the satellite and signal; an animated
+  globe behind the title screen. Respects `prefers-reduced-motion`.
+
 **Sprint 5: Juice and onboarding**
-- WebAudio synth SFX and ambient score, nicer unit sprites/portraits, screen shake, hit-chance breakdown tooltip.
+- WebAudio synth SFX and ambient score, portraits, hit-chance breakdown tooltip.
 - Guided first mission (tutorial), glossary, settings (animation speed, colorblind palette).
 
 **Sprint 6: Tactical depth**

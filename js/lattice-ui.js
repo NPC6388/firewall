@@ -44,6 +44,8 @@ XG.LUI = (function () {
     var H = 56.25, pos = {};
     D.regions.forEach(function (r) { pos[r.id] = [r.x, r.y * H / 100]; });
     var s = '<svg class="worldmap" viewBox="0 0 100 ' + H + '" role="img" aria-label="Your infection across Earth">';
+    s += XG.Backdrop.mapDecor({ H: H, accent: '255,61,242', packet: '#ff3df2', signal: '#ff3df2', pos: pos, links: D.links,
+      tint: function (id) { var inf = Lat.region(g, id).infection; return [infColor(inf), .05 + inf / 300]; } });
     D.links.forEach(function (l) { s += '<line class="link" x1="' + pos[l[0]][0] + '" y1="' + pos[l[0]][1] + '" x2="' + pos[l[1]][0] + '" y2="' + pos[l[1]][1] + '"/>'; });
     s += '<text x="50" y="4" fill="#5a2a55" font-size="2" text-anchor="middle" letter-spacing=".4">LATTICE SUBSTRATE MAP</text>';
     D.regions.forEach(function (r) {

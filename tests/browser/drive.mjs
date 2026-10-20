@@ -25,7 +25,10 @@ let id = 0; const pend = new Map(); const errors = [];
 ws.addEventListener('message', (m) => {
   const d = JSON.parse(m.data);
   if (d.id && pend.has(d.id)) { pend.get(d.id)(d); pend.delete(d.id); }
-  if (d.method === 'Runtime.exceptionThrown') errors.push(d.params.exceptionDetails.exception?.description || d.params.exceptionDetails.text);
+  if (d.method === 'Runtime.exceptionThrown') {
+    const x = d.params.exceptionDetails, fr = x.stackTrace?.callFrames?.[0];
+    errors.push((x.exception?.description || x.text).split(/\r?\n/)[0] + (fr ? ` @ ${fr.url.split('/').pop()}:${fr.lineNumber + 1}:${fr.columnNumber + 1} (${fr.functionName || 'anon'})` : ''));
+  }
   if (d.method === 'Runtime.consoleAPICalled' && d.params.type === 'error') errors.push(d.params.args.map((a) => a.value || a.description).join(' '));
 });
 const send = (method, params = {}) => new Promise((r) => { const i = ++id; pend.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });

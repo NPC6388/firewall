@@ -7,7 +7,6 @@ XG.TacUI = (function () {
   var st = null, cv, ctx, dpr = 1, bound = false;
 
   var DUR = { move: 85, shot: 260, dmg: 140, heal: 140, text: 110, death: 380, boom: 440, scan: 420, hack: 380, spawn: 280, pause: 1 };
-  var THEME = { purge: '79,209,255', relay: '199,146,255', uplink: '255,42,85' };
 
   function start(g, mission, squad, onDone) { startWith(g, Tac.create(g, mission, squad), onDone); }
   // Runs any prepared battle (FIREWALL or Lattice controlled). b.human says which side the person plays.
@@ -15,7 +14,8 @@ XG.TacUI = (function () {
     cv = $('tac-canvas'); ctx = cv.getContext('2d');
     st = {
       g: g, b: b, onDone: onDone, sel: null, mode: null, aim: null, hover: null,
-      queue: [], cur: null, floaters: [], fx: [], displayPos: {}, displayHp: {}, dying: {}, hidden: {},
+      queue: [], cur: null, floaters: [], fx: [], parts: [], face: {}, faceDisp: {}, flash: {}, shake: null, lastNow: 0,
+      displayPos: {}, displayHp: {}, dying: {}, hidden: {},
       reachCache: null, finished: false, lastLog: 0, dirty: true
     };
     $('tac-log').innerHTML = '';
@@ -26,7 +26,8 @@ XG.TacUI = (function () {
     resize();
     if (b.side !== b.human) banner(lat() ? 'FIREWALL TURN' : 'LATTICE TURN', 'enemy');
     hud();
-    requestAnimationFrame(frame);
+    var loop = st.loop = {};
+    requestAnimationFrame(function tick(now) { if (st && st.loop === loop) { frame(now); requestAnimationFrame(tick); } });
   }
 
   function bindOnce() {
@@ -216,6 +217,7 @@ XG.TacUI = (function () {
 
   function begin(e, now) {
     var dur = DUR[e.t] || 0, b = st.b, u = e.id && Tac.unitById(b, e.id);
+    eventFx(e, now);
     if (e.t === 'move') {
       var shown = (u && u.side === HS()) || pathVisible(e.path);
       dur = shown ? DUR.move * (e.path.length - 1) : 0;
@@ -415,11 +417,8 @@ XG.TacUI = (function () {
 
   // ------------------------------------------------------------ render
   function frame(now) {
-    if (!st) return;
     pump(now);
-    if (!st) return;
-    draw(now);
-    requestAnimationFrame(frame);
+    if (st) draw(now);
   }
 
   function center(x, y) { return [x * TS + TS / 2, y * TS + TS / 2]; }
@@ -427,6 +426,7 @@ XG.TacUI = (function () {
     if (st.cur && st.cur.e.t === 'move' && st.cur.e.id === u.id) {
       var p = st.cur.e.path, k = Math.min(1, (now - st.cur.t0) / (st.cur.end - st.cur.t0)) * (p.length - 1);
       var i = Math.min(p.length - 2, Math.floor(k)), f = k - i;
+      faceTo(u.id, Math.atan2(p[i + 1][1] - p[i][1], p[i + 1][0] - p[i][0]));
       return [p[i][0] + (p[i + 1][0] - p[i][0]) * f, p[i][1] + (p[i + 1][1] - p[i][1]) * f];
     }
     var d = st.displayPos[u.id];
@@ -434,38 +434,29 @@ XG.TacUI = (function () {
   }
 
   function draw(now) {
-    var b = st.b, theme = THEME[b.mission.kind];
+    var b = st.b, G = XG.Gfx;
+    var dt = Math.min(50, now - (st.lastNow || now)); st.lastNow = now;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = '#070d16'; ctx.fillRect(0, 0, W * TS, H * TS);
-    // floor + grid
-    for (var y = 0; y < H; y++) for (var x = 0; x < W; x++) {
-      var t = b.tiles[y * W + x], px = x * TS, py = y * TS;
-      ctx.fillStyle = (x + y) % 2 ? '#0b1422' : '#0c1625'; ctx.fillRect(px, py, TS, TS);
-      ctx.strokeStyle = 'rgba(' + theme + ',.06)'; ctx.strokeRect(px + .5, py + .5, TS - 1, TS - 1);
-      if (t === Tac.WALL) {
-        ctx.fillStyle = '#26364f'; ctx.fillRect(px, py, TS, TS);
-        ctx.fillStyle = '#3a5277'; ctx.fillRect(px, py, TS, 4);
-        ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.beginPath();
-        for (var hz = 8; hz < TS; hz += 8) { ctx.moveTo(px, py + hz + .5); ctx.lineTo(px + TS, py + hz + .5); }
-        ctx.stroke();
-      } else if (t === Tac.LOW) {
-        ctx.fillStyle = '#1a2c44'; ctx.fillRect(px + 4, py + 15, TS - 8, TS - 19);
-        ctx.strokeStyle = 'rgba(' + theme + ',.45)'; ctx.strokeRect(px + 4.5, py + 15.5, TS - 9, TS - 20);
-      } else if (t === Tac.HIGH) {
-        ctx.fillStyle = '#152238'; ctx.fillRect(px + 5, py + 3, TS - 10, TS - 6);
-        ctx.strokeStyle = '#34507a'; ctx.strokeRect(px + 5.5, py + 3.5, TS - 11, TS - 7);
-        ctx.fillStyle = 'rgba(' + theme + ',.7)';
-        for (var l = 0; l < 4; l++) ctx.fillRect(px + 10, py + 8 + l * 7, (l * 7 + x * 3 + y) % 13 + 4, 2);
-      }
-    }
+    var sh = shakeOffset(now); ctx.translate(sh[0], sh[1]);
+    ctx.drawImage(G.terrain(b, dpr).canvas, 0, 0, W * TS, H * TS);
+    G.ambient(ctx, b, now);
+    // light pools under visible units
+    var pools = [];
+    b.units.forEach(function (x) {
+      if (!x.alive || st.hidden[x.id]) return;
+      var p = unitPos(x, now);
+      if (x.side !== HS() && !b.visible[Math.round(p[1]) * W + Math.round(p[0])]) return;
+      pools.push({ x: p[0] * TS + TS / 2, y: p[1] * TS + TS / 2, r: x.isStatic ? 72 : 50, rgb: G.rgbOf(x.color), a: x.isStatic ? .22 : .12 });
+    });
+    G.lights(ctx, pools);
     // active scans
     b.scans.forEach(function (s) {
       var c = center(s.x, s.y);
-      ctx.strokeStyle = 'rgba(255,209,102,.35)'; ctx.setLineDash([4, 6]); ctx.beginPath(); ctx.arc(c[0], c[1], s.r * TS, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+      ctx.strokeStyle = 'rgba(255,209,102,.35)'; ctx.setLineDash([4, 6]); ctx.lineDashOffset = -now / 60; ctx.beginPath(); ctx.arc(c[0], c[1], s.r * TS, 0, 7); ctx.stroke(); ctx.setLineDash([]);
     });
-    // fog
-    ctx.fillStyle = 'rgba(2,4,8,.58)';
-    for (var fy = 0; fy < H; fy++) for (var fx = 0; fx < W; fx++) if (!b.visible[fy * W + fx]) ctx.fillRect(fx * TS, fy * TS, TS, TS);
+    G.fog(ctx, b);
+    G.motes(ctx, b, now);
 
     var u = selUnit(), idle = canInput();
     // movement range + path preview
@@ -502,25 +493,31 @@ XG.TacUI = (function () {
       drawUnit(x, pos, alpha, now);
     });
 
-    // fx
+    // fx and particles
     st.fx = st.fx.filter(function (f) { return now - f.t0 < f.dur; });
     st.fx.forEach(function (f) { drawFx(f, now); });
-    // floaters
-    st.floaters = st.floaters.filter(function (f) { return now - f.t0 < 1000; });
-    ctx.textAlign = 'center'; ctx.font = 'bold 13px "Share Tech Mono", monospace';
+    st.parts = G.particles(ctx, st.parts, now, dt);
+    // floaters: pop in, drift up, fade
+    st.floaters = st.floaters.filter(function (f) { return now - f.t0 < 1100; });
+    ctx.textAlign = 'center';
     st.floaters.forEach(function (f) {
-      var k = (now - f.t0) / 1000; if (k < 0) return;
-      var c = center(f.x, f.y);
-      ctx.globalAlpha = 1 - k * k; ctx.fillStyle = '#000'; ctx.fillText(f.text, c[0] + 1, c[1] - 22 - k * 26 + 1);
-      ctx.fillStyle = f.color; ctx.fillText(f.text, c[0], c[1] - 22 - k * 26); ctx.globalAlpha = 1;
+      var k = (now - f.t0) / 1100; if (k < 0) return;
+      var c = center(f.x, f.y), big = /CRIT/.test(f.text), pop = k < .12 ? .6 + k / .12 * .6 : k < .2 ? 1.2 - (k - .12) / .08 * .2 : 1;
+      ctx.save(); ctx.translate(c[0], c[1] - 24 - k * 28); ctx.scale(pop, pop);
+      ctx.font = 'bold ' + (big ? 17 : 13) + 'px "Share Tech Mono", monospace';
+      ctx.globalAlpha = 1 - k * k; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.85)'; ctx.strokeText(f.text, 0, 0);
+      ctx.fillStyle = f.color; ctx.fillText(f.text, 0, 0); ctx.restore();
     });
-    // turn banner flash
-    if (bannerEl && now - bannerEl.t0 < 1100) {
-      var a = 1 - (now - bannerEl.t0) / 1100;
-      ctx.globalAlpha = a * .9; ctx.fillStyle = 'rgba(4,8,14,.75)'; ctx.fillRect(0, H * TS / 2 - 34, W * TS, 68);
-      ctx.fillStyle = bannerEl.color; ctx.font = 'bold 34px Rajdhani, sans-serif';
-      ctx.fillText(bannerEl.text, W * TS / 2, H * TS / 2 + 12); ctx.globalAlpha = 1;
-    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    G.vignette(ctx, W * TS, H * TS);
+    if (bannerEl && now - bannerEl.t0 < 1300) G.banner(ctx, bannerEl.text, bannerEl.color, (now - bannerEl.t0) / 1300, W * TS, H * TS, now);
+  }
+  function shake(mag, now) { if (!XG.Gfx.REDUCED) st.shake = { t0: now, mag: Math.max(mag, st.shake && now - st.shake.t0 < 300 ? st.shake.mag : 0) }; }
+  function shakeOffset(now) {
+    if (!st.shake) return [0, 0];
+    var k = (now - st.shake.t0) / 380; if (k >= 1) { st.shake = null; return [0, 0]; }
+    var m = st.shake.mag * (1 - k) * (1 - k);
+    return [Math.sin(now / 17) * m, Math.cos(now / 23) * m];
   }
 
   // Hit odds against every known hostile if the unit stood on (x, y). Cached per tile/state.
@@ -607,66 +604,118 @@ XG.TacUI = (function () {
   }
 
   function drawUnit(x, pos, alpha, now) {
-    var c = [pos[0] * TS + TS / 2, pos[1] * TS + TS / 2], enemy = x.side === 'enemy' || x.origSide === 'enemy';
-    ctx.globalAlpha = Math.max(0, alpha);
+    var c = [pos[0] * TS + TS / 2, pos[1] * TS + TS / 2];
     if (x.id === st.sel && x.alive) {
       ctx.strokeStyle = '#4fd1ff'; ctx.setLineDash([6, 4]); ctx.lineDashOffset = -now / 40; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(c[0], c[1], 18, 0, 7); ctx.stroke(); ctx.setLineDash([]); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(c[0], c[1], 21, 0, 7); ctx.stroke(); ctx.setLineDash([]); ctx.lineWidth = 1;
     }
-    var R = x.isStatic ? 16 : 13;
-    ctx.fillStyle = enemy ? '#1d0a12' : '#0a1626';
-    ctx.strokeStyle = x.color; ctx.lineWidth = 2;
-    ctx.beginPath();
-    if (x.isStatic) { for (var k = 0; k < 6; k++) { var a = k * Math.PI / 3 + now / 1500; ctx.lineTo(c[0] + Math.cos(a) * R, c[1] + Math.sin(a) * R); } ctx.closePath(); }
-    else if (enemy) { ctx.moveTo(c[0], c[1] - R); ctx.lineTo(c[0] + R, c[1]); ctx.lineTo(c[0], c[1] + R); ctx.lineTo(c[0] - R, c[1]); ctx.closePath(); }
-    else ctx.arc(c[0], c[1], R, 0, 7);
-    ctx.fill(); ctx.stroke(); ctx.lineWidth = 1;
-    if (enemy && !x.isStatic) { ctx.shadowColor = x.color; ctx.shadowBlur = 10; }
-    ctx.fillStyle = x.color; ctx.font = 'bold 14px "Share Tech Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(x.glyph, c[0], c[1] + 1); ctx.textBaseline = 'alphabetic'; ctx.shadowBlur = 0;
-    // hp pips
-    var hp = st.displayHp[x.id] !== undefined ? st.displayHp[x.id] : x.hp, n = x.maxHp, pw = Math.min(5, 30 / n);
-    var x0 = c[0] - (n * pw) / 2;
-    for (var i = 0; i < n; i++) { ctx.fillStyle = i < hp ? (enemy ? '#ff4d6d' : '#7dff9b') : '#2a1820'; ctx.fillRect(x0 + i * pw, c[1] - 20, pw - 1, 3); }
-    for (var s = 0; s < x.shield; s++) { ctx.fillStyle = '#c792ff'; ctx.fillRect(x0 + s * pw, c[1] - 24, pw - 1, 2); }
-    // status
-    ctx.font = '10px "Share Tech Mono", monospace';
-    if (x.overwatch) { ctx.fillStyle = '#4fd1ff'; ctx.fillText('OW', c[0] - 13, c[1] + 19); }
-    if (x.hunker) { ctx.fillStyle = '#4fd1ff'; ctx.fillText('HNK', c[0] + 12, c[1] + 19); }
-    if (x.shield) { ctx.strokeStyle = 'rgba(199,146,255,.7)'; ctx.beginPath(); ctx.arc(c[0], c[1], 16, 0, 7); ctx.stroke(); }
-    if (x.marked) { ctx.strokeStyle = '#ffd166'; [[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(function (o) { ctx.beginPath(); ctx.moveTo(c[0] + o[0] * 17, c[1] + o[1] * 11); ctx.lineTo(c[0] + o[0] * 17, c[1] + o[1] * 17); ctx.lineTo(c[0] + o[0] * 11, c[1] + o[1] * 17); ctx.stroke(); }); }
-    if (x.stunned) { ctx.fillStyle = '#7dff9b'; ctx.fillText('zz', c[0] + 14, c[1] - 10); }
-    if (x.override) { ctx.fillStyle = '#7dff9b'; ctx.fillText('⟲' + x.override, c[0] + 14, c[1] - 10); }
-    if (x.side === 'enemy' && !x.alerted && !x.isStatic) { ctx.fillStyle = '#7d8ea5'; ctx.fillText('?', c[0] + 14, c[1] - 10); }
-    if (x.side === HS() && x.ap <= 0 && x.alive && st.b.side === HS() && !x.isStatic) { ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.arc(c[0], c[1], 13, 0, 7); ctx.fill(); }
-    ctx.globalAlpha = 1;
+    var fl = st.flash[x.id] ? 1 - (now - st.flash[x.id]) / 260 : 0;
+    if (fl <= 0) delete st.flash[x.id];
+    var kick = fl > 0 ? fl * 3 : 0, ang = facing(x, now);
+    XG.Gfx.unit(ctx, x, c[0] - Math.cos(ang) * kick, c[1] - Math.sin(ang) * kick, {
+      facing: ang, now: now, alpha: alpha, flash: Math.max(0, fl), human: HS(), myTurn: st.b.side === HS(),
+      hp: st.displayHp[x.id] !== undefined ? st.displayHp[x.id] : x.hp
+    });
+  }
+  // Facing: set by moves and shots, eased toward the target angle every frame.
+  function faceTo(id, ang) { st.face[id] = ang; }
+  function facing(x, now) {
+    var want = st.face[x.id] !== undefined ? st.face[x.id] : x.side === 'player' ? 0 : Math.PI, cur = st.faceDisp[x.id];
+    if (cur === undefined) cur = want;
+    var d = Math.atan2(Math.sin(want - cur), Math.cos(want - cur));
+    cur += d * Math.min(1, .25);
+    st.faceDisp[x.id] = cur;
+    return cur;
   }
 
+  var SHOT_RGB = { bullet: '255,233,168', lattice: '255,61,110', pulse: '199,146,255', spike: '255,61,242' };
   function drawFx(f, now) {
-    var e = f.e, k = Math.min(1, (now - f.t0) / (f.dur - 120 > 0 ? f.dur - 120 : f.dur));
-    if (e.t === 'shot' || e.t === 'hack') {
-      var a = center(e.fx, e.fy), z = center(e.tx, e.ty);
-      if (e.t === 'shot' && !e.hit) { z = [z[0] + (e.tx >= e.fx ? 12 : -12), z[1] - 14]; }
-      var col = e.t === 'hack' ? '#7dff9b' : { bullet: '#ffe9a8', lattice: '#ff3d6e', pulse: '#c792ff', spike: '#ff3df2' }[e.kind];
-      ctx.strokeStyle = col; ctx.globalAlpha = 1 - Math.max(0, (now - f.t0 - (f.dur - 120)) / 120);
-      ctx.lineWidth = e.kind === 'spike' ? 3 : 2;
-      if (e.t === 'hack') { ctx.setLineDash([3, 5]); ctx.lineDashOffset = -now / 20; }
-      var head = Math.min(1, k * 1.15), tail = Math.max(0, k * 1.15 - .35);
-      ctx.beginPath(); ctx.moveTo(a[0] + (z[0] - a[0]) * tail, a[1] + (z[1] - a[1]) * tail); ctx.lineTo(a[0] + (z[0] - a[0]) * head, a[1] + (z[1] - a[1]) * head); ctx.stroke();
-      ctx.setLineDash([]); ctx.lineWidth = 1; ctx.globalAlpha = 1;
+    var e = f.e, G = XG.Gfx, k = Math.min(1, (now - f.t0) / (f.dur - 120 > 0 ? f.dur - 120 : f.dur));
+    var fade = 1 - Math.max(0, (now - f.t0 - (f.dur - 120)) / 120);
+    if (e.t === 'shot') {
+      var a = center(e.fx, e.fy), z = center(e.tx, e.ty), ang = Math.atan2(z[1] - a[1], z[0] - a[0]);
+      if (!e.hit) { // the miss sails past the target and keeps going a little
+        var side = (e.id || e.from) % 2 ? 1 : -1;
+        z = [z[0] + Math.cos(ang) * 30 - Math.sin(ang) * 14 * side, z[1] + Math.sin(ang) * 30 + Math.cos(ang) * 14 * side];
+      }
+      var rgb = SHOT_RGB[e.kind] || SHOT_RGB.bullet, m0 = [a[0] + Math.cos(ang) * 16, a[1] + Math.sin(ang) * 16];
+      if (!f.fired) { f.fired = true; G.FX.muzzle(st.parts, m0[0], m0[1], ang, rgb, now); }
+      ctx.save(); ctx.globalAlpha = fade;
+      if (e.kind === 'spike') { if (k > .15) G.bolt(ctx, m0[0], m0[1], z[0], z[1], rgb, 2.5, Math.floor(now / 50)); }
+      else {
+        var head = Math.min(1, k * 1.25), tail = Math.max(0, k * 1.25 - (e.kind === 'pulse' ? .55 : .3));
+        G.tracer(ctx, m0[0], m0[1], z[0], z[1], tail, head, rgb, e.kind === 'pulse' ? 3.5 : e.kind === 'lattice' ? 2.5 : 2);
+      }
+      ctx.restore();
+      if (!f.landed && k >= .8) {
+        f.landed = true;
+        var tgt = Tac.unitById(st.b, e.to);
+        if (e.hit) G.FX.impact(st.parts, z[0], z[1], ang, rgb, !tgt || !!(tgt.machine || tgt.isStatic), now);
+        else G.FX.ricochet(st.parts, z[0], z[1], now);
+      }
+    } else if (e.t === 'hack') {
+      var h0 = center(e.fx, e.fy), h1 = center(e.tx, e.ty);
+      ctx.save(); ctx.globalAlpha = fade; ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = 'rgba(125,255,155,.25)'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(h0[0], h0[1]); ctx.lineTo(h1[0], h1[1]); ctx.stroke();
+      ctx.font = '11px "Share Tech Mono", monospace'; ctx.textAlign = 'center';
+      for (var j = 0; j < 12; j++) {
+        var q = k * 1.6 - j * .06; if (q < 0 || q > 1) continue;
+        ctx.fillStyle = 'rgba(125,255,155,' + (1 - j / 14) + ')';
+        ctx.fillText(G.hash(j, Math.floor(now / 70), 5) < .5 ? '0' : '1', h0[0] + (h1[0] - h0[0]) * q, h0[1] + (h1[1] - h0[1]) * q + Math.sin(q * 12 + j) * 4);
+      }
+      ctx.restore();
+      if (!f.landed && k >= .9) { f.landed = true; G.FX.stun(st.parts, h1[0], h1[1], now); }
     } else if (e.t === 'boom') {
-      var c = center(e.x, e.y), rr = (0.4 + k * 1.2) * TS;
-      ctx.globalAlpha = 1 - k; ctx.fillStyle = e.kind === 'emp' ? 'rgba(79,209,255,.5)' : 'rgba(255,123,58,.55)';
-      ctx.beginPath(); ctx.arc(c[0], c[1], rr, 0, 7); ctx.fill();
-      ctx.strokeStyle = e.kind === 'emp' ? '#4fd1ff' : '#ffd166'; ctx.lineWidth = 2; ctx.stroke(); ctx.lineWidth = 1; ctx.globalAlpha = 1;
+      var c = center(e.x, e.y);
+      if (e.kind === 'emp' && k < .8) { // arcs crawling over the blast area
+        ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 1 - k;
+        for (var n = 0; n < 5; n++) {
+          var aa = G.hash(n, Math.floor(now / 60), 7) * 6.28, rr = TS * 1.4 * G.hash(n, Math.floor(now / 60), 8);
+          G.bolt(ctx, c[0], c[1], c[0] + Math.cos(aa) * rr, c[1] + Math.sin(aa) * rr, '120,220,255', 1.2, n + Math.floor(now / 60));
+        }
+        ctx.restore();
+      }
     } else if (e.t === 'scan') {
       var c2 = center(e.x, e.y);
-      ctx.globalAlpha = 1 - k; ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(c2[0], c2[1], k * e.r * TS, 0, 7); ctx.stroke(); ctx.lineWidth = 1; ctx.globalAlpha = 1;
+      G.sweep(ctx, c2[0], c2[1], e.r * TS, k);
     } else if (e.t === 'spawn') {
       var c3 = center(e.x, e.y);
-      ctx.globalAlpha = 1 - k; ctx.strokeStyle = '#ff2a55'; ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.arc(c3[0], c3[1], (1 - k) * TS * 1.2 + 6, 0, 7); ctx.stroke(); ctx.lineWidth = 1; ctx.globalAlpha = 1;
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 1 - k;
+      var bg = ctx.createLinearGradient(0, c3[1] - 200, 0, c3[1]);
+      bg.addColorStop(0, 'rgba(255,42,85,0)'); bg.addColorStop(1, 'rgba(255,42,85,.7)');
+      ctx.fillStyle = bg; ctx.fillRect(c3[0] - 8 * (1 - k) - 2, c3[1] - 200, 16 * (1 - k) + 4, 200);
+      ctx.strokeStyle = '#ff2a55'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(c3[0], c3[1], (1 - k) * TS * 1.2 + 6, 0, 7); ctx.stroke();
+      ctx.restore(); ctx.lineWidth = 1;
+    }
+  }
+  // Particles and shake for events as they start playing (only for things the person can see).
+  function eventFx(e, now) {
+    var b = st.b, G = XG.Gfx, L = st.parts, u = e.id && Tac.unitById(b, e.id);
+    var seen = function (x, y) { return b.visible[y * W + x]; };
+    if (e.t === 'dmg') {
+      st.flash[e.id] = now;
+      if (e.crit) shake(3, now);
+    } else if (e.t === 'heal') { var hc = center(e.x, e.y); G.FX.heal(L, hc[0], hc[1], now); }
+    else if (e.t === 'death' && u && (u.side === HS() || seen(e.x, e.y))) {
+      var dc = center(e.x, e.y), rgb = G.rgbOf(u.color), soft = !!D.software[u.kind] && u.sid < 0;
+      if (u.kind === 'harmonic' || soft) G.FX.derez(L, dc[0], dc[1], rgb, now);
+      else if (u.machine || u.isStatic) {
+        G.FX.wreck(L, dc[0], dc[1], rgb, now); shake(u.isStatic ? 9 : 4, now);
+        if (G.biomeOf(b) !== 'cyber') G.decal(b, 'scorch', e.x, e.y, u.isStatic ? 1.6 : 1);
+        if (u.isStatic) G.FX.explosion(L, dc[0], dc[1], 1.2, now);
+      } else G.FX.downed(L, dc[0], dc[1], rgb, now);
+    } else if (e.t === 'boom') {
+      var bc = center(e.x, e.y);
+      if (e.kind === 'emp') { G.FX.emp(L, bc[0], bc[1], e.r || 1, now); shake(4, now); }
+      else { G.FX.explosion(L, bc[0], bc[1], e.r || 1, now); shake(8, now); if (G.biomeOf(b) !== 'cyber') G.decal(b, 'scorch', e.x, e.y, 1.8); }
+    } else if (e.t === 'spawn') { var sc = center(e.x, e.y); G.FX.warp(L, sc[0], sc[1], now); }
+    else if (e.t === 'text' && seen(e.x, e.y)) {
+      var tc = center(e.x, e.y);
+      if (/SHIELD|AEGIS/.test(e.text)) G.FX.shieldUp(L, tc[0], tc[1], now);
+      else if (e.text === '!') G.FX.alert(L, tc[0], tc[1], now);
+      else if (/STUNNED|OVERRIDDEN/.test(e.text)) G.FX.stun(L, tc[0], tc[1], now);
+    } else if (e.t === 'shot' || e.t === 'hack') {
+      faceTo(e.from, Math.atan2(e.ty - e.fy, e.tx - e.fx));
     }
   }
 

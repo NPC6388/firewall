@@ -115,9 +115,10 @@ XG.UI = (function () {
     var vis = St.infectionVisible(g), H = 56.25, pos = {};
     D.regions.forEach(function (r) { pos[r.id] = [r.x, r.y * H / 100]; });
     var s = '<svg class="worldmap" viewBox="0 0 100 ' + H + '" role="img" aria-label="Regional infection map">';
+    s += XG.Backdrop.mapDecor({ H: H, accent: '79,209,255', packet: '#4fd1ff', signal: '#ff2a55', pos: pos, links: D.links,
+      tint: function (id) { var inf = St.region(g, id).infection; return vis ? [infColor(inf), .05 + inf / 300] : ['#4a5d78', .06]; } });
     D.links.forEach(function (l) { s += '<line class="link" x1="' + pos[l[0]][0] + '" y1="' + pos[l[0]][1] + '" x2="' + pos[l[1]][0] + '" y2="' + pos[l[1]][1] + '"/>'; });
     s += '<text x="50" y="4" fill="#2f4560" font-size="2" text-anchor="middle" letter-spacing=".4">HALCYON GLOBAL NETWORK VIEW</text>';
-    s += '<circle cx="50" cy="' + (H / 2) + '" r="0.6" fill="#ff2a55"><animate attributeName="opacity" values="1;.2;1" dur="1.6s" repeatCount="indefinite"/></circle>';
     D.regions.forEach(function (r) {
       var gr = St.region(g, r.id), p = pos[r.id], inf = gr.infection, col = vis ? infColor(inf) : '#4a5d78';
       var rad = 2.2 + (vis ? inf / 25 : 1.2);

@@ -36,6 +36,8 @@ they assault the Uplink: hold it or lose.
 | `Enter` | End turn |
 | `Esc` / right-click | Cancel |
 
+The game honours your system's *reduce motion* setting: no screen shake, fewer particles, a still title globe.
+
 Hover a tile to see its cover (shield icons: filled = full, hollow = half). Hover an enemy to see hit %, crit % and its cover from your angle: cover counts in full within 30° of head-on, fades to half by about 63°, and past that the target is flanked.
 
 ## Project layout
@@ -46,7 +48,9 @@ Hover a tile to see its cover (shield icons: filled = full, hollow = half). Hove
 | `js/strategy.js` | FIREWALL campaign rules: day clock, research, base, missions, Convergence, mission results |
 | `js/lattice.js` | LATTICE campaign rules: compute, protocols, the Array, forces, Detection/Trace, breaches, raids, strikes, the AI FIREWALL |
 | `js/tactical.js` | Pure battle engine (no DOM): map gen, LOS, cover, abilities, AI, turns. `b.human` is the side the person plays |
-| `js/tactical-ui.js` | Canvas renderer, input, event animation queue |
+| `js/tactical-ui.js` | Tactical screen: input, HUD, event animation queue, draw order |
+| `js/gfx.js` | Procedural graphics, no image files: baked terrain for four biomes (city, relay, uplink, cyberspace), unit sprites, particles, fog, lights, banners |
+| `js/backdrop.js` | World-map continents, data packets and satellite; the animated title globe |
 | `js/ui.js` | FIREWALL strategy screens, modals, story player |
 | `js/lattice-ui.js` | LATTICE strategy screens (magenta theme), squad picker, results |
 | `js/main.js` | Boot and click-action router |
@@ -63,6 +67,8 @@ Browser check (drives the real page in headless Edge, reports page errors):
 node tests/browser/drive.mjs tests/browser/playthrough.mjs
 node tests/browser/drive.mjs tests/browser/finale.mjs
 node tests/browser/drive.mjs tests/browser/lattice.mjs
+node tests/browser/drive.mjs tests/browser/gfx-gallery.mjs   # zoomed shots of every sprite in every biome, plus effects and fps
+node tests/browser/drive.mjs tests/browser/gfx-profile.mjs   # milliseconds per frame for each drawing stage
 ```
 Add `PAGE_URL=https://npc6388.github.io/firewall/` in front of either command to test the live site.
 The smoke test prints win/loss per mission type and difficulty, and how each simulated campaign ended. Exit code 1 means a check failed.
