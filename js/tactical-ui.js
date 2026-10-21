@@ -472,7 +472,8 @@ XG.TacUI = (function () {
     var b = st.b, h = st.hover, u = selUnit(), html = '';
     var focus = st.aim ? Tac.unitById(b, st.aim) : h ? unitAtVisible(h.x, h.y) : null;
     if (focus && focus.alive) {
-      html = '<b style="color:' + focus.color + '">' + focus.name + '</b><div>HP ' + focus.hp + '/' + focus.maxHp + (focus.armor ? ' · armor ' + focus.armor : '') + (focus.shield ? ' · shield ' + focus.shield : '') + '</div>';
+      html = '<b style="color:' + focus.color + '">' + focus.name + '</b><div>HP ' + focus.hp + '/' + focus.maxHp + (focus.armor ? ' · armor ' + focus.armor : '') + (focus.shield ? ' · shield ' + focus.shield : '') +
+        (focus.side === b.human && !focus.isStatic ? ' · <span class="' + (focus.ap ? 'good' : 'dim') + '">' + focus.ap + ' AP left</span>' : '') + '</div>';
       if (focus.side !== b.human) {
         var E = D.enemies[focus.kind] || D.classes[focus.kind] || D.software[focus.kind];
         html += (focus.rank ? '<div class="dim">' + focus.rank + ' ' + E.name + '</div>' : '') + '<div class="dim">' + E.blurb + '</div>';
@@ -804,6 +805,20 @@ XG.TacUI = (function () {
       facing: ang, now: now, alpha: alpha, flash: Math.max(0, fl), human: HS(), myTurn: st.b.side === HS(),
       hp: st.displayHp[x.id] !== undefined ? st.displayHp[x.id] : x.hp
     });
+    var h = st.hover;
+    if (h && h.x === pos[0] && h.y === pos[1] && x.alive && x.side === HS() && !x.isStatic && st.b.side === HS()) apPips(x, c);
+  }
+  // AP left on a hovered unit of yours: a little column of diamonds on the sprite's left (clear of the gun, the HP bar
+  // and the neighbours' badges), filled = AP left, outlined = spent, read top to bottom.
+  function apPips(x, c) {
+    var n = Math.max(2, x.ap), gap = 8, px = c[0] - 18, y0 = c[1] - (n - 1) * gap / 2;
+    ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(px - 5, y0 - 6, 10, (n - 1) * gap + 12);
+    for (var i = 0; i < n; i++) {
+      var y = y0 + i * gap;
+      ctx.beginPath(); ctx.moveTo(px, y - 3.5); ctx.lineTo(px + 3, y); ctx.lineTo(px, y + 3.5); ctx.lineTo(px - 3, y); ctx.closePath();
+      if (i < x.ap) { ctx.fillStyle = i >= 2 ? '#ffd166' : '#4fd1ff'; ctx.fill(); } // a third (overclocked) AP shows gold
+      else { ctx.strokeStyle = 'rgba(79,209,255,.4)'; ctx.lineWidth = 1; ctx.stroke(); }
+    }
   }
   // Facing: set by moves and shots, eased toward the target angle every frame.
   function faceTo(id, ang) { st.face[id] = ang; }
