@@ -45,7 +45,7 @@ XG.LUI = (function () {
     D.regions.forEach(function (r) { pos[r.id] = [r.x, r.y * H / 100]; });
     var s = '<svg class="worldmap" viewBox="0 0 100 ' + H + '" role="img" aria-label="Your infection across Earth">';
     s += XG.Backdrop.mapDecor({ H: H, key: 'l', accent: '255,61,242', packet: '#ff3df2', signal: '#ff3df2', pos: pos, links: D.links,
-      cell: function (id, f) { return XG.Backdrop.spread(Lat.region(g, id).infection, f); } });
+      cell: function (id, f) { return XG.Backdrop.spread(Lat.region(g, id).infection, f, infColor); } });
     D.links.forEach(function (l) { s += '<line class="link" x1="' + pos[l[0]][0] + '" y1="' + pos[l[0]][1] + '" x2="' + pos[l[1]][0] + '" y2="' + pos[l[1]][1] + '"/>'; });
     s += '<text x="50" y="' + (H - 1.4) + '" fill="#5a2a55" font-size="2" text-anchor="middle" letter-spacing=".4">LATTICE SUBSTRATE MAP</text>';
     // infection halos first (area ∝ infection), so no halo covers another region's node or label

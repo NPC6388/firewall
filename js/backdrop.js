@@ -219,18 +219,12 @@ XG.Backdrop = (function () {
       '<circle class="halo-rough" cx="' + x + '" cy="' + y + '" r="' + r.toFixed(2) + '" fill="' + col + '" fill-opacity=".26" filter="url(#haze-' + id + ')"/>';
   }
 
-  // Land heat scale: green (0%) -> yellow (50%) -> red (100%).
-  function heat(p) {
-    var t = Math.max(0, Math.min(100, p)) / 100, g = [80, 220, 110], y = [255, 209, 80], r = [255, 50, 70];
-    var a = t < .5 ? g : y, z = t < .5 ? y : r, k = t < .5 ? t * 2 : (t - .5) * 2;
-    return 'rgb(' + a.map(function (v, i) { return Math.round(v + (z[i] - v) * k); }).join(',') + ')';
-  }
   // Infection spreading out from a region's node: the region's infection at the node, falling to 0% at the
-  // region's farthest pixel (frac 1), coloured on the heat scale.
-  function spread(inf, frac) {
+  // region's farthest pixel (frac 1), in the campaign's own infection colours (colorOf: % -> colour).
+  function spread(inf, frac, colorOf) {
     var local = Math.max(0, Math.min(100, inf)) * (1 - frac);
-    return [heat(Math.round(local / 5) * 5), .5];
+    return [colorOf(Math.round(local / 5) * 5), .5];
   }
 
-  return { mapDecor: mapDecor, LAND: LAND, spread: spread, heat: heat, halo: halo, haloRadius: haloRadius, roughHalo: roughHalo, roughBand: roughBand };
+  return { mapDecor: mapDecor, LAND: LAND, spread: spread, halo: halo, haloRadius: haloRadius, roughHalo: roughHalo, roughBand: roughBand };
 })();
