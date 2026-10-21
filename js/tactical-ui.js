@@ -49,7 +49,7 @@ XG.TacUI = (function () {
       else if (e.key === 'Tab') { e.preventDefault(); if (st.mode) cycleTarget(e.shiftKey ? -1 : 1); else cycle(); }
       else if (e.key === 'Enter') endTurn();
       else if (e.key === 'o' || e.key === 'O') overclock();
-      else if (e.key === ' ') { e.preventDefault(); confirmArmed(); }
+      else if (e.key === ' ') { e.preventDefault(); if (!(XG.Tutorial && XG.Tutorial.advance())) confirmArmed(); }
       else if (e.key === 'y' || e.key === 'Y') overwatchAll();
       else if (e.key === 'm' || e.key === 'M') XG.Settings.set('muted', !XG.Settings.get('muted'));
       else if (e.key === '?' || e.key === 'F1') { e.preventDefault(); XG.Help.open(); }

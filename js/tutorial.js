@@ -81,7 +81,7 @@ XG.Tutorial = (function () {
     var list = steps(), st = list[run.step], el = $('coach'), train = run.side === 'train';
     var text = typeof st.t === 'function' ? st.t(run, run.b) : st.t, key = run.side + run.step;
     if (!el) { el = document.createElement('div'); el.id = 'coach'; el.className = 'coach'; document.querySelector('.canvas-wrap').appendChild(el); }
-    var btn = st.done === 'next' ? '<button class="primary coach-go" id="coach-next">Next ▸</button>' : !st.done ? '<button class="primary" id="coach-ok">' + (st.finish || 'Got it') + '</button>' : '';
+    var btn = st.done === 'next' ? '<button class="primary coach-go" id="coach-next">Next ▸' + (train ? ' <span class="dim">Space</span>' : '') + '</button>' : !st.done ? '<button class="primary" id="coach-ok">' + (st.finish || 'Got it') + (train ? ' <span class="dim">Space</span>' : '') + '</button>' : '';
     el.innerHTML = '<div class="coach-h"><span>' + (train ? 'COMBAT TRAINING ' : 'TRAINING ') + (run.step + 1) + '/' + list.length + '</span><button id="coach-skip" title="' + (train ? 'Leave the range' : 'Turn the tutorial off') + '">' +
       (train ? 'Leave' : 'Skip tutorial') + '</button></div><div class="coach-t">' + text + '</div>' + (btn ? '<div class="coach-a">' + btn + '</div>' : '');
     el.classList.remove('hidden');
@@ -89,6 +89,13 @@ XG.Tutorial = (function () {
     $('coach-skip').onclick = function () { finish(true); };
     if ($('coach-ok')) $('coach-ok').onclick = function () { finish(true); };
     if ($('coach-next')) $('coach-next').onclick = function () { run.step++; run.turn = run.b.turn; if (XG.Audio) XG.Audio.play('select'); battleUpdate(run.b, null, null, null); };
+  }
+  // Space in combat training presses the coach's button (Next / Finish) when there is one; otherwise it fires as usual.
+  function advance() {
+    if (!run || run.side !== 'train') return false;
+    var btn = $('coach-next') || $('coach-ok');
+    if (!btn || $('coach').classList.contains('hidden')) return false;
+    btn.click(); return true;
   }
   function hide() { var el = $('coach'); if (el) el.classList.add('hidden'); }
 
@@ -245,6 +252,6 @@ XG.Tutorial = (function () {
     return '<div class="tip"><span class="tip-i">TIP</span><span class="tip-t">' + text + '</span><button data-action="tip-ok" data-arg="' + id + '">Got it</button></div>';
   }
 
-  return { startTraining: startTraining, overlay: overlay, battleStart: battleStart, battleUpdate: battleUpdate, event: event, finish: finish, stratTip: stratTip, STEPS: STEPS,
+  return { startTraining: startTraining, overlay: overlay, battleStart: battleStart, battleUpdate: battleUpdate, advance: advance, event: event, finish: finish, stratTip: stratTip, STEPS: STEPS,
     goal: function () { var st = run && run.side === 'train' && TRAIN_STEPS[run.step], k = st && st.goal && T(run.b); return k && k.tr ? goalTile(run.b, st, k) : null; }, TIPS: TIPS, state: function () { return run && { side: run.side, step: run.step, shots: run.shots }; } };
 })();
