@@ -646,10 +646,10 @@ XG.Gfx = (function () {
 
   // HP plate, shield, and status icons around a unit.
   function badges(c, u, cx, cy, o) {
-    var P = pal(), enemy = u.side === 'enemy', n = u.maxHp, hp = o.hp, pw = Math.min(5, 30 / n), w = n * pw, x0 = cx - w / 2, y0 = cy - 23;
+    var P = pal(), enemy = u.side === 'enemy', n = u.maxHp, hp = o.hp, pw = Math.min(5, 30 / n), w = n * pw, x0 = cx - w / 2, y0 = Math.max(4, cy - 23); // top row: keep it on the map
     c.fillStyle = 'rgba(0,0,0,.65)'; c.fillRect(x0 - 2, y0 - 2, w + 3, 7);
     for (var i = 0; i < n; i++) { c.fillStyle = i < hp ? (enemy ? P.hpLat : P.hpFw) : '#2a1820'; c.fillRect(x0 + i * pw, y0, pw - 1, 3); }
-    for (var s = 0; s < u.shield; s++) { c.fillStyle = '#c792ff'; c.fillRect(x0 + s * pw, y0 - 4, pw - 1, 2); }
+    for (var s = 0; s < u.shield; s++) { c.fillStyle = '#c792ff'; c.fillRect(x0 + s * pw, y0 < 6 ? y0 + 4 : y0 - 4, pw - 1, 2); }
     if (u.shield) { c.strokeStyle = 'rgba(199,146,255,' + (.45 + .25 * Math.sin(o.now / 200)) + ')'; c.lineWidth = 1.5; circle(c, cx, cy, 19); c.stroke(); c.lineWidth = 1; }
     if (u.overwatch) eye(c, cx - 15, cy + 17, '#4fd1ff');
     if (u.hunker) shieldIcon(c, cx + 15, cy + 17, '#4fd1ff');

@@ -309,6 +309,8 @@ XG.Strat = (function () {
 
     // --------------------------------------------------------- results
     // result: { outcome:'win'|'loss'|'abort', units:[{sid, hp, alive, kills}], salvage }
+    // Credits a mission pays on success: its reward, but never below the minimum (the final mission ends the war instead).
+    missionCredits: function (m) { return m.kind === 'uplink' ? 0 : Math.max(D.tuning.minMissionCredits || 0, (m.reward && m.reward.credits) || 0); },
     resolveMission: function (g, missionId, result) {
       var m = g.missions.filter(function (x) { return x.id === missionId; })[0];
       var out = { mission: m, outcome: result.outcome, deaths: [], promotions: [], salvage: 0, credits: 0, infection: 0 };
@@ -333,7 +335,7 @@ XG.Strat = (function () {
       if (result.outcome === 'win') {
         g.stats.missionsWon++;
         out.salvage = (m.reward.salvage || 0) + (result.salvage || 0);
-        out.credits = m.reward.credits || 0;
+        out.credits = Strat.missionCredits(m);
         out.infection = -(m.reward.infection || 0);
         g.salvage += out.salvage; g.credits += out.credits;
         reg.infection = Math.max(0, reg.infection + out.infection);

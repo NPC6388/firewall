@@ -650,8 +650,8 @@ XG.Tac = (function () {
     hunker: function (b, u) {
       if (!canAct(b, u)) return null;
       var ev = []; spend(u, 'hunker'); u.hunker = true;
-      ev.push({ t: 'text', x: u.x, y: u.y, text: 'HUNKER', color: '#4fd1ff' });
-      log(b, ev, u.short + ' hunkers down.', ''); return after(b, ev);
+      ev.push({ t: 'text', x: u.x, y: u.y, text: 'HUNKER −25', color: '#4fd1ff' });
+      log(b, ev, u.short + ' hunkers down: shots at it get −25 to hit until its next turn.', ''); return after(b, ev);
     },
     grenade: function (b, u, x, y) {
       if (!canAct(b, u) || abilityBlock(b, u, 'grenade') || !tileOk(b, u, 'grenade', x, y)) return null;

@@ -153,7 +153,7 @@ XG.UI = (function () {
 
   function missionCard(g, m) {
     var cls = m.kind === 'relay' ? 'story' : m.kind === 'uplink' ? 'final' : '';
-    var rew = m.kind === 'uplink' ? 'Ends the war.' : 'Reward: ' + m.reward.salvage + ' salvage' + (m.reward.credits ? ', §' + m.reward.credits : '') + ', region infection -' + m.reward.infection + '%';
+    var rew = m.kind === 'uplink' ? 'Ends the war.' : 'Reward: ' + m.reward.salvage + ' salvage' + ', §' + St.missionCredits(m) + ', region infection -' + m.reward.infection + '%';
     var ready = g.soldiers.filter(function (s) { return S.available(g, s); }).length;
     return '<div class="mission ' + cls + '"><div class="mh"><span class="mn">' + m.name + '</span><span class="' + (m.daysLeft !== null && m.daysLeft <= 1 ? 'bad' : 'dim') + '">' +
       (m.daysLeft === null ? 'story' : m.daysLeft + 'd left') + '</span></div>' +

@@ -384,9 +384,24 @@ XG.TacUI = (function () {
     $('tac-abort').disabled = !canInput();
     infoPanel(u);
   }
+  // What Hunker Down buys: every visible hostile's chance to hit u now, and if u hunkers.
+  function hunkerOdds(u) {
+    var b = st.b, was = u.hunker, out = [];
+    b.units.forEach(function (e) {
+      if (!e.alive || e.side === HS() || e.isStatic || !b.visible[e.y * W + e.x]) return;
+      u.hunker = false; var a = Tac.hitInfo(b, e, u); u.hunker = true; var h = Tac.hitInfo(b, e, u);
+      if (a.ok) out.push({ e: e, now: a.chance, hunk: h.chance });
+    });
+    u.hunker = was;
+    return out;
+  }
   function modeHint() {
     var A = D.abilities[st.mode];
     var u = selUnit(), k = u ? u.abilities.indexOf(st.mode) + 1 : 0;
+    if (st.mode === 'hunker' && u) {
+      var ho = hunkerOdds(u), best = ho.reduce(function (m, o) { return o.now > m.now ? o : m; }, { now: -1 });
+      return (best.now >= 0 ? 'Hunkered, the best shot on you drops from ' + best.now + '% to ' + best.hunk + '%. ' : 'No visible hostile has a shot at you right now. ') + 'Press ' + k + ' again or Space to confirm. Esc cancels.';
+    }
     if (A.target === 'self') return 'Press ' + k + ' again or Space to confirm. Esc cancels.';
     if (A.target === 'enemy') return 'Tab cycles targets. Click the target again, or press ' + k + ' or Space, to fire. Esc cancels.';
     if (A.target === 'ally') return 'Click an ally, or Tab to one and press ' + k + ' or Space. Esc cancels.';
@@ -476,6 +491,8 @@ XG.TacUI = (function () {
   }
 
   function center(x, y) { return [x * TS + TS / 2, y * TS + TS / 2]; }
+  // Labels sit above a unit; on the top row there's no room, so they go below it instead.
+  function labelY(c) { return c[1] < TS ? c[1] + 58 : c[1]; }
   function unitPos(u, now) {
     if (st.cur && st.cur.e.t === 'move' && st.cur.e.id === u.id) {
       var p = st.cur.e.path, k = Math.min(1, (now - st.cur.t0) / (st.cur.end - st.cur.t0)) * (p.length - 1);
@@ -558,7 +575,7 @@ XG.TacUI = (function () {
     st.floaters.forEach(function (f) {
       var k = (now - f.t0) / 1100; if (k < 0) return;
       var c = center(f.x, f.y), big = /CRIT/.test(f.text), pop = k < .12 ? .6 + k / .12 * .6 : k < .2 ? 1.2 - (k - .12) / .08 * .2 : 1;
-      ctx.save(); ctx.translate(c[0], c[1] - 24 - k * 28); ctx.scale(pop, pop);
+      ctx.save(); ctx.translate(c[0], Math.max(16, c[1] - 24 - k * 28)); ctx.scale(pop, pop);
       ctx.font = 'bold ' + (big ? 17 : 13) + 'px "Share Tech Mono", monospace';
       ctx.globalAlpha = 1 - k * k; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.85)'; ctx.strokeText(f.text, 0, 0);
       ctx.fillStyle = f.color; ctx.fillText(f.text, 0, 0); ctx.restore();
@@ -599,9 +616,9 @@ XG.TacUI = (function () {
       var c = center(it.e.x, it.e.y), txt = it.hi.ok ? it.hi.chance + '%' : '–';
       ctx.font = 'bold 12px "Share Tech Mono", monospace';
       var w = ctx.measureText(txt).width + 8;
-      ctx.fillStyle = 'rgba(0,0,0,.8)'; ctx.fillRect(c[0] - w / 2, c[1] - 38, w, 15);
+      ctx.fillStyle = 'rgba(0,0,0,.8)'; ctx.fillRect(c[0] - w / 2, labelY(c) - 38, w, 15);
       ctx.fillStyle = !it.hi.ok ? '#7d8ea5' : o.dash ? 'rgba(255,209,102,.5)' : it.hi.cover === 0 ? XG.Gfx.pal().flank : '#ffd166';
-      ctx.fillText(txt, c[0], c[1] - 26);
+      ctx.fillText(txt, c[0], labelY(c) - 26);
       if (it.hi.ok && !o.dash) {
         var s = center(x, y);
         ctx.strokeStyle = 'rgba(255,209,102,.18)'; ctx.setLineDash([2, 6]); ctx.beginPath(); ctx.moveTo(s[0], s[1]); ctx.lineTo(c[0], c[1]); ctx.stroke(); ctx.setLineDash([]);
@@ -634,6 +651,12 @@ XG.TacUI = (function () {
       ctx.font = 'bold 11px "Share Tech Mono", monospace'; ctx.textAlign = 'center';
       var lab = A.name + ' · Space', lw = ctx.measureText(lab).width + 10;
       ctx.fillStyle = 'rgba(0,0,0,.8)'; ctx.fillRect(cs[0] - lw / 2, cs[1] + 26, lw, 15); ctx.fillStyle = '#ffd166'; ctx.fillText(lab, cs[0], cs[1] + 37);
+      if (st.mode === 'hunker') hunkerOdds(u).forEach(function (o) {
+        var c = center(o.e.x, o.e.y), txt = o.now + '% → ' + o.hunk + '%';
+        ctx.font = 'bold 12px "Share Tech Mono", monospace'; var w = ctx.measureText(txt).width + 10;
+        ctx.fillStyle = 'rgba(0,0,0,.85)'; ctx.fillRect(c[0] - w / 2, labelY(c) - 40, w, 16); ctx.fillStyle = '#4fd1ff'; ctx.fillText(txt, c[0], labelY(c) - 28);
+        ctx.strokeStyle = 'rgba(79,209,255,.25)'; ctx.setLineDash([3, 6]); ctx.beginPath(); ctx.moveTo(c[0], c[1]); ctx.lineTo(cs[0], cs[1]); ctx.stroke(); ctx.setLineDash([]);
+      });
       return;
     }
     if (A.target === 'enemy' || A.target === 'ally') {
@@ -644,8 +667,8 @@ XG.TacUI = (function () {
         if (A.target === 'enemy') {
           var ch = st.mode === 'hack' ? Math.max(10, Math.min(90, u.hackSkill - t.hackDef)) : st.mode === 'sever' ? Math.min(90, u.hackSkill + 10) : Tac.hitInfo(b, u, t).chance;
           ctx.font = 'bold ' + (aimed ? 15 : 12) + 'px "Share Tech Mono", monospace'; ctx.textAlign = 'center';
-          ctx.fillStyle = '#000'; ctx.fillRect(c[0] - 18, c[1] - 36, 36, 15);
-          ctx.fillStyle = '#ffd166'; ctx.fillText(ch + '%', c[0], c[1] - 24);
+          ctx.fillStyle = '#000'; ctx.fillRect(c[0] - 18, labelY(c) - 36, 36, 15);
+          ctx.fillStyle = '#ffd166'; ctx.fillText(ch + '%', c[0], labelY(c) - 24);
           if (aimed) {
             var s = center(u.x, u.y); ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.moveTo(s[0], s[1]); ctx.lineTo(c[0], c[1]); ctx.stroke(); ctx.setLineDash([]);
           }
@@ -781,7 +804,7 @@ XG.TacUI = (function () {
       if (/SHIELD|AEGIS/.test(e.text)) { G.FX.shieldUp(L, tc[0], tc[1], now); A.play('shield'); }
       else if (e.text === '!') { G.FX.alert(L, tc[0], tc[1], now); A.play('alert'); }
       else if (/STUNNED|OVERRIDDEN/.test(e.text)) { G.FX.stun(L, tc[0], tc[1], now); A.play('stun'); }
-      else if (e.text === 'OVERWATCH' || e.text === 'HUNKER') A.play('overwatch');
+      else if (e.text === 'OVERWATCH' || /^HUNKER/.test(e.text)) A.play('overwatch');
     } else if (e.t === 'shot' || e.t === 'hack') {
       faceTo(e.from, Math.atan2(e.ty - e.fy, e.tx - e.fx));
       var from = Tac.unitById(b, e.from), to = Tac.unitById(b, e.to);

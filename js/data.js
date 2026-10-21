@@ -43,7 +43,7 @@ XG.DATA = {
     shoot:     { name: 'Shoot',        key: '1', target: 'enemy', ends: true,  desc: 'Fire your weapon. Ends turn.' },
     overwatch: { name: 'Overwatch',    key: '2', target: 'self',  ends: true,  desc: 'Shoot the first hostile that moves in view (-15 aim).' },
     grenade:   { name: 'Grenade',      key: '3', target: 'tile',  ends: true,  range: 8, charges: 1, desc: 'Frag: 3 dmg in 3×3, destroys cover. EMP upgrade: 5 vs machines, harmless to humans.' },
-    hunker:    { name: 'Hunker Down',  key: '4', target: 'self',  ends: true,  desc: '+25 defense until your next turn.' },
+    hunker:    { name: 'Hunker Down',  key: '4', target: 'self',  ends: true,  desc: 'Brace in place: every shot at you gets −25 to hit until your next turn (on top of cover). Ends the turn.' },
     hack:      { name: 'Hack',         key: '3', target: 'enemy', ends: true,  range: 10, desc: 'Stun a Lattice machine for 2 turns, or override it (Lattice Grammar).' },
     medkit:    { name: 'Medkit',       key: '3', target: 'ally',  ends: false, range: 1, charges: 2, desc: 'Heal an adjacent ally for 4. Costs 1 AP.' },
     scan:      { name: 'Sensor Scan',  key: '4', target: 'tile',  ends: false, range: 12, cooldown: 3, desc: 'Reveal a 5-tile radius and mark hostiles (+15 aim vs them). 1 AP.' },
@@ -169,6 +169,7 @@ XG.DATA = {
     expirePenalty: { infection: 10, convergence: 2 },
     fundingPerRegion: 32,      // credits per month at 0% infection
     hireCost: 30,
+    minMissionCredits: 15,     // every won mission pays at least this
     missionEvery: [3, 5],
     missionLife: [4, 6]
   },

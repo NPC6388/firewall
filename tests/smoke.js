@@ -69,6 +69,11 @@ function autoBattle(g, m, squad) {
   check(g.base[1] && g.credits === c1, 'no refund before demolition ends');
   Strat.advanceDay(g);
   check(g.base[1] === null && g.credits >= c1 + 40, 'demolition frees slot and refunds 50%');
+  // every won mission pays at least the minimum credits, even if its rolled reward was 0
+  var gm = S.newGame(12), rm = S.rng(gm), mm = Strat.spawnMission(gm, rm, 'purge'); S.saveRng(gm, rm);
+  mm.reward.credits = 0; var cr0 = gm.credits;
+  var outm = Strat.resolveMission(gm, mm.id, { outcome: 'win', units: [], salvage: 0 });
+  check(outm.credits === XG.DATA.tuning.minMissionCredits && gm.credits === cr0 + outm.credits, 'won missions pay at least the minimum credits (' + outm.credits + ')');
   // a generator that is carrying load cannot be demolished
   var g2 = S.newGame(10); g2.credits = 999;
   Strat.build(g2, 'generator', 1); g2.base[1].daysLeft = 0;

@@ -13,7 +13,7 @@ XG.Help = (function () {
     ['Flanked', 'both', 'A target with no cover toward the shooter. Easier to hit and +25% crit chance. Odds shown in green on the move preview.'],
     ['Critical hit', 'both', 'Extra damage. Base crit comes from the weapon; flanking adds 25%.'],
     ['Overwatch', 'both', 'Ends the turn; the unit shoots the first hostile that moves in view, at −15 aim.'],
-    ['Hunker down', 'both', '+25 defense until your next turn. Use it when there is nothing to shoot and cover is thin.'],
+    ['Hunker down', 'both', 'Every shot at you gets −25 to hit until your next turn, on top of cover (so 45% becomes 20%). Arm it to see each visible enemy\'s odds on you now and hunkered. Use it when you can\'t shoot and can\'t reach better cover.'],
     ['Fog of war', 'both', 'You only see what your units see (about 9 tiles, blocked by walls). Hostiles out of sight are not drawn.'],
     ['Hit chance', 'both', 'Aim, minus cover and defense, plus close-range and scan bonuses, minus long-range and overwatch penalties, kept between 5% and 95%. Hover a target to see the breakdown.'],
     ['Hack', 'fw', 'Hackers can stun a Lattice machine for 2 turns. With Lattice Grammar researched, a successful hack takes control of it instead. Each success raises that hacker\'s skill by 1.'],
