@@ -44,7 +44,7 @@ Your first battle on each side runs a short tutorial (skip it any time), and eac
 
 The game honours your system's *reduce motion* setting: no screen shake, fewer particles, a still title globe.
 
-Hover a tile to see its cover (shield icons: filled = full, half-filled = half). Hover an enemy to see hit %, crit % and its cover from your angle: cover counts in full within 30° of head-on, fades to half by about 63°, and past that the target is flanked.
+Hover a tile to see its cover (shield icons: filled = full, half-filled = half; blue = faces a visible enemy, yellow = only at an angle, and no shield where the cover faces no enemy you can see). Hover an enemy to see hit %, crit % and its cover from your angle: cover counts in full within 30° of head-on, fades to half by about 63°, and past that the target is flanked.
 
 ## Project layout
 | Path | What |

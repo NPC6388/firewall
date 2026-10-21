@@ -474,7 +474,7 @@ XG.TacUI = (function () {
       if (t === 0) {
         var cf = coverFacing(h.x, h.y), sides = SIDES.map(function (o) {
           var c = Tac.tile(b, h.x + o[0], h.y + o[1]), s = sideState(cf, o);
-          var tag = s === 'idle' ? ' <span class="dim">(faces no visible enemy)</span>' : s === 'fading' ? ' <span class="warn">(angled)</span>' : '';
+          var tag = s === 'idle' ? ' <span class="bad">(no use: faces no visible enemy)</span>' : s === 'fading' ? ' <span class="warn">(angled)</span>' : '';
           var what = c === 1 ? 'wall' : c === 3 ? 'high cover' : 'crate';
           return c ? '<br>· ' + o[3] + ': ' + what + ', <b>' + (c === 2 ? 'half cover −20' : 'full cover −40') + '</b>' + tag : null;
         }).filter(Boolean);
@@ -649,21 +649,16 @@ XG.TacUI = (function () {
     ctx.fillText(tag, cc[0], cc[1] + 32);
   }
 
-  // How each side's cover at (x, y) does against the hostiles you can see that could shoot that tile:
-  // 'full' (blocks one head-on), 'fading' (only at an angle), 'idle' (faces none of them). With no visible
-  // shooter at all, every side reads 'full' (nothing to judge it against). Cached per tile/state.
+  // How each side's cover at (x, y) does against the hostiles you can see, by direction only (they can move
+  // into range or around a wall): 'full' (blocks one head-on), 'fading' (only at an angle), 'idle' (faces none
+  // of them). With no visible hostile at all, every side reads 'full' (nothing to judge it against). Cached.
   var SIDES = [[0, -1, 'N', 'North'], [1, 0, 'E', 'East'], [0, 1, 'S', 'South'], [-1, 0, 'W', 'West']];
   function coverFacing(x, y) {
     var b = st.b, key = [x, y, b.turn, b.log.length].join(',');
     if (st.facingCache && st.facingCache.key === key) return st.facingCache;
-    var res = { key: key, threats: 0, side: {} }, sel = selUnit();
+    var res = { key: key, threats: 0, side: {} };
     b.units.forEach(function (e) {
       if (!e.alive || e.side === HS() || e.isStatic || !e.range || st.hidden[e.id] || !b.visible[e.y * W + e.x]) return;
-      if (Tac.dist(e.x, e.y, x, y) > e.range) return;
-      var ox, oy; if (sel) { ox = sel.x; oy = sel.y; sel.x = x; sel.y = y; } // judge it as if you stood there
-      var seen = Tac.los(b, e.x, e.y, x, y);
-      if (sel) { sel.x = ox; sel.y = oy; }
-      if (!seen) return;
       res.threats++;
       var cd = Tac.coverDetail(b, x, y, e.x, e.y);
       if (!cd.side) return;
@@ -680,14 +675,13 @@ XG.TacUI = (function () {
       var t = Tac.tile(st.b, x + o[0], y + o[1]);
       if (t === 0) return;
       var full = t === Tac.WALL || t === Tac.HIGH, c = center(x, y), sx = c[0] + o[0] * 14, sy = c[1] + o[1] * 14, s = sideState(f, o);
-      var col = s === 'full' ? '79,209,255' : s === 'fading' ? '255,209,102' : '125,142,165';
-      ctx.globalAlpha = s === 'idle' ? .4 : 1;
+      if (s === 'idle') return; // cover facing away from every enemy you can see is no cover at all
+      var col = s === 'full' ? '79,209,255' : '255,209,102';
       ctx.beginPath(); ctx.moveTo(sx - 5, sy - 5); ctx.lineTo(sx + 5, sy - 5); ctx.lineTo(sx + 5, sy); ctx.lineTo(sx, sy + 6); ctx.lineTo(sx - 5, sy); ctx.closePath();
       ctx.fillStyle = 'rgba(' + col + ',.15)'; ctx.fill();
       // full cover: a solid shield; half cover: the lower half filled
       ctx.save(); ctx.clip(); ctx.fillStyle = 'rgb(' + col + ')'; ctx.fillRect(sx - 6, full ? sy - 6 : sy - 1, 12, full ? 13 : 8); ctx.restore();
       ctx.strokeStyle = 'rgb(' + col + ')'; ctx.stroke();
-      ctx.globalAlpha = 1;
     });
   }
 
