@@ -4,7 +4,7 @@ var XG = globalThis.XG = globalThis.XG || {};
 XG.UI = (function () {
   var D = XG.DATA, S = XG.State, St = XG.Strat;
   var $ = function (id) { return document.getElementById(id); };
-  var UI = { g: null, tab: 'command', slot: null };
+  var UI = { g: null, tab: 'command', slot: null, sort: { key: null, dir: 1 } };
 
   function infColor(p) {
     // cyan (clean) -> amber -> red (lost)
@@ -238,8 +238,34 @@ XG.UI = (function () {
   }
 
   // ----- barracks
+  // Barracks columns: [key, header, sort value]. Click a header to sort by it; click again to reverse.
+  var BARRACKS_COLS = [
+    ['name', 'Name', function (g, s) { return s.name.toLowerCase(); }],
+    ['cls', 'Class', function (g, s) { return D.classes[s.cls].name; }],
+    ['rank', 'Rank', function (g, s) { return s.xp; }],
+    ['hp', 'HP', function (g, s) { return s.hp / S.stats(g, s).maxHp; }],
+    ['status', 'Status', function (g, s) { return S.available(g, s) ? 0 : S.stats(g, s).maxHp - s.hp; }],
+    ['aim', 'Aim', function (g, s) { return S.stats(g, s).aim; }],
+    ['hack', 'Hack', function (g, s) { return S.stats(g, s).hackSkill || -1; }],
+    ['missions', 'Missions', function (g, s) { return s.missions; }],
+    ['kills', 'Kills', function (g, s) { return s.kills; }]
+  ];
+  UI.sortBy = function (key) {
+    if (UI.sort.key === key) UI.sort.dir = -UI.sort.dir;
+    else { UI.sort.key = key; UI.sort.dir = key === 'name' || key === 'cls' || key === 'status' ? 1 : -1; } // numbers: biggest first
+    UI.render();
+  };
+  function sortedSoldiers(g) {
+    var col = BARRACKS_COLS.filter(function (c) { return c[0] === UI.sort.key; })[0];
+    var list = g.soldiers.slice();
+    if (!col) return list;
+    return list.sort(function (a, b) {
+      var x = col[2](g, a), y = col[2](g, b);
+      return (x < y ? -1 : x > y ? 1 : a.id - b.id) * (x === y ? 1 : UI.sort.dir);
+    });
+  }
   function viewBarracks(g) {
-    var rows = g.soldiers.map(function (s) {
+    var rows = sortedSoldiers(g).map(function (s) {
       var st = S.stats(g, s), C = D.classes[s.cls], ok = S.available(g, s);
       var heal = St.built(g, 'infirmary') ? 2 : 1;
       return '<tr><td class="who">' + UI.portrait(s) + s.name + '</td><td>' + C.name + '</td><td>' + S.rankName(s) + ' <span class="dim">(' + s.xp + ' xp)</span></td>' +
@@ -252,7 +278,10 @@ XG.UI = (function () {
     var mem = g.memorial.length ? '<table><tr><th>Name</th><th>Class</th><th>Fell</th><th>Missions</th><th>Kills</th></tr>' + g.memorial.map(function (s) {
       return '<tr><td>' + s.name + '</td><td>' + D.classes[s.cls].name + '</td><td>Day ' + s.diedDay + ', ' + s.diedAt + '</td><td>' + s.missions + '</td><td>' + s.kills + '</td></tr>';
     }).join('') + '</table>' : '<p class="dim">No names on the wall. Keep it that way.</p>';
-    return '<div class="panel"><h2>Operatives <small>squad size ' + St.squadSize(g) + '</small></h2><div style="overflow-x:auto"><table><tr><th>Name</th><th>Class</th><th>Rank</th><th>HP</th><th>Status</th><th>Aim</th><th>Hack</th><th>Missions</th><th>Kills</th></tr>' + rows + '</table></div>' +
+    return '<div class="panel"><h2>Operatives <small>squad size ' + St.squadSize(g) + '</small></h2><div style="overflow-x:auto"><table class="sortable"><tr>' + BARRACKS_COLS.map(function (c) {
+        var on = UI.sort.key === c[0];
+        return '<th data-action="sort" data-arg="' + c[0] + '" class="' + (on ? 'on' : '') + '" title="Sort by ' + c[1].toLowerCase() + '">' + c[1] + (on ? (UI.sort.dir > 0 ? ' ▲' : ' ▼') : '') + '</th>';
+      }).join('') + '</tr>' + rows + '</table></div>' +
       '<div class="advance-row">' + hire + '</div></div>' +
       '<div class="panel" style="margin-top:16px"><h2>Classes</h2>' + Object.keys(D.classes).map(function (c) {
         var C = D.classes[c]; return '<p><span class="glyph" style="color:' + C.color + '">' + C.glyph + '</span><b>' + C.name + '</b>: ' + C.blurb + '</p>';

@@ -17,7 +17,7 @@ XG.Tutorial = (function () {
         done: function (r, b) { return b.units.some(function (u) { return u.alive && u.side !== b.human && !u.isStatic && b.visible[u.y * XG.Tac.W + u.x]; }); } },
       { t: '<b>Aim.</b> Click a hostile to aim at it. The panel on the right shows the hit chance and every modifier behind it: cover, angle, range.',
         done: function (r, b, u, mode) { return mode === 'shoot' || r.shots > 0; } },
-      { t: '<b>Fire.</b> Click the target again, or press <b>1</b>, to shoot. A unit with no shot can take <b>Overwatch</b> instead and fire at the first hostile that moves.',
+      { t: '<b>Fire.</b> Click the target again, or press <b>1</b> or <b>Space</b>, to shoot. A unit with no shot can take <b>Overwatch</b> instead (<b>Y</b> puts everyone on overwatch).',
         done: function (r, b) { return r.shots > 0 || humans(b).some(function (u) { return u.overwatch; }); } },
       { t: '<b>End the turn.</b> When everyone has acted, press <b>End Turn</b> (Enter). The Lattice moves next.',
         done: function (r, b) { return b.turn > r.turn; } },

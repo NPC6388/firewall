@@ -252,3 +252,8 @@ body.cb { --green: #6cb4ff; --red: #ffa133; }
 body.cb .bad, body.cb table.odds .bad { color: #ffb04d; }
 body.cb .pips i { background: #6cb4ff; } body.cb .pips i.e { background: #2a1820; }
 @media (prefers-reduced-motion: reduce) { .coach.pop { animation: none; } }
+
+/* sortable barracks headers */
+table.sortable th { cursor: pointer; user-select: none; white-space: nowrap; }
+table.sortable th:hover { color: var(--text); }
+table.sortable th.on { color: var(--cyan); }

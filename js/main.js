@@ -39,6 +39,7 @@ var XG = globalThis.XG = globalThis.XG || {};
     'close': function () { UI.closeModal(); },
     'help': function () { XG.Help.open(); },
     'settings': function () { XG.Help.settings(); },
+    'sort': function (key) { UI.sortBy(key); },
     'tip-ok': function (id) { XG.Settings.markTip(id); UI.render(); },
     'tab': function (arg) { UI.tab = arg; UI.slot = null; UI.render(); },
     'advance': function () {

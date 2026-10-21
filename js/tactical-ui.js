@@ -49,12 +49,17 @@ XG.TacUI = (function () {
       else if (e.key === 'Tab') { e.preventDefault(); if (st.mode) cycleTarget(e.shiftKey ? -1 : 1); else cycle(); }
       else if (e.key === 'Enter') endTurn();
       else if (e.key === 'o' || e.key === 'O') overclock();
+      else if (e.key === ' ') { e.preventDefault(); confirmArmed(); }
+      else if (e.key === 'y' || e.key === 'Y') overwatchAll();
       else if (e.key === 'm' || e.key === 'M') XG.Settings.set('muted', !XG.Settings.get('muted'));
       else if (e.key === '?' || e.key === 'F1') { e.preventDefault(); XG.Help.open(); }
       else if (/^[1-9]$/.test(e.key)) { var u = selUnit(); if (u && u.abilities[+e.key - 1]) pickAbility(u.abilities[+e.key - 1]); }
     });
     $('tac-endturn').onclick = endTurn;
     $('tac-overclock').onclick = overclock;
+    $('tac-owall').onclick = overwatchAll;
+    // Esc closes the overwatch-all question (the battle key handler is paused while a modal is open)
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && $('owa-no') && XG.UI.isModal()) XG.UI.closeModal(); });
     $('tac-abort').onclick = function () {
       if (!canInput()) return;
       XG.UI.modal(lat() ? '<h1>Withdraw?</h1><p>Your units pull back into the network. The mission counts as lost.</p>' +
@@ -157,7 +162,6 @@ XG.TacUI = (function () {
     var u = selUnit(); if (!canInput() || !u) return;
     var why = Tac.abilityBlock(st.b, u, id); if (why) return;
     var A = D.abilities[id];
-    if (A.target === 'self') { run(id); return; }
     if (st.mode === id && confirmMode(u, id, A)) return;
     st.mode = id; st.aim = null;
     if (A.target === 'enemy') {
@@ -171,6 +175,7 @@ XG.TacUI = (function () {
   // (or the only one in reach), or the hovered tile. Returns false if there's nothing to fire at.
   function confirmMode(u, id, A) {
     var b = st.b, h = st.hover, ts;
+    if (A.target === 'self') { run(id); return true; }
     if (A.target === 'enemy') {
       var t = st.aim && Tac.unitById(b, st.aim);
       if (t && Tac.targets(b, u, id).indexOf(t) >= 0) { run(id, t); return true; }
@@ -193,6 +198,28 @@ XG.TacUI = (function () {
     st.mode = null; st.aim = null;
     if (ev) enqueue(ev);
     hud();
+  }
+  // Space fires whatever ability is armed (same as pressing its key again).
+  function confirmArmed() {
+    var u = selUnit(); if (!canInput() || !u || !st.mode) return;
+    confirmMode(u, st.mode, D.abilities[st.mode]);
+  }
+  // Overwatch all: every unit of yours with AP left that can take overwatch, after an "are you sure?".
+  function overwatchAll() {
+    if (!canInput()) return;
+    var b = st.b, list = b.units.filter(function (u) { return u.alive && u.side === HS() && !u.isStatic && u.ap > 0 && !Tac.abilityBlock(b, u, 'overwatch'); });
+    if (!list.length) { XG.UI.modal('<h1>Overwatch all</h1><p>No one can go on overwatch right now.</p><div class="modal-actions"><button class="primary" id="owa-no">OK</button></div>'); $('owa-no').onclick = XG.UI.closeModal; $('owa-no').focus(); return; }
+    st.mode = null; st.aim = null; hud();
+    XG.UI.modal('<h1>Overwatch all?</h1><p>Are you sure? <b>' + list.length + '</b> unit' + (list.length > 1 ? 's go' : ' goes') + ' on overwatch and end' + (list.length > 1 ? '' : 's') + ' the turn: ' +
+      list.map(function (u) { return u.short || u.name; }).join(', ') + '.</p>' +
+      '<div class="modal-actions"><button id="owa-no">Cancel (Esc)</button><button class="primary" id="owa-yes">Overwatch all (Space)</button></div>');
+    $('owa-no').onclick = XG.UI.closeModal;
+    $('owa-yes').onclick = function () {
+      XG.UI.closeModal();
+      list.forEach(function (u) { if (u.alive && u.ap > 0) { var ev = Tac.act.overwatch(st.b, u); if (ev) enqueue(ev); } });
+      hud();
+    };
+    $('owa-yes').focus(); // Space / Enter press the focused button
   }
   function overclock() {
     var u = selUnit(); if (!canInput() || !u) return;
@@ -351,15 +378,17 @@ XG.TacUI = (function () {
     oc.textContent = 'Overclock (' + b.overclock + ')';
     oc.disabled = !canInput() || !u || !u.sid || b.overclock <= 0 || u.overclocked;
     $('tac-endturn').disabled = !canInput();
+    $('tac-owall').disabled = !canInput();
     $('tac-abort').disabled = !canInput();
     infoPanel(u);
   }
   function modeHint() {
     var A = D.abilities[st.mode];
     var u = selUnit(), k = u ? u.abilities.indexOf(st.mode) + 1 : 0;
-    if (A.target === 'enemy') return 'Tab cycles targets. Click the target again or press ' + k + ' to fire. Esc cancels.';
-    if (A.target === 'ally') return 'Click an ally, or Tab to one and press ' + k + '. Esc cancels.';
-    return 'Click a tile, or hover one and press ' + k + ' (range ' + A.range + '). Esc cancels.';
+    if (A.target === 'self') return 'Press ' + k + ' again or Space to confirm. Esc cancels.';
+    if (A.target === 'enemy') return 'Tab cycles targets. Click the target again, or press ' + k + ' or Space, to fire. Esc cancels.';
+    if (A.target === 'ally') return 'Click an ally, or Tab to one and press ' + k + ' or Space. Esc cancels.';
+    return 'Click a tile, or hover one and press ' + k + ' or Space (range ' + A.range + '). Esc cancels.';
   }
   function infoPanel(u) {
     if (!u) { $('tac-info').innerHTML = '<span class="dim">' + (st.b.side !== st.b.human ? (lat() ? 'FIREWALL is moving…' : 'The Lattice is moving…') : 'No unit selected.') + '</span>'; return; }
@@ -596,6 +625,14 @@ XG.TacUI = (function () {
 
   function drawModePreview(u, now) {
     var b = st.b, A = D.abilities[st.mode], pulse = .5 + .5 * Math.sin(now / 180);
+    if (A.target === 'self') { // armed, waiting for the second press / Space
+      var cs = center(u.x, u.y);
+      ctx.strokeStyle = 'rgba(255,209,102,' + (.45 + pulse * .45) + ')'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cs[0], cs[1], 24 + pulse * 3, 0, 7); ctx.stroke(); ctx.lineWidth = 1;
+      ctx.font = 'bold 11px "Share Tech Mono", monospace'; ctx.textAlign = 'center';
+      var lab = A.name + ' · Space', lw = ctx.measureText(lab).width + 10;
+      ctx.fillStyle = 'rgba(0,0,0,.8)'; ctx.fillRect(cs[0] - lw / 2, cs[1] + 26, lw, 15); ctx.fillStyle = '#ffd166'; ctx.fillText(lab, cs[0], cs[1] + 37);
+      return;
+    }
     if (A.target === 'enemy' || A.target === 'ally') {
       Tac.targets(b, u, st.mode).forEach(function (t) {
         var c = center(t.x, t.y), aimed = st.aim === t.id;
