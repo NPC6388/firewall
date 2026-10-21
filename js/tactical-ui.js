@@ -91,7 +91,12 @@ XG.TacUI = (function () {
   function lat() { return st.b.human === 'enemy'; }
   function selUnit() { var u = st.sel && Tac.unitById(st.b, st.sel); return u && u.alive && u.side === HS() ? u : null; }
   function squadUnits() { return st.b.units.filter(function (u) { return u.side === HS() && !u.isStatic && (u.alive || u.sid || u.deployed); }); }
-  function firstReady() { var u = st.b.units.filter(function (x) { return x.alive && x.side === HS() && x.ap > 0; })[0]; return u ? u.id : null; }
+  // Your units with AP left, leader first: most HP now, then most max HP, then squad order. Selection and Tab follow this.
+  function readyUnits() {
+    return st.b.units.filter(function (x) { return x.alive && x.side === HS() && x.ap > 0; })
+      .sort(function (a, c) { return c.hp - a.hp || c.maxHp - a.maxHp || a.id - c.id; });
+  }
+  function firstReady() { var u = readyUnits()[0]; return u ? u.id : null; }
   function canInput() { return st && !st.cur && !st.queue.length && st.b.side === st.b.human && !st.b.outcome; }
   function visibleUnit(u) { return u.side === HS() || st.b.visible[u.y * W + u.x]; }
   function unitAtVisible(x, y) {
@@ -137,7 +142,7 @@ XG.TacUI = (function () {
   function select(id) { if (id !== st.sel) XG.Audio.play('select'); st.sel = id; st.mode = null; st.aim = null; hud(); hoverPanel(); }
   function cancel() { if (st.mode) { st.mode = null; st.aim = null; hud(); hoverPanel(); } }
   function cycle() {
-    var list = st.b.units.filter(function (u) { return u.alive && u.side === HS() && u.ap > 0; });
+    var list = readyUnits();
     if (!list.length) return;
     var i = list.map(function (u) { return u.id; }).indexOf(st.sel);
     select(list[(i + 1) % list.length].id);
@@ -297,7 +302,7 @@ XG.TacUI = (function () {
       enqueue(ev);
       if (b.side === b.human && !b.outcome) {
         banner('YOUR TURN', 'player');
-        if (!selUnit() || selUnit().ap <= 0) st.sel = firstReady();
+        st.sel = firstReady(); st.mode = null; st.aim = null; // every turn starts on the leader
         hud();
       }
       return;

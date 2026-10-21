@@ -28,7 +28,7 @@ they assault the Uplink: hold it or lose.
 ## Tactical controls
 | Input | Action |
 |---|---|
-| Click operative / squad card / `Tab` | Select (while an ability is armed, `Tab` / `Shift+Tab` cycles its targets instead) |
+| Click operative / squad card / `Tab` | Select. Each turn starts on the leader (most HP); `Tab` goes down the squad by HP. While an ability is armed, `Tab` / `Shift+Tab` cycles its targets instead |
 | Click blue tile / amber tile | Move (1 AP) / dash (2 AP) |
 | Click enemy, click again | Aim, then fire |
 | `1`–`5` | Pick an ability (numbers shown on the buttons); press the same key again to fire it at the aimed enemy or hovered tile/ally |
