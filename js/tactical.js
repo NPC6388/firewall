@@ -226,6 +226,7 @@ XG.Tac = (function () {
     // pods of 2-3, centers spread out
     var centers = [], pods = [];
     while (list.length) pods.push(list.splice(0, list.length === 4 ? 2 : Math.min(3, list.length)));
+    b.pods = [];
     pods.forEach(function (pod) {
       var c = null;
       for (var i = 0; i < cand.length && !c; i++) {
@@ -235,14 +236,27 @@ XG.Tac = (function () {
       }
       c = c || cand.filter(function (p) { return free(b, p[0], p[1]); })[0];
       centers.push(c);
+      var P = { route: patrolRoute(b, rng, c, cand), wp: 1, members: [] };
       pod.forEach(function (type) {
         var spot = nearestFree(b, c[0], c[1], 3);
-        if (spot) makeEnemy(b, type, spot[0], spot[1]);
+        if (spot) { var e = makeEnemy(b, type, spot[0], spot[1]); e.pod = b.pods.length; P.members.push(e.id); }
       });
+      b.pods.push(P);
     });
     refreshVis(b);
     log(b, [], 'Deployed: ' + b.mission.name + ' — ' + b.mission.city + '. ' + ({ purge: 'Eliminate all hostiles.', relay: 'Destroy the Relay and all hostiles.', uplink: 'Destroy or Sever the Uplink Core.' })[b.mission.kind], 'sys');
     return b;
+  }
+  // A looping patrol: the pod's start plus two or three reachable points 3-8 tiles away, kept clear of the
+  // squad's deployment edge so a pod never walks into the start zone on turn one.
+  function patrolRoute(b, rng, c, cand) {
+    var route = [[c[0], c[1]]], n = rng.int(2, 3), pool = cand.filter(function (p) { var d = dist(p[0], p[1], c[0], c[1]); return d >= 3 && d <= 8 && p[0] >= 8; });
+    rng.shuffle(pool);
+    for (var i = 0; i < pool.length && route.length <= n; i++) {
+      var p = pool[i];
+      if (route.every(function (q) { return dist(q[0], q[1], p[0], p[1]) >= 3; })) route.push([p[0], p[1]]);
+    }
+    return route;
   }
   function placeStatic(b, type, cand, minX) {
     var spot = cand.filter(function (p) {
@@ -776,12 +790,49 @@ XG.Tac = (function () {
     return endPlayerTurn(b);
   }
 
+  // ------------------------------------------------------------ patrols
+  // An unaware pod walks its route: the leader (first living member) heads for the next waypoint with a normal move,
+  // the others follow to free tiles near it. Moving can trip overwatch or spot the squad; a pod that is spotted or
+  // spots someone mid-walk stops there (it activates but doesn't get to shoot this turn).
+  function patrol(b, u) {
+    var P = b.pods && b.pods[u.pod];
+    u.ap = 0;
+    if (!P || !P.route || P.route.length < 2 || u.stunned) return [];
+    var alive = P.members.map(function (id) { return unitById(b, id); }).filter(function (m) { return m && m.alive && m.side === 'enemy' && !m.alerted; });
+    var lead = alive[0]; if (!lead) return [];
+    var goal;
+    if (u === lead) {
+      var wp = P.route[P.wp % P.route.length];
+      if (dist(u.x, u.y, wp[0], wp[1]) <= 1.5) { P.wp++; wp = P.route[P.wp % P.route.length]; }
+      goal = wp;
+    } else goal = [lead.x, lead.y];
+    if (u !== lead && dist(u.x, u.y, goal[0], goal[1]) <= 2.5) return []; // already in formation
+    var r = reach(b, u, u.mobility), best = null;
+    // prefer the furthest tile along the real path to the goal (BFS), so pods route around walls instead of hugging them;
+    // if the goal tile itself is blocked (a unit on it), fall back to straight-line distance
+    var toGoal = pathTo(reach(b, u, 40), goal[0], goal[1]);
+    var onPath = {}; if (toGoal) toGoal.forEach(function (q, i) { onPath[q[0] + ',' + q[1]] = i; });
+    for (var i = 0; i < r.d.length; i++) {
+      if (r.d[i] <= 0) continue;
+      var x = i % W, y = (i - x) / W, d = dist(x, y, goal[0], goal[1]);
+      if (u !== lead && d < 1) continue;
+      var k = onPath[x + ',' + y], score = k !== undefined ? -k * 10 : d;
+      if (k === undefined && toGoal) score = 1e3 + d;
+      if (best === null || score < best.s) best = { x: x, y: y, s: score };
+    }
+    if (!best) return [];
+    u.ap = 1;
+    var ev = doMove(b, u, best.x, best.y) || [];
+    u.ap = 0;
+    return ev;
+  }
+
   // ------------------------------------------------------------ AI
   // Works for either side, so tests can auto-play the squad too.
   function ai(b, u) {
     var ev = [];
     if (u.isStatic) return spawnTick(b, u, ev);
-    if (u.side === 'enemy' && !u.alerted) return ev;
+    if (u.side === 'enemy' && !u.alerted) return patrol(b, u);
     var guard = 0;
     while (u.ap > 0 && u.alive && !b.outcome && guard++ < 4) {
       var foes = foesOf(b, u);

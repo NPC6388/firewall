@@ -107,6 +107,18 @@ function autoBattle(g, m, squad) {
   var c45 = Tac.coverDetail(bc, 10, 10, 15, 15);
   check(c45.value > 20 && c45.value < 40 && c45.base === 40 && c45.angle === 45, '45° shot gets partial full cover (' + c45.value + ')');
   check(Tac.coverValue(bc, 10, 10, 13, 18) === 0, 'steep shot past 63° flanks the cover');
+  // unaware pods walk their patrol routes on the Lattice turn
+  var moved = 0, routes = 0;
+  for (var ps = 1; ps <= 6; ps++) {
+    var bp = Tac.create(g, Object.assign({}, m, { kind: 'purge', diff: 3, seed: 100 + ps }), g.soldiers.slice(0, 4));
+    routes += bp.pods.filter(function (P) { return P.route.length >= 2; }).length;
+    var before = {}; bp.units.forEach(function (u) { if (u.side === 'enemy') before[u.id] = [u.x, u.y]; });
+    Tac.endPlayerTurn(bp); var gd = 0; while (Tac.enemyStep(bp) && gd++ < 50) { }
+    bp.units.forEach(function (u) { if (u.side === 'enemy' && u.alive && !u.isStatic && (u.x !== before[u.id][0] || u.y !== before[u.id][1])) moved++; });
+    check(bp.side === 'player', 'enemy turn with patrols ends');
+  }
+  check(routes > 0, 'pods get patrol routes');
+  check(moved > 0, 'unaware pods move on their turn (' + moved + ' moved)');
   // the hit breakdown always adds up to the shown chance
   var sh = bc.units.filter(function (u) { return u.side === 'player'; })[0], tg = bc.units.filter(function (u) { return u.side === 'enemy'; })[0];
   sh.x = 15; sh.y = 15; tg.x = 10; tg.y = 10; tg.hunker = true; tg.marked = 1;
