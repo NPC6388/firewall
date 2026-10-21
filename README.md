@@ -33,7 +33,7 @@ they assault the Uplink: hold it or lose.
 | Click enemy, click again | Aim, then fire |
 | `1`–`5` | Pick an ability (numbers shown on the buttons); press the same key again to fire it at the aimed enemy or hovered tile/ally |
 | `O` | HALCYON Overclock: +1 AP (after HALCYON Integration) |
-| `Space` | Confirm the armed ability (same as its key again) |
+| `Space` | Confirm the armed ability (same as its key again); with nobody left with AP, end the turn; in combat training, press the coach's Next |
 | `Y` | Overwatch all (asks first) |
 | `Enter` | End turn |
 | `Esc` / right-click | Cancel |

@@ -102,7 +102,7 @@ XG.Tutorial = (function () {
 
   // ---------------------------------------------------------- combat training (title screen / help)
   // A guided range: Tac.createTraining builds the map (trooper at 3,8; target drone at 13,8 behind a crate on its
-  // west side; gunner drone at 17,12; tall cover at 10,12-13; crates at 10,3 and 13,4 for the angle and flank spots). Step text can be a function so numbers stay live.
+  // west side; gunner drone at 17,12; tall cover at 10,12-13; crates at 9,4 and 12,5 for the angle and flank spots). Step text can be a function so numbers stay live.
   function T(b) {
     var tr = b.units.filter(function (u) { return u.side === 'player' && u.alive; })[0];
     var tg = b.units.filter(function (u) { return u.dummy === 'passive'; })[0], gn = b.units.filter(function (u) { return u.dummy === 'gunner'; })[0];
@@ -110,6 +110,8 @@ XG.Tutorial = (function () {
   }
   // A marked tile never leaves you in the open: real cover must face the Gunner Drone.
   function covered(k) { return k.gi && k.gi.ok && k.gi.cover > 0; }
+  // Among those, the best cover against the Gunner wins (the north-side lessons stay north of the target).
+  function gunnerCover(k) { return k.gi.cover; }
   function partsLine(hi) {
     if (!hi || !hi.ok) return '<span class="dim">no line of fire from here</span>';
     return hi.parts.map(function (p, i) { return i ? (p[1] > 0 ? '+' : '−') + Math.abs(p[1]) + ' ' + p[0].toLowerCase() : p[0] + ' ' + p[1]; }).join(' ') + ' = <b>' + hi.chance + '%</b>';
@@ -127,10 +129,10 @@ XG.Tutorial = (function () {
     { t: function (r, b) { var k = T(b); return '<b>Where the number comes from.</b> ' + partsLine(k.hi) + '.<br>' + angleLine(k.hi) + ' The same list is on the right under the target. Every modifier simply adds up, then the total is kept between 5% and 95%.'; }, done: 'next', show: 'angle', arm: true },
     { t: function (r, b) { var k = T(b); return '<b>Change the angle.</b> Press <b>Esc</b>, then move your trooper to the <b class="good">marked tile</b> to the north, behind a crate so the Gunner can\'t catch you in the open. The cones on the target show the rule: inside <span class="good">30°</span> the crate counts in full, up to <span class="warn">63°</span> it fades toward half, past that you\'re flanking.<br>Now: ' + angleLine(k.hi) + ' ' + (k.hi && k.hi.ok ? 'Hit chance ' + k.hi.chance + '%.' : ''); },
       done: function (r, b) { var k = T(b); return k.hi && k.hi.ok && k.hi.cover > 0 && k.hi.cover < k.hi.coverBase; }, show: 'angle',
-      goal: { ok: function (k) { return k.hi && k.hi.ok && k.hi.cover > 0 && k.hi.cover <= k.hi.coverBase * .75 && covered(k); } } }, // a fade you can see
+      goal: { ok: function (k) { return k.tr.y < k.tg.y && k.hi && k.hi.ok && k.hi.cover > 0 && k.hi.cover <= k.hi.coverBase * .75 && covered(k); }, score: gunnerCover } }, // a fade you can see
     { t: function (r, b) { var k = T(b); return '<b>Flank it.</b> Keep circling north and east to the <b class="good">marked tile</b>: no cover sits between you and the target, and a crate still shields you from the Gunner. Never end a move in the open if you can help it. The move preview shows <span class="good">green</span> odds for flanked shots.<br>Now: ' + angleLine(k.hi) + ' ' + (k.hi && k.hi.ok ? partsLine(k.hi) : ''); },
       done: function (r, b) { var k = T(b); return k.hi && k.hi.ok && k.hi.cover === 0; }, show: 'angle',
-      goal: { ok: function (k) { return k.hi && k.hi.ok && k.hi.cover === 0 && covered(k); } } },
+      goal: { ok: function (k) { return k.tr.y < k.tg.y && k.hi && k.hi.ok && k.hi.cover === 0 && covered(k); }, score: gunnerCover } },
     { t: function (r, b) { var k = T(b); return '<b>Other modifiers.</b> Within 3 tiles: <b>+close range</b> (rifle +10). Past 10 tiles: <b>−3% per tile</b>. A <b>hunkered</b> target: −25. A target <b>marked</b> by a scientist\'s scan: +15. <b>Overwatch</b> shots: −15. Some targets have <b>defense</b> (drones −10).<br>Your shot now: ' + partsLine(k.hi) + (k.hi && k.hi.ok ? ' · distance ' + k.hi.d.toFixed(1) : ''); }, done: 'next' },
     { t: function () { return '<b>Take the shot.</b> Press <b>1</b> to aim at the Target Drone, then <b>1</b> again to fire.'; }, done: function (r) { return r.shots > 0; }, arm: true, fire: true },
     { t: function (r, b) { var k = T(b), g = k.gi; return '<b>Cover works for you too.</b> The Gunner Drone shoots on its turn. Its chance to hit you right now: ' + (g && g.ok ? '<b>' + g.chance + '%</b>' + (g.cover ? ' (your cover −' + g.cover + ')' : ' <span class="bad">(you\'re in the open)</span>') : '<span class="dim">it has no shot at you</span>') + '.<br>Move to the <b class="good">marked tile</b>: behind the <b>tall cover</b> near the bottom middle, on the side away from the gunner, so full cover (−40) faces it.'; },

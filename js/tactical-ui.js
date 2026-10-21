@@ -49,7 +49,7 @@ XG.TacUI = (function () {
       else if (e.key === 'Tab') { e.preventDefault(); if (st.mode) cycleTarget(e.shiftKey ? -1 : 1); else cycle(); }
       else if (e.key === 'Enter') endTurn();
       else if (e.key === 'o' || e.key === 'O') overclock();
-      else if (e.key === ' ') { e.preventDefault(); if (!(XG.Tutorial && XG.Tutorial.advance())) confirmArmed(); }
+      else if (e.key === ' ') { e.preventDefault(); if (!(XG.Tutorial && XG.Tutorial.advance())) { if (st.mode) confirmArmed(); else if (allSpent()) endTurn(); } }
       else if (e.key === 'y' || e.key === 'Y') overwatchAll();
       else if (e.key === 'm' || e.key === 'M') XG.Settings.set('muted', !XG.Settings.get('muted'));
       else if (e.key === '?' || e.key === 'F1') { e.preventDefault(); XG.Help.open(); }
@@ -92,6 +92,8 @@ XG.TacUI = (function () {
   function selUnit() { var u = st.sel && Tac.unitById(st.b, st.sel); return u && u.alive && u.side === HS() ? u : null; }
   function squadUnits() { return st.b.units.filter(function (u) { return u.side === HS() && !u.isStatic && (u.alive || u.sid || u.deployed); }); }
   // Your units with AP left, leader first: most HP now, then most max HP, then squad order. Selection and Tab follow this.
+  // Every unit of yours is out of AP: Space ends the turn and the End Turn button pulses.
+  function allSpent() { return canInput() && !readyUnits().length; }
   function readyUnits() {
     return st.b.units.filter(function (x) { return x.alive && x.side === HS() && x.ap > 0; })
       .sort(function (a, c) { return c.hp - a.hp || c.maxHp - a.maxHp || a.id - c.id; });
@@ -389,6 +391,8 @@ XG.TacUI = (function () {
     oc.textContent = 'Overclock (' + b.overclock + ')';
     oc.disabled = !canInput() || !u || !u.sid || b.overclock <= 0 || u.overclocked;
     $('tac-endturn').disabled = !canInput();
+    $('tac-endturn').classList.toggle('spent', allSpent());
+    $('tac-endturn').innerHTML = allSpent() ? 'End Turn <span class="dim">Space</span>' : 'End Turn ⏎';
     $('tac-owall').disabled = !canInput();
     $('tac-abort').disabled = !canInput();
     infoPanel(u);
@@ -471,9 +475,10 @@ XG.TacUI = (function () {
         var cf = coverFacing(h.x, h.y), sides = SIDES.map(function (o) {
           var c = Tac.tile(b, h.x + o[0], h.y + o[1]), s = sideState(cf, o);
           var tag = s === 'idle' ? ' <span class="dim">(faces no visible enemy)</span>' : s === 'fading' ? ' <span class="warn">(angled)</span>' : '';
-          return c === 1 || c === 3 ? o[2] + ' full' + tag : c === 2 ? o[2] + ' half' + tag : null;
+          var what = c === 1 ? 'wall' : c === 3 ? 'high cover' : 'crate';
+          return c ? '<br>· ' + o[3] + ': ' + what + ', <b>' + (c === 2 ? 'half cover −20' : 'full cover −40') + '</b>' + tag : null;
         }).filter(Boolean);
-        html += '<div class="dim">Cover here: ' + (sides.length ? sides.join(', ') : 'none') + '</div>';
+        html += '<div class="dim">Cover here: ' + (sides.length ? sides.join('') : 'none') + '</div>';
         if (u && !st.mode && canInput() && getReach(u).d[h.y * W + h.x] > 0) {
           var o = moveOdds(u, h.x, h.y);
           if (o.list.length) html += '<div>' + (o.dash ? '<span class="warn">' + o.why + ': no shot after this move</span><br>' : '') + 'Odds from here:' +
@@ -647,7 +652,7 @@ XG.TacUI = (function () {
   // How each side's cover at (x, y) does against the hostiles you can see that could shoot that tile:
   // 'full' (blocks one head-on), 'fading' (only at an angle), 'idle' (faces none of them). With no visible
   // shooter at all, every side reads 'full' (nothing to judge it against). Cached per tile/state.
-  var SIDES = [[0, -1, 'N'], [1, 0, 'E'], [0, 1, 'S'], [-1, 0, 'W']];
+  var SIDES = [[0, -1, 'N', 'North'], [1, 0, 'E', 'East'], [0, 1, 'S', 'South'], [-1, 0, 'W', 'West']];
   function coverFacing(x, y) {
     var b = st.b, key = [x, y, b.turn, b.log.length].join(',');
     if (st.facingCache && st.facingCache.key === key) return st.facingCache;

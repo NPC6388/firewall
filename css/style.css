@@ -241,7 +241,7 @@ table.odds tr.tot td { color: #fff; border-top: 1px solid var(--line-2); padding
 .coach-h button { font-size: 11px; padding: 2px 8px; color: var(--dim); }
 .coach-a { text-align: right; margin-top: 8px; }
 .coach-nudge { margin-top: 6px; font-size: 12px; }
-.coach-go { animation: coach-go 1.4s ease-in-out infinite; }
+.coach-go, #tac-endturn.spent { animation: coach-go 1.4s ease-in-out infinite; }
 @keyframes coach-go { 50% { box-shadow: 0 0 14px rgba(79,209,255,.7); } }
 .coach .cy { color: var(--cyan); }
 .tip { display: flex; gap: 12px; align-items: center; background: rgba(79,209,255,.06); border: 1px solid var(--line-2); border-left: 3px solid var(--amber);
@@ -254,7 +254,7 @@ td.who { white-space: nowrap; }
 body.cb { --green: #6cb4ff; --red: #ffa133; }
 body.cb .bad, body.cb table.odds .bad { color: #ffb04d; }
 body.cb .pips i { background: #6cb4ff; } body.cb .pips i.e { background: #2a1820; }
-@media (prefers-reduced-motion: reduce) { .coach.pop, .coach-go { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .coach.pop, .coach-go, #tac-endturn.spent { animation: none; } }
 
 /* sortable barracks headers */
 table.sortable th { cursor: pointer; user-select: none; white-space: nowrap; }
