@@ -398,8 +398,8 @@ XG.TacUI = (function () {
     if (u) u.abilities.forEach(function (id, i) {
       var A = D.abilities[id], why = Tac.abilityBlock(b, u, id), extra = '';
       if (A.charges) extra = ' (' + (u.charges[id] || 0) + ')';
-      var name = id === 'grenade' && b.emp ? 'EMP Grenade' : A.name;
-      ab += '<button data-ab="' + id + '" class="' + (st.mode === id ? 'on' : '') + '"' + (why || !canInput() ? ' disabled' : '') + ' title="' + A.desc + (why ? ' — ' + why : '') + '"><span class="key">' + (i + 1) + '</span>' + name + extra + '</button>';
+      var name = id === 'grenade' && b.emp ? 'EMP Grenade' : A.short || A.name; // short label keeps the bar on one row
+      ab += '<button data-ab="' + id + '" class="' + (st.mode === id ? 'on' : '') + '"' + (why || !canInput() ? ' disabled' : '') + ' title="' + A.name + ': ' + A.desc + (why ? ' — ' + why : '') + '"><span class="key">' + (i + 1) + '</span>' + name + extra + '</button>';
     });
     if (st.mode) ab += '<span class="dim">' + modeHint() + '</span>';
     $('tac-abilities').innerHTML = ab;

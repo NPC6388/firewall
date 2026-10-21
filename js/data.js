@@ -11,12 +11,12 @@ XG.DATA = {
     },
     hacker: {
       name: 'Hacker', glyph: 'H', color: '#7dff9b', hp: 5, aim: 62, mobility: 6, weapon: 'smg', hackSkill: 60,
-      abilities: ['shoot', 'hack', 'overwatch'],
+      abilities: ['shoot', 'hack', 'overwatch', 'hunker'],
       blurb: 'Breaks Lattice machines. With Lattice Grammar, turns them against their masters. +1 hack skill per successful hack.'
     },
     scientist: {
       name: 'Field Scientist', glyph: 'S', color: '#ffd166', hp: 5, aim: 58, mobility: 6, weapon: 'pistol',
-      abilities: ['shoot', 'medkit', 'scan', 'overwatch'],
+      abilities: ['shoot', 'medkit', 'scan', 'overwatch', 'hunker'],
       blurb: 'Patches wounds and paints targets with sensor scans (+15 aim).'
     },
     sentinel: {
@@ -43,10 +43,10 @@ XG.DATA = {
     shoot:     { name: 'Shoot',        key: '1', target: 'enemy', ends: true,  desc: 'Fire your weapon. Ends turn.' },
     overwatch: { name: 'Overwatch',    key: '2', target: 'self',  ends: true,  desc: 'Shoot the first hostile that moves in view (-15 aim).' },
     grenade:   { name: 'Grenade',      key: '3', target: 'tile',  ends: true,  range: 8, charges: 1, desc: 'Frag: 3 dmg in 3×3, destroys cover. EMP upgrade: 5 vs machines, harmless to humans.' },
-    hunker:    { name: 'Hunker Down',  key: '4', target: 'self',  ends: true,  desc: 'Brace in place: every shot at you gets −25 to hit until your next turn (on top of cover). Ends the turn.' },
+    hunker:    { name: 'Hunker Down',  short: 'Hunker', key: '4', target: 'self',  ends: true,  desc: 'Brace in place: every shot at you gets −25 to hit until your next turn (on top of cover). Ends the turn.' },
     hack:      { name: 'Hack',         key: '3', target: 'enemy', ends: true,  range: 10, desc: 'Stun a Lattice machine for 2 turns, or override it (Lattice Grammar).' },
     medkit:    { name: 'Medkit',       key: '3', target: 'ally',  ends: false, range: 1, charges: 2, desc: 'Heal an adjacent ally for 4. Costs 1 AP.' },
-    scan:      { name: 'Sensor Scan',  key: '4', target: 'tile',  ends: false, range: 12, cooldown: 3, desc: 'Reveal a 5-tile radius and mark hostiles (+15 aim vs them). 1 AP.' },
+    scan:      { name: 'Sensor Scan',  short: 'Scan', key: '4', target: 'tile',  ends: false, range: 12, cooldown: 3, desc: 'Reveal a 5-tile radius and mark hostiles (+15 aim vs them). 1 AP.' },
     shield:    { name: 'Aegis Shield', key: '3', target: 'ally',  ends: false, cooldown: 2, desc: 'Give any ally on the map (or self) 3 shield points. No range limit, no line of sight needed. 1 AP.' },
     spike:     { name: 'Data Spike',   key: '2', target: 'enemy', ends: true,  range: 14, cooldown: 3, desc: 'Lattice: 3 damage that ignores cover and never misses. Cooldown 3.' },
     detonate:  { name: 'Detonate',     key: '3', target: 'self',  ends: true,  desc: 'Lattice drone: explode for 3 damage in 3×3 and destroy cover. The drone is lost.' },
@@ -55,11 +55,11 @@ XG.DATA = {
 
   // -------------------------------------------------------------- enemies
   enemies: {
-    drone:    { name: 'Swarm Drone',   glyph: '◆', color: '#ff4d6d', hp: 4,  armor: 0, aim: 58, mobility: 7, dmg: [2, 3], range: 10, defense: 10, machine: true, hackDef: 0,  xp: 1, abilities: ['shoot', 'overwatch'],
+    drone:    { name: 'Swarm Drone',   glyph: '◆', color: '#ff4d6d', hp: 4,  armor: 0, aim: 58, mobility: 7, dmg: [2, 3], range: 10, defense: 10, machine: true, hackDef: 0,  xp: 1, abilities: ['shoot', 'overwatch', 'hunker'],
                 blurb: 'Consumer drones running Lattice code. Fast, fragile, everywhere.' },
     warden:   { name: 'Warden Mech',   glyph: '▣', color: '#ff7b3a', hp: 10, armor: 1, aim: 60, mobility: 4, dmg: [3, 5], range: 12, defense: 0,  machine: true, hackDef: 25, xp: 2, abilities: ['shoot', 'overwatch', 'hunker'],
                 blurb: 'Hijacked security robot. Slow, armored, hits hard.' },
-    harmonic: { name: 'Harmonic',      glyph: '✶', color: '#ff3df2', hp: 7,  armor: 0, aim: 70, mobility: 6, dmg: [3, 4], range: 12, defense: 10, machine: true, hackDef: null, xp: 3, special: 'spike', abilities: ['shoot', 'spike', 'overwatch'],
+    harmonic: { name: 'Harmonic',      glyph: '✶', color: '#ff3df2', hp: 7,  armor: 0, aim: 70, mobility: 6, dmg: [3, 4], range: 12, defense: 10, machine: true, hackDef: null, xp: 3, special: 'spike', abilities: ['shoot', 'spike', 'overwatch', 'hunker'],
                 blurb: 'Hard-light avatar of the Lattice. Its Data Spike ignores cover. Cannot be hacked.' },
     relay:    { name: 'Lattice Relay', glyph: '⌬', color: '#ff2a55', hp: 12, armor: 1, aim: 0,  mobility: 0, dmg: [0, 0], range: 0,  defense: 0,  machine: true, hackDef: null, xp: 3, static: true,
                 spawn: { type: 'drone', every: 2, max: 3 }, blurb: 'Signal relay. Spawns drones until destroyed.' },
@@ -72,9 +72,9 @@ XG.DATA = {
     firewall_sw: { name: 'Perimeter Firewall', glyph: '▦', color: '#4fd1ff', hp: 8, armor: 1, aim: 60, mobility: 3, dmg: [2, 3], range: 10,
       abilities: ['shoot', 'overwatch', 'hunker'], blurb: 'A packet filter with a body. Slow and tough; it holds the line.' },
     antivirus:   { name: 'Antivirus Daemon', glyph: '✚', color: '#7dff9b', hp: 5, aim: 64, mobility: 6, dmg: [2, 3], range: 10,
-      abilities: ['shoot', 'overwatch'], blurb: 'Hunts and quarantines foreign code. Fast and persistent.' },
+      abilities: ['shoot', 'overwatch', 'hunker'], blurb: 'Hunts and quarantines foreign code. Fast and persistent.' },
     ids:         { name: 'Intrusion Sentinel', glyph: '◉', color: '#ffd166', hp: 4, aim: 70, mobility: 5, dmg: [1, 3], range: 13,
-      abilities: ['shoot', 'overwatch'], blurb: 'Intrusion detection. Long sight lines and sharp aim, but fragile.' }
+      abilities: ['shoot', 'overwatch', 'hunker'], blurb: 'Intrusion detection. Long sight lines and sharp aim, but fragile.' }
   },
 
   // Earth's first defenders: security software given bodies in the grid (Lattice Infiltration phase).
@@ -82,9 +82,9 @@ XG.DATA = {
     firewall_sw: { name: 'Perimeter Firewall', glyph: '▦', color: '#4fd1ff', hp: 8, armor: 1, aim: 60, mobility: 3, dmg: [2, 3], range: 10,
       abilities: ['shoot', 'overwatch', 'hunker'], blurb: 'A packet filter with a body. Slow and tough; it holds the line.' },
     antivirus:   { name: 'Antivirus Daemon', glyph: '✚', color: '#7dff9b', hp: 5, aim: 64, mobility: 6, dmg: [2, 3], range: 10,
-      abilities: ['shoot', 'overwatch'], blurb: 'Hunts and quarantines foreign code. Fast and persistent.' },
+      abilities: ['shoot', 'overwatch', 'hunker'], blurb: 'Hunts and quarantines foreign code. Fast and persistent.' },
     ids:         { name: 'Intrusion Sentinel', glyph: '◉', color: '#ffd166', hp: 4, aim: 70, mobility: 5, dmg: [1, 3], range: 13,
-      abilities: ['shoot', 'overwatch'], blurb: 'Intrusion detection. Long sight lines and sharp aim, but fragile.' }
+      abilities: ['shoot', 'overwatch', 'hunker'], blurb: 'Intrusion detection. Long sight lines and sharp aim, but fragile.' }
   },
 
   // ------------------------------------------------------------- research

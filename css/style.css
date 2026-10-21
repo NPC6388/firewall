@@ -190,7 +190,7 @@ td { padding: 7px 6px; border-bottom: 1px solid #121c2b; }
 .pips i { width: 7px; height: 6px; background: var(--green); display: block; }
 .pips i.e { background: #2a1820; } .pips i.s { background: var(--violet); }
 .abilities { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; flex: 1; }
-.abilities button { min-width: 92px; }
+.abilities button { min-width: 76px; padding-left: 10px; padding-right: 10px; } /* five abilities (scientist) fit on one row */
 .abilities button.on { border-color: var(--amber); color: var(--amber); }
 .abilities button .key, #tac-owall .key, #tac-overclock .key { color: var(--dim); margin-right: 5px; }
 .tac-end { display: flex; gap: 6px; align-items: center; }

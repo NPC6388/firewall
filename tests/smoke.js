@@ -104,6 +104,9 @@ function autoBattle(g, m, squad) {
   b.visible[core.y * Tac.W + core.x] = true;
   check(Tac.act.sever(b, tr, core) === null, 'trooper cannot sever');
   check(Tac.targets(b, hk, 'sever').indexOf(core) >= 0, 'adjacent hacker can sever');
+  // every class and Lattice unit can hunker except the HALCYON Sentinel
+  check(Object.keys(XG.DATA.classes).every(function (k) { return (XG.DATA.classes[k].abilities.indexOf('hunker') >= 0) === (k !== 'sentinel'); }) &&
+    Object.keys(XG.DATA.enemies).every(function (k) { var E = XG.DATA.enemies[k]; return E.static || E.abilities.indexOf('hunker') >= 0; }), 'everyone but the Sentinel can hunker');
   // Aegis Shield has no range limit and needs no line of sight
   tr.abilities = tr.abilities.concat('shield'); tr.ap = 2;
   var far = b.units.filter(function (u) { return u.side === 'player' && u !== tr && u.alive; })[0];
