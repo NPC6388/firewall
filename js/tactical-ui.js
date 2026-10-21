@@ -10,9 +10,12 @@ XG.TacUI = (function () {
 
   function start(g, mission, squad, onDone) { startWith(g, Tac.create(g, mission, squad), onDone); }
   // Runs any prepared battle (FIREWALL or Lattice controlled). b.human says which side the person plays.
-  function startWith(g, b, onDone) {
+  // snap: the battle as it stood on turn 1 (JSON), kept so Restart can rebuild it; taken here on a fresh start.
+  function startWith(g, b, onDone, snap) {
     cv = $('tac-canvas'); ctx = cv.getContext('2d');
+    if (XG.Comms) XG.Comms.clear();
     st = {
+      snap: b.training ? null : snap || JSON.stringify(b),
       g: g, b: b, onDone: onDone, sel: null, mode: null, aim: null, hover: null,
       queue: [], cur: null, floaters: [], fx: [], parts: [], face: {}, faceDisp: {}, flash: {}, shake: null, lastNow: 0,
       displayPos: {}, displayHp: {}, dying: {}, hidden: {},
@@ -63,11 +66,14 @@ XG.TacUI = (function () {
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && $('owa-no') && XG.UI.isModal()) XG.UI.closeModal(); });
     $('tac-abort').onclick = function () {
       if (!canInput()) return;
+      // Restart: start over from turn 1, same map, squad and enemies; nothing from this attempt counts
+      var RS = st.snap ? '<button id="ab-restart" title="Start over from turn 1: same map, squad and enemies. Nothing from this attempt counts.">Restart mission</button>' : '';
       XG.UI.modal(st.b.training ? '<h1>Leave the range?</h1><p>Training ends; nothing is lost.</p><div class="modal-actions"><button id="ab-no">Stay</button><button class="danger" id="ab-yes">Leave</button></div>' : lat() ? '<h1>Withdraw?</h1><p>Your units pull back into the network. The mission counts as lost.</p>' +
-        '<div class="modal-actions"><button id="ab-no">Keep fighting</button><button class="danger" id="ab-yes">Withdraw</button></div>' :
+        '<div class="modal-actions"><button id="ab-no">Keep fighting</button>' + RS + '<button class="danger" id="ab-yes">Withdraw</button></div>' :
         '<h1>Abort mission?</h1><p>The squad extracts. The mission counts as a failure: regional infection rises and Convergence +2%.' +
         (st.b.mission.kind !== 'purge' ? ' Story missions stay available for another attempt.' : '') + '</p>' +
-        '<div class="modal-actions"><button id="ab-no">Stay and fight</button><button class="danger" id="ab-yes">Abort</button></div>');
+        '<div class="modal-actions"><button id="ab-no">Stay and fight</button>' + RS + '<button class="danger" id="ab-yes">Abort</button></div>');
+      if ($('ab-restart')) $('ab-restart').onclick = restart;
       $('ab-no').onclick = XG.UI.closeModal;
       $('ab-yes').onclick = function () { XG.UI.closeModal(); Tac.abort(st.b); };
     };
@@ -323,6 +329,15 @@ XG.TacUI = (function () {
     }
   }
 
+  // Restart the mission from turn 1: same map, squad and enemies. Nothing from the abandoned attempt counts.
+  function restart() {
+    if (!st || !st.snap) return;
+    var nb = JSON.parse(st.snap);
+    nb.rng = Object.assign(new XG.RNG(1), nb.rng);
+    XG.UI.closeModal();
+    startWith(st.g, nb, st.onDone, st.snap);
+  }
+
   function finishBattle() {
     st.finished = true;
     syncLog(); hud();
@@ -335,7 +350,8 @@ XG.TacUI = (function () {
         ? (XG.Lat.latticeWon(b.mission.lkind, o) ? '<h1 class="good">' + (b.mission.lkind === 'breach' ? 'SYSTEM BREACHED' : b.mission.lkind === 'strike' ? 'SAFEHOUSE HARMONIZED' : b.mission.lkind === 'uplink' ? 'UPLINK HOLDS' : 'CELL HOLDS') + '</h1>'
           : o === 'abort' ? '<h1 class="warn">WITHDRAWN</h1>' : '<h1 class="bad">FORCES LOST</h1>')
         : o === 'win' ? '<h1 class="good">OBJECTIVE COMPLETE</h1>' : o === 'abort' ? '<h1 class="warn">EXTRACTION</h1>' : '<h1 class="bad">SQUAD LOST</h1>';
-      XG.UI.modal(head + '<p>' + b.mission.name + ' · turn ' + b.turn + '</p><div class="modal-actions"><button class="primary" id="tac-done">Debrief ▸</button></div>');
+      XG.UI.modal(head + '<p>' + b.mission.name + ' · turn ' + b.turn + '</p><div class="modal-actions">' + (st.snap ? '<button id="tac-again">Restart mission</button>' : '') + '<button class="primary" id="tac-done">Debrief ▸</button></div>');
+      if ($('tac-again')) $('tac-again').onclick = restart;
       $('tac-done').onclick = function () { XG.UI.closeModal(); var cb = st.onDone, res = Tac.result(b); st = null; cb(res); };
     }, 650);
   }
@@ -395,7 +411,8 @@ XG.TacUI = (function () {
     oc.disabled = !canInput() || !u || !u.sid || b.overclock <= 0 || u.overclocked;
     $('tac-endturn').disabled = !canInput();
     $('tac-endturn').classList.toggle('spent', allSpent());
-    $('tac-endturn').innerHTML = allSpent() ? 'End Turn <span class="dim">Space</span>' : 'End Turn ⏎';
+    $('tac-endturn').innerHTML = allSpent() ? 'End Turn ␣' : 'End Turn ⏎';
+    $('tac-endturn').title = allSpent() ? 'Everyone is out of AP: Space or Enter ends the turn' : 'End turn (Enter)';
     $('tac-owall').disabled = !canInput();
     $('tac-abort').disabled = !canInput();
     infoPanel(u);

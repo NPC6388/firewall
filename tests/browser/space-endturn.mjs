@@ -8,6 +8,6 @@ export default async function ({ ev, shot, sleep, send }) {
   await press(' ', 'Space', 32); await sleep(400); console.log('space with AP left ->', await turn());
   await ev(`(function(){ var s=XG.TacUI.debug(); s.b.units.forEach(function(u){ if (u.side===s.b.human) u.ap=0; }); s.dirty=true; })()`);
   await press('Escape', 'Escape', 27); await sleep(300);
-  console.log('all spent, button', await ev(`document.getElementById('tac-endturn').innerText + ' | ' + document.getElementById('tac-endturn').className`)); await shot('space-spent');
+  console.log('all spent, button title', await ev(`document.getElementById('tac-endturn').title`), '|', await ev(`document.getElementById('tac-endturn').innerText + ' | ' + document.getElementById('tac-endturn').className`)); await shot('space-spent');
   await press(' ', 'Space', 32); await sleep(6000); console.log('space with all spent ->', await turn());
 }
