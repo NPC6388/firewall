@@ -59,6 +59,7 @@ Hover a tile to see its cover (shield icons: filled = full, half-filled = half; 
 | `js/settings.js` | Player settings and tutorial progress (`firewall-settings-v1`, separate from saves) |
 | `js/audio.js` | WebAudio synth: every sound effect plus a generative score per scene; no sound files |
 | `js/tutorial.js` | First-battle coach for each side and one-time strategy tips |
+| `js/comms.js` | HALCYON / Lattice comms chatter (lines in `DATA.comms`) on time advance and battle events |
 | `js/help.js` | Help modal (searchable glossary, controls, field manual) and the settings modal |
 | `js/backdrop.js` | World-map continents, data packets and satellite; the animated title globe |
 | `js/ui.js` | FIREWALL strategy screens, modals, story player |
