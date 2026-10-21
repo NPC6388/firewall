@@ -270,6 +270,33 @@ XG.Tac = (function () {
     log(b, [], 'Deployed: ' + b.mission.name + ' — ' + b.mission.city + '. ' + ({ purge: 'Eliminate all hostiles.', relay: 'Destroy the Relay and all hostiles.', uplink: 'Destroy or Sever the Uplink Core.' })[b.mission.kind], 'sys');
     return b;
   }
+  // Combat training range (tutorial): a fixed map, one trooper, a passive target drone behind a crate and a gunner
+  // drone that only shoots back. The whole map is visible. Layout notes are in js/tutorial.js (the lessons use them).
+  function createTraining(g, squad) {
+    var b = {
+      W: W, H: H, tiles: new Array(W * H).fill(FLOOR), reachable: new Array(W * H).fill(true), units: [], nextId: 1, turn: 1, side: 'player', human: 'player',
+      rng: new XG.RNG(4242), mission: { kind: 'purge', diff: 1, name: 'Combat training', city: 'HALCYON simulation', site: 'range' },
+      grammar: false, emp: false, overclock: 0, visible: null, scans: [], sever: 0, outcome: null, salvage: 0, log: [], enemyQueue: [], pods: [], training: true
+    };
+    var put = function (x, y, t) { b.tiles[y * W + x] = t; };
+    put(12, 8, LOW);                                   // the target's crate, facing west
+    put(10, 12, HIGH); put(10, 13, HIGH);              // tall cover for the defense lesson, facing the gunner
+    put(3, 12, LOW); put(4, 12, LOW); put(6, 14, LOW);  // spare crates
+    for (var x = 16; x <= 21; x++) put(x, 3, WALL);     // a building, top right
+    for (var y = 0; y <= 3; y++) put(16, y, WALL);
+    put(18, 3, FLOOR);
+    put(19, 11, LOW);
+    makeSquadUnit(b, g, squad[0], 3, 8);
+    var tgt = makeEnemy(b, 'drone', 13, 8), gun = makeEnemy(b, 'drone', 17, 12);
+    tgt.name = 'Target Drone'; tgt.short = 'Target'; tgt.dummy = 'passive'; tgt.hp = tgt.maxHp = 30; tgt.alerted = true;
+    gun.name = 'Gunner Drone'; gun.short = 'Gunner'; gun.dummy = 'gunner'; gun.hp = gun.maxHp = 30; gun.alerted = true; gun.aim = 60; gun.dmg = [1, 1]; gun.range = 14;
+    refreshVis(b);
+    log(b, [], 'Training range online. Nothing here can kill you.', 'sys');
+    return b;
+  }
+  // Training only: the range refills your AP between lessons (tutorial.js decides when).
+  function refillAP(b, u) { if (b.training && u.alive) u.ap = 2; }
+
   // A looping patrol: the pod's start plus two or three reachable points 3-8 tiles away, kept clear of the
   // squad's deployment edge so a pod never walks into the start zone on turn one.
   function patrolRoute(b, rng, c, cand) {
@@ -395,6 +422,7 @@ XG.Tac = (function () {
     b.scans.forEach(function (s) {
       for (var y = 0; y < H; y++) for (var x = 0; x < W; x++) if (dist(s.x, s.y, x, y) <= s.r) v[y * W + x] = true;
     });
+    if (b.training) v.fill(true);
     b.visible = v;
   }
   // b.human is the side the person controls ('player' = FIREWALL, 'enemy' = Lattice); fog is drawn from its view.
@@ -856,6 +884,11 @@ XG.Tac = (function () {
   function ai(b, u) {
     var ev = [];
     if (u.isStatic) return spawnTick(b, u, ev);
+    if (u.dummy) { // training drones: the target never acts, the gunner only fires from where it is
+      var tg = u.dummy === 'gunner' && foesOf(b, u).filter(function (f) { return hitInfo(b, u, f).ok; })[0];
+      if (tg) { spend(u, 'shoot'); fire(b, u, tg, ev); }
+      u.ap = 0; return ev;
+    }
     if (u.side === 'enemy' && !u.alerted) return patrol(b, u);
     var guard = 0;
     while (u.ap > 0 && u.alive && !b.outcome && guard++ < 4) {
@@ -975,7 +1008,7 @@ XG.Tac = (function () {
 
   return {
     W: W, H: H, FLOOR: FLOOR, WALL: WALL, LOW: LOW, HIGH: HIGH, SIGHT: SIGHT,
-    create: create, createLattice: createLattice, act: act, endPlayerTurn: endPlayerTurn, enemyStep: enemyStep, ai: ai,
+    create: create, createLattice: createLattice, createTraining: createTraining, refillAP: refillAP, act: act, endPlayerTurn: endPlayerTurn, enemyStep: enemyStep, ai: ai,
     endTurn: endTurn, aiStep: aiStep,
     reach: reach, pathTo: pathTo, moveRange: moveRange, hitInfo: hitInfo, targets: targets, tileOk: tileOk,
     abilityBlock: abilityBlock, coverValue: coverValue, coverDetail: coverDetail, los: los, isVisible: isVisible, unitAt: unitAt,

@@ -44,23 +44,26 @@ XG.Tutorial = (function () {
   }
 
   // ---------------------------------------------------------- battle coach
+  function steps() { return run.side === 'train' ? TRAIN_STEPS : STEPS[run.side]; }
   function battleStart(g, b, api) {
     hide(); run = null;
+    if (b.training) { run = { side: 'train', b: b, step: 0, start: {}, turn: b.turn, shots: 0, api: api }; show(); return; }
     var side = b.human === 'enemy' ? 'lat' : 'fw', T = S.get('tutorial');
     if (!S.get('hints') || T[side]) return;
     run = { side: side, b: b, step: 0, start: {}, turn: b.turn, shots: 0, api: api };
     humans(b).forEach(function (u) { run.start[u.id] = [u.x, u.y]; });
     show();
   }
-  function battleUpdate(b, unit, mode) {
+  function battleUpdate(b, unit, mode, aim) {
     if (!run || run.b !== b) return;
-    var st = STEPS[run.side][run.step];
-    if (st.done && st.done(run, b, unit, mode)) {
-      run.step++; run.turn = b.turn;
+    var list = steps(), st = list[run.step];
+    if (typeof st.done === 'function' && st.done(run, b, unit, mode, aim)) {
+      run.step++; run.turn = b.turn; st = list[run.step];
       if (XG.Audio) XG.Audio.play('select');
-      show();
     }
-    if (b.outcome) finish(run.step >= STEPS[run.side].length - 2);
+    if (run.side === 'train' && st.refill && unit && unit.ap <= 0 && b.side === b.human && !b.outcome) XG.Tac.refillAP(b, unit);
+    if (b.outcome) { if (run.side === 'train') { run = null; hide(); return; } finish(run.step >= list.length - 2); return; }
+    show();
   }
   function event(e, b) {
     if (!run || run.b !== b) return;
@@ -69,20 +72,105 @@ XG.Tutorial = (function () {
   // done = false (battle ended early): keep the tutorial for the next battle.
   function finish(done) {
     if (!run) return;
+    if (run.side === 'train') { var b = run.b; run = null; hide(); XG.Tac.abort(b); return; } // ends the range; TacUI shows the result
     if (done !== false) { var T = S.get('tutorial'); T[run.side] = true; S.set('tutorial', T); }
     run = null; hide();
   }
   function show() {
     if (!run) return;
-    var list = STEPS[run.side], st = list[run.step], el = $('coach');
+    var list = steps(), st = list[run.step], el = $('coach'), train = run.side === 'train';
+    var text = typeof st.t === 'function' ? st.t(run, run.b) : st.t, key = run.side + run.step;
     if (!el) { el = document.createElement('div'); el.id = 'coach'; el.className = 'coach'; document.querySelector('.canvas-wrap').appendChild(el); }
-    el.innerHTML = '<div class="coach-h"><span>TRAINING ' + (run.step + 1) + '/' + list.length + '</span><button id="coach-skip" title="Turn the tutorial off">Skip tutorial</button></div>' +
-      '<div class="coach-t">' + st.t + '</div>' + (st.done ? '' : '<div class="coach-a"><button class="primary" id="coach-ok">Got it</button></div>');
-    el.classList.remove('hidden'); el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
+    var btn = st.done === 'next' ? '<button class="primary" id="coach-next">Next ▸</button>' : !st.done ? '<button class="primary" id="coach-ok">' + (st.finish || 'Got it') + '</button>' : '';
+    el.innerHTML = '<div class="coach-h"><span>' + (train ? 'COMBAT TRAINING ' : 'TRAINING ') + (run.step + 1) + '/' + list.length + '</span><button id="coach-skip" title="' + (train ? 'Leave the range' : 'Turn the tutorial off') + '">' +
+      (train ? 'Leave' : 'Skip tutorial') + '</button></div><div class="coach-t">' + text + '</div>' + (btn ? '<div class="coach-a">' + btn + '</div>' : '');
+    el.classList.remove('hidden');
+    if (el.getAttribute('data-step') !== key) { el.setAttribute('data-step', key); el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
     $('coach-skip').onclick = function () { finish(true); };
-    if (!st.done) $('coach-ok').onclick = function () { finish(true); };
+    if ($('coach-ok')) $('coach-ok').onclick = function () { finish(true); };
+    if ($('coach-next')) $('coach-next').onclick = function () { run.step++; run.turn = run.b.turn; if (XG.Audio) XG.Audio.play('select'); battleUpdate(run.b, null, null, null); };
   }
   function hide() { var el = $('coach'); if (el) el.classList.add('hidden'); }
+
+
+  // ---------------------------------------------------------- combat training (title screen / help)
+  // A guided range: Tac.createTraining builds the map (trooper at 3,8; target drone at 13,8 behind a crate on its
+  // west side; gunner drone at 17,12; tall cover at 10,12-13). Step text can be a function so numbers stay live.
+  function T(b) {
+    var tr = b.units.filter(function (u) { return u.side === 'player' && u.alive; })[0];
+    var tg = b.units.filter(function (u) { return u.dummy === 'passive'; })[0], gn = b.units.filter(function (u) { return u.dummy === 'gunner'; })[0];
+    return { tr: tr, tg: tg, gn: gn, hi: tr && tg && tg.alive ? XG.Tac.hitInfo(b, tr, tg) : null, gi: tr && gn && gn.alive ? XG.Tac.hitInfo(b, gn, tr) : null };
+  }
+  function partsLine(hi) {
+    if (!hi || !hi.ok) return '<span class="dim">no line of fire from here</span>';
+    return hi.parts.map(function (p, i) { return i ? (p[1] > 0 ? '+' : '−') + Math.abs(p[1]) + ' ' + p[0].toLowerCase() : p[0] + ' ' + p[1]; }).join(' ') + ' = <b>' + hi.chance + '%</b>';
+  }
+  function angleLine(hi) {
+    if (!hi || !hi.ok) return '';
+    if (!hi.cover) return 'The shot is <b class="good">flanked</b>: no cover counts, +25% crit.';
+    return 'Angle <b>' + hi.coverAngle + '°</b> off the crate\'s facing: cover ' + (hi.cover < hi.coverBase ? '<b class="warn">−' + hi.cover + ' of ' + hi.coverBase + '</b> (fading)' : '<b>−' + hi.cover + '</b> (full value)') + '.';
+  }
+  var TRAIN_STEPS = [
+    { t: function () { return '<b>Welcome to the range.</b> One trooper, two training drones. The <b>Target Drone</b> stands behind a crate; the <b>Gunner Drone</b> (bottom right) shoots back but can\'t hurt you much. You\'ll learn how cover works and where your hit chance comes from.'; }, done: 'next' },
+    { t: function () { return '<b>Cover protects one side.</b> The crate is on the target\'s <b>west</b> side, so it only helps against shots from the west. Crates and barriers are <b>half cover (−20)</b>; walls and racks are <b>full cover (−40)</b>. Hover any floor tile to see its shield icons: filled = full, hollow = half.'; }, done: 'next', show: 'cover' },
+    { t: function () { return '<b>Aim.</b> Press <b>1</b> to arm Shoot, or click the Target Drone. The yellow ring is the aimed target; <b>Tab</b> cycles targets.'; },
+      done: function (r, b, u, mode, aim) { var k = T(b); return mode === 'shoot' && k.tg && aim === k.tg.id; } },
+    { t: function (r, b) { var k = T(b); return '<b>Where the number comes from.</b> ' + partsLine(k.hi) + '.<br>' + angleLine(k.hi) + ' The same list is on the right under the target. Every modifier simply adds up, then the total is kept between 5% and 95%.'; }, done: 'next', show: 'angle' },
+    { t: function (r, b) { var k = T(b); return '<b>Change the angle.</b> Press <b>Esc</b>, then move your trooper <b>north</b> (up the map). The cones on the target show the rule: inside <span class="good">30°</span> the crate counts in full, up to <span class="warn">63°</span> it fades toward half, past that you\'re flanking.<br>Now: ' + angleLine(k.hi) + ' ' + (k.hi && k.hi.ok ? 'Hit chance ' + k.hi.chance + '%.' : ''); },
+      done: function (r, b) { var k = T(b); return k.hi && k.hi.ok && k.hi.cover > 0 && k.hi.cover < k.hi.coverBase; }, show: 'angle', refill: true },
+    { t: function (r, b) { var k = T(b); return '<b>Flank it.</b> Keep circling north and east until no cover sits between you and the target. The move preview shows <span class="good">green</span> odds for flanked shots.<br>Now: ' + angleLine(k.hi) + ' ' + (k.hi && k.hi.ok ? partsLine(k.hi) : ''); },
+      done: function (r, b) { var k = T(b); return k.hi && k.hi.ok && k.hi.cover === 0; }, show: 'angle', refill: true },
+    { t: function (r, b) { var k = T(b); return '<b>Other modifiers.</b> Within 3 tiles: <b>+close range</b> (rifle +10). Past 10 tiles: <b>−3% per tile</b>. A <b>hunkered</b> target: −25. A target <b>marked</b> by a scientist\'s scan: +15. <b>Overwatch</b> shots: −15. Some targets have <b>defense</b> (drones −10).<br>Your shot now: ' + partsLine(k.hi) + (k.hi && k.hi.ok ? ' · distance ' + k.hi.d.toFixed(1) : ''); }, done: 'next', refill: true },
+    { t: function () { return '<b>Take the shot.</b> Press <b>1</b>, then <b>1</b> again or <b>Space</b>.'; }, done: function (r) { return r.shots > 0; }, refill: true },
+    { t: function (r, b) { var k = T(b), g = k.gi; return '<b>Cover works for you too.</b> The Gunner Drone shoots on its turn. Its chance to hit you right now: ' + (g && g.ok ? '<b>' + g.chance + '%</b>' + (g.cover ? ' (your cover −' + g.cover + ')' : ' <span class="bad">(you\'re in the open)</span>') : '<span class="dim">it has no shot at you</span>') + '.<br>Get behind the <b>tall cover</b> near the bottom middle, on the side away from the gunner, so full cover (−40) faces it.'; },
+      done: function (r, b) { var k = T(b); return k.gi && k.gi.ok && k.gi.cover >= 40; }, show: 'defense', refill: true },
+    { t: function (r, b) { var k = T(b), g = k.gi; return '<b>Good: full cover facing it.</b> Its chance on you is down to <b>' + (g && g.ok ? g.chance : '—') + '%</b>. End the turn (<b>Enter</b>) and watch it try.'; },
+      done: function (r, b) { return b.turn > r.turn; }, show: 'defense' },
+    { t: function () { return '<b>That\'s the whole rule.</b> Hit chance = aim − cover (by angle) − defense − hunker + close range + scan mark − overwatch − long range, kept between 5% and 95%. Move cover to cover, flank what you can\'t outshoot, and check the breakdown before you fire. Press <b>?</b> in any battle for the glossary.'; }, done: null, finish: 'Finish training' }
+  ];
+  var trainExit = null;
+  function startTraining(exit) {
+    trainExit = exit;
+    var g = XG.State.newGame(4242), s = g.soldiers.filter(function (x) { return x.cls === 'trooper'; })[0];
+    var b = XG.Tac.createTraining(g, [s]);
+    XG.TacUI.startWith(g, b, function () { var T2 = S.get('tutorial'); T2.combat = true; S.set('tutorial', T2); if (trainExit) trainExit(); });
+  }
+  // Teaching overlays drawn on the battle canvas: the target's cover cones, or your cover against the gunner.
+  function overlay(c, b, now) {
+    if (!run || run.side !== 'train' || run.b !== b) return;
+    var st = TRAIN_STEPS[run.step], k = T(b), TS = 40, cen = function (u) { return [u.x * TS + TS / 2, u.y * TS + TS / 2]; };
+    if (!st.show || !k.tr) return;
+    c.save();
+    if ((st.show === 'cover' || st.show === 'angle') && k.tg && k.tg.alive) {
+      var o = cen(k.tg), axis = Math.PI; // the crate is west of the target
+      if (st.show === 'cover') {
+        c.strokeStyle = 'rgba(255,209,102,' + (.5 + .4 * Math.sin(now / 200)) + ')'; c.lineWidth = 2; c.strokeRect(12 * TS + 2, 8 * TS + 2, TS - 4, TS - 4);
+      }
+      var cone = function (a0, a1, col) { c.fillStyle = col; c.beginPath(); c.moveTo(o[0], o[1]); c.arc(o[0], o[1], 6.5 * TS, axis + a0, axis + a1); c.closePath(); c.fill(); };
+      var d30 = Math.PI / 6, d63 = Math.atan(2);
+      cone(-d30, d30, 'rgba(125,255,155,.10)'); cone(d30, d63, 'rgba(255,209,102,.10)'); cone(-d63, -d30, 'rgba(255,209,102,.10)');
+      c.fillStyle = 'rgba(125,255,155,.9)'; c.font = 'bold 11px "Share Tech Mono", monospace'; c.textAlign = 'center';
+      c.fillText('full cover', o[0] - 4.2 * TS, o[1] + 4); c.fillStyle = 'rgba(255,209,102,.9)';
+      c.fillText('fading', o[0] - 3.6 * TS, o[1] - 2.4 * TS); c.fillText('fading', o[0] - 3.6 * TS, o[1] + 2.6 * TS);
+      c.fillStyle = 'rgba(255,107,133,.85)'; c.fillText('flanked', o[0] - 1.2 * TS, o[1] - 3.6 * TS); c.fillText('flanked', o[0] - 1.2 * TS, o[1] + 3.8 * TS);
+      if (st.show === 'angle') { // the line of the shot
+        var a = cen(k.tr);
+        c.strokeStyle = k.hi && k.hi.ok ? (k.hi.cover === 0 ? '#7dff9b' : k.hi.cover < k.hi.coverBase ? '#ffd166' : '#4fd1ff') : '#7d8ea5';
+        c.setLineDash([6, 6]); c.lineDashOffset = -now / 40; c.lineWidth = 1.5; c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(o[0], o[1]); c.stroke(); c.setLineDash([]);
+        if (k.hi && k.hi.ok) { var mx = (a[0] + o[0]) / 2, my = (a[1] + o[1]) / 2, lab = k.hi.chance + '%' + (k.hi.cover ? ' · cover −' + k.hi.cover : ' · flanked');
+          c.font = 'bold 12px "Share Tech Mono", monospace'; var w = c.measureText(lab).width + 10; c.fillStyle = 'rgba(0,0,0,.8)'; c.fillRect(mx - w / 2, my - 18, w, 16); c.fillStyle = c.strokeStyle; c.fillText(lab, mx, my - 6); }
+      }
+    }
+    if (st.show === 'defense' && k.gn && k.gn.alive) {
+      var g0 = cen(k.gn), t0 = cen(k.tr);
+      c.strokeStyle = k.gi && k.gi.ok ? (k.gi.cover >= 40 ? '#4fd1ff' : '#ff6b85') : '#7d8ea5';
+      c.setLineDash([6, 6]); c.lineDashOffset = now / 40; c.lineWidth = 1.5; c.beginPath(); c.moveTo(g0[0], g0[1]); c.lineTo(t0[0], t0[1]); c.stroke(); c.setLineDash([]);
+      c.strokeStyle = 'rgba(79,209,255,' + (.5 + .4 * Math.sin(now / 200)) + ')'; c.lineWidth = 2; c.strokeRect(10 * TS + 2, 12 * TS + 2, TS - 4, TS * 2 - 4);
+      if (k.gi && k.gi.ok) { var lab2 = 'gunner: ' + k.gi.chance + '% on you'; c.font = 'bold 12px "Share Tech Mono", monospace'; c.textAlign = 'center';
+        var w2 = c.measureText(lab2).width + 10; c.fillStyle = 'rgba(0,0,0,.8)'; c.fillRect(t0[0] - w2 / 2, t0[1] + 24, w2, 16); c.fillStyle = c.strokeStyle; c.fillText(lab2, t0[0], t0[1] + 36); }
+    }
+    c.restore();
+  }
 
   // ---------------------------------------------------------- strategy tips
   var TIPS = {
@@ -107,5 +195,5 @@ XG.Tutorial = (function () {
     return '<div class="tip"><span class="tip-i">TIP</span><span class="tip-t">' + text + '</span><button data-action="tip-ok" data-arg="' + id + '">Got it</button></div>';
   }
 
-  return { battleStart: battleStart, battleUpdate: battleUpdate, event: event, finish: finish, stratTip: stratTip, STEPS: STEPS, TIPS: TIPS, state: function () { return run && { side: run.side, step: run.step, shots: run.shots }; } };
+  return { startTraining: startTraining, overlay: overlay, battleStart: battleStart, battleUpdate: battleUpdate, event: event, finish: finish, stratTip: stratTip, STEPS: STEPS, TIPS: TIPS, state: function () { return run && { side: run.side, step: run.step, shots: run.shots }; } };
 })();

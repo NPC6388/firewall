@@ -62,7 +62,7 @@ XG.TacUI = (function () {
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && $('owa-no') && XG.UI.isModal()) XG.UI.closeModal(); });
     $('tac-abort').onclick = function () {
       if (!canInput()) return;
-      XG.UI.modal(lat() ? '<h1>Withdraw?</h1><p>Your units pull back into the network. The mission counts as lost.</p>' +
+      XG.UI.modal(st.b.training ? '<h1>Leave the range?</h1><p>Training ends; nothing is lost.</p><div class="modal-actions"><button id="ab-no">Stay</button><button class="danger" id="ab-yes">Leave</button></div>' : lat() ? '<h1>Withdraw?</h1><p>Your units pull back into the network. The mission counts as lost.</p>' +
         '<div class="modal-actions"><button id="ab-no">Keep fighting</button><button class="danger" id="ab-yes">Withdraw</button></div>' :
         '<h1>Abort mission?</h1><p>The squad extracts. The mission counts as a failure: regional infection rises and Convergence +2%.' +
         (st.b.mission.kind !== 'purge' ? ' Story missions stay available for another attempt.' : '') + '</p>' +
@@ -317,7 +317,7 @@ XG.TacUI = (function () {
     var won = lat() ? XG.Lat.latticeWon(b.mission.lkind, o) : o === 'win';
     XG.Audio.play(won ? 'victory' : 'defeat');
     setTimeout(function () {
-      var head = lat()
+      var head = b.training ? '<h1 class="good">TRAINING COMPLETE</h1>' : lat()
         ? (XG.Lat.latticeWon(b.mission.lkind, o) ? '<h1 class="good">' + (b.mission.lkind === 'breach' ? 'SYSTEM BREACHED' : b.mission.lkind === 'strike' ? 'SAFEHOUSE HARMONIZED' : b.mission.lkind === 'uplink' ? 'UPLINK HOLDS' : 'CELL HOLDS') + '</h1>'
           : o === 'abort' ? '<h1 class="warn">WITHDRAWN</h1>' : '<h1 class="bad">FORCES LOST</h1>')
         : o === 'win' ? '<h1 class="good">OBJECTIVE COMPLETE</h1>' : o === 'abort' ? '<h1 class="warn">EXTRACTION</h1>' : '<h1 class="bad">SQUAD LOST</h1>';
@@ -345,7 +345,7 @@ XG.TacUI = (function () {
     var left = b.units.filter(function (x) { return x.alive && x.side !== HS() && visibleUnit(x); }).length;
     var mine = b.side === b.human;
     XG.Audio.intensity(left ? 1 : .15);
-    if (XG.Tutorial) XG.Tutorial.battleUpdate(b, u, st.mode);
+    if (XG.Tutorial) XG.Tutorial.battleUpdate(b, u, st.mode, st.aim);
     $('tac-top').innerHTML = '<b>' + b.mission.name + '</b><span class="dim">' + b.mission.city + '</span><span class="obj">◎ ' + obj + '</span>' +
       '<span class="dim">Turn ' + b.turn + (b.turnLimit ? '/' + b.turnLimit : '') + ' · ' + left + ' hostile(s) in sight</span>' +
       '<span class="turn-banner ' + (mine ? 'player' : 'enemy') + '">' + (b.outcome ? 'BATTLE OVER' : mine ? 'YOUR TURN' : lat() ? 'FIREWALL TURN' : 'LATTICE TURN') + '</span>';
@@ -547,6 +547,7 @@ XG.TacUI = (function () {
       drawUnit(x, pos, alpha, now);
     });
 
+    XG.Tutorial.overlay(ctx, b, now);
     // fx and particles
     st.fx = st.fx.filter(function (f) { return now - f.t0 < f.dur; });
     st.fx.forEach(function (f) { drawFx(f, now); });

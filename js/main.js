@@ -38,6 +38,7 @@ var XG = globalThis.XG = globalThis.XG || {};
     'to-title': function () { if (UI.g && !UI.g.over) UI.save(UI.g); UI.closeModal(); titleScreen(); },
     'close': function () { UI.closeModal(); },
     'help': function () { XG.Help.open(); },
+    'training': function () { UI.closeModal(); XG.Tutorial.startTraining(titleScreen); },
     'settings': function () { XG.Help.settings(); },
     'sort': function (key) { UI.sortBy(key); },
     'tip-ok': function (id) { XG.Settings.markTip(id); UI.render(); },

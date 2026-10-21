@@ -80,7 +80,7 @@ XG.Help = (function () {
         '<p><b>Between battles:</b> keep research running, build power before labs, and keep wounded operatives out of the next fight.</p>';
     }
     XG.UI.modal('<h1>Help</h1><div class="help-tabs">' + tabs.map(function (t) { return '<button data-help="' + t[0] + '" class="' + (t[0] === tab ? 'on' : '') + '">' + t[1] + '</button>'; }).join('') +
-      '</div>' + body + '<div class="modal-actions"><button data-help-settings>Settings ⚙</button><button class="primary" data-action="close">Close</button></div>');
+      '</div>' + body + '<div class="modal-actions">' + (XG.UI && XG.UI.g ? '' : '<button data-action="training">Combat training</button>') + '<button data-help-settings>Settings ⚙</button><button class="primary" data-action="close">Close</button></div>');
     document.querySelectorAll('[data-help]').forEach(function (b) { b.onclick = function () { open(b.getAttribute('data-help')); }; });
     document.querySelector('[data-help-settings]').onclick = settings;
     if (tab === 'glossary') {
