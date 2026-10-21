@@ -3,7 +3,7 @@
 var XG = globalThis.XG = globalThis.XG || {};
 
 XG.Gfx = (function () {
-  var TS = 40, FLOOR = 0, WALL = 1, LOW = 2, HIGH = 3;
+  var TS = 40, FLOOR = 0, WALL = 1, LOW = 2, HIGH = 3, PIT = 4;
   var REDUCED = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // ------------------------------------------------------------ helpers
@@ -27,13 +27,17 @@ XG.Gfx = (function () {
   // ------------------------------------------------------------ biomes
   var BIOMES = {
     city:   { accent: '79,209,255', floor: [16, 25, 38], roof: [27, 40, 58], roofEdge: '#30486a', facade: '#0b131e', window: '255,209,102',
-              low: [37, 52, 74], stripe: '#ffd166', high: [18, 29, 46], leds: ['#4fd1ff', '#7dff9b', '#ffd166', '#ff4d6d'] },
+              low: [37, 52, 74], stripe: '#ffd166', high: [18, 29, 46], leds: ['#4fd1ff', '#7dff9b', '#ffd166', '#ff4d6d'],
+              pit: { name: 'Sinkhole', deep: '#04070b', glow: '79,150,200', glowA: .3, water: true } },
     relay:  { accent: '199,146,255', floor: [21, 18, 35], roof: [33, 26, 54], roofEdge: '#3f3266', facade: '#100b1c', window: '199,146,255',
-              low: [44, 36, 66], stripe: '#c792ff', high: [23, 18, 48], leds: ['#c792ff', '#ff3df2', '#4fd1ff'], veins: '199,146,255' },
+              low: [44, 36, 66], stripe: '#c792ff', high: [23, 18, 48], leds: ['#c792ff', '#ff3df2', '#4fd1ff'], veins: '199,146,255',
+              pit: { name: 'Lattice chasm', deep: '#07040d', glow: '199,146,255', glowA: .5 } },
     uplink: { accent: '255,42,85', floor: [27, 15, 21], roof: [42, 21, 32], roofEdge: '#4d2335', facade: '#13090f', window: '255,77,109',
-              low: [58, 30, 42], stripe: '#ff2a55', high: [31, 15, 24], leds: ['#ff2a55', '#ff3df2', '#ffd166'], veins: '255,42,85' },
+              low: [58, 30, 42], stripe: '#ff2a55', high: [31, 15, 24], leds: ['#ff2a55', '#ff3df2', '#ffd166'], veins: '255,42,85',
+              pit: { name: 'Coolant breach', deep: '#0b0306', glow: '255,42,85', glowA: .55 } },
     cyber:  { accent: '79,209,255', floor: [3, 7, 14], roof: [8, 26, 40], roofEdge: '#4fd1ff', facade: '#04101a', window: '79,209,255',
-              low: [10, 30, 44], stripe: '#4fd1ff', high: [6, 18, 30], leds: ['#4fd1ff', '#7dff9b'], veins: '255,61,242', cyber: true }
+              low: [10, 30, 44], stripe: '#4fd1ff', high: [6, 18, 30], leds: ['#4fd1ff', '#7dff9b'], veins: '255,61,242', cyber: true,
+              pit: { name: 'Null sector', deep: '#000000', glow: '255,61,242', glowA: .25 } }
   };
   function biomeOf(b) { var m = b.mission; return m.lkind === 'breach' ? 'cyber' : m.kind === 'relay' ? 'relay' : m.kind === 'uplink' ? 'uplink' : 'city'; }
 
@@ -76,6 +80,7 @@ XG.Gfx = (function () {
     if (B.veins) s.veins.forEach(function (v) { strokePath(c, v, rgba(B.veins, .16), 1.6); });
     // ambient occlusion along solid edges
     for (y = 0; y < H; y++) for (x = 0; x < W; x++) if (tileAt(b, x, y) !== WALL) aoTile(c, b, x, y);
+    for (y = 0; y < H; y++) for (x = 0; x < W; x++) if (tileAt(b, x, y) === PIT) pitTile(c, B, b, x, y);
     // cast shadows (light from the upper left), drawn once on a mask so overlaps don't stack
     var sh = document.createElement('canvas'); sh.width = s.canvas.width; sh.height = s.canvas.height;
     var sc = sh.getContext('2d'); sc.setTransform(dpr, 0, 0, dpr, 0, 0); sc.fillStyle = '#000';
@@ -197,6 +202,65 @@ XG.Gfx = (function () {
         c.fillStyle = lit < .3 ? rgba(B.window, .55) : lit < .45 ? rgba(B.accent, .3) : 'rgba(0,0,0,.45)';
         c.fillRect(px + 3 + wi * 9.5, py + roofH + 4, 6, 4);
       }
+    }
+  }
+  // A hole in the ground (impassable, no cover): dark depths lit faintly from below, the far wall visible in 3/4 view,
+  // a ragged lip where it meets the floor. Cyber: a void with grid lines falling away into it.
+  function pitTile(c, B, b, x, y) {
+    var px = x * TS, py = y * TS, P = B.pit, open = function (dx, dy) { return tileAt(b, x + dx, y + dy) !== PIT; };
+    var n = open(0, -1), s = open(0, 1), w = open(-1, 0), e = open(1, 0);
+    c.fillStyle = P.deep; c.fillRect(px, py, TS, TS);
+    var g = c.createRadialGradient(px + TS / 2, py + TS * .7, 2, px + TS / 2, py + TS * .7, TS * .8);
+    g.addColorStop(0, rgba(P.glow, P.glowA)); g.addColorStop(1, rgba(P.glow, 0));
+    c.fillStyle = g; c.fillRect(px, py, TS, TS);
+    if (B.cyber) { // grid lines falling away into the void
+      for (var k = 1; k <= 3; k++) {
+        c.strokeStyle = rgba(B.accent, .45 / k); var ins = k * 5;
+        c.strokeRect(px + (w ? ins : 0) + .5, py + (n ? ins : 0) + .5, TS - (w ? ins : 0) - (e ? ins : 0) - 1, TS - (n ? ins : 0) - (s ? ins : 0) - 1);
+      }
+      c.fillStyle = rgba(B.accent, .95);
+      if (n) c.fillRect(px, py, TS, 2); if (s) c.fillRect(px, py + TS - 2, TS, 2); if (w) c.fillRect(px, py, 2, TS); if (e) c.fillRect(px + TS - 2, py, 2, TS);
+      return;
+    }
+    if (P.water) { // flooded at the bottom: a few glints on dark water
+      c.fillStyle = rgba(P.glow, .35);
+      for (var r = 0; r < 3; r++) c.fillRect(px + 6 + hash(x, y, 60 + r) * 20, py + 22 + r * 5, 6 + hash(x, y, 63 + r) * 8, 1);
+    }
+    if (n) { // the far wall of the hole, seen from above at an angle, with rock/concrete strata
+      var fg = c.createLinearGradient(0, py, 0, py + 18);
+      fg.addColorStop(0, shade(B.floor, 30)); fg.addColorStop(1, P.deep);
+      c.fillStyle = fg; c.fillRect(px, py, TS, 18);
+      c.fillStyle = 'rgba(0,0,0,.4)'; c.fillRect(px, py + 6, TS, 1); c.fillRect(px, py + 12, TS, 1);
+      if (hash(x, y, 70) < .5) { c.strokeStyle = 'rgba(170,140,110,.55)'; c.beginPath(); c.moveTo(px + 8 + hash(x, y, 71) * 20, py + 2); c.lineTo(px + 12 + hash(x, y, 72) * 20, py + 15); c.stroke(); } // rebar
+    }
+    [[w, px, 1], [e, px + TS - 5, -1]].forEach(function (sd) { // side walls, in shade
+      if (!sd[0]) return;
+      var sg = c.createLinearGradient(sd[1] + (sd[2] < 0 ? 5 : 0), 0, sd[1] + (sd[2] < 0 ? 0 : 5), 0);
+      sg.addColorStop(0, shade(B.floor, 14)); sg.addColorStop(1, 'rgba(0,0,0,0)');
+      c.fillStyle = sg; c.fillRect(sd[1], py, 5, TS);
+    });
+    // ragged lip: chunks of floor breaking off into the hole, edged in light
+    c.fillStyle = shade(B.floor, 26);
+    [[n, 0, -1], [s, 0, 1], [w, -1, 0], [e, 1, 0]].forEach(function (sd, si) {
+      if (!sd[0]) return;
+      for (var i = 0; i < 4; i++) {
+        var u = (i + .2 + hash(x * 4 + i, y, 73 + si) * .6) * TS / 4, d = 2 + hash(x, y * 4 + i, 77 + si) * 4;
+        var ax = sd[1] ? (sd[1] < 0 ? px : px + TS) : px + u, ay = sd[2] ? (sd[2] < 0 ? py : py + TS) : py + u;
+        c.beginPath();
+        if (sd[1]) { c.moveTo(ax, ay - 4); c.lineTo(ax - sd[1] * d, ay); c.lineTo(ax, ay + 4); }
+        else { c.moveTo(ax - 4, ay); c.lineTo(ax, ay - sd[2] * d); c.lineTo(ax + 4, ay); }
+        c.fill();
+      }
+    });
+    c.fillStyle = shade(B.floor, 44);
+    if (n) c.fillRect(px, py, TS, 2); if (w) c.fillRect(px, py, 2, TS); if (e) c.fillRect(px + TS - 2, py, 2, TS);
+    c.fillStyle = 'rgba(255,255,255,.2)';
+    if (s) c.fillRect(px, py + TS - 2, TS, 2); // the near lip catches the light
+    if (n) { // caution tape strung along the far edge
+      c.fillStyle = rgba(rgbOf(B.stripe), .8);
+      for (var t2 = 0; t2 < 4; t2++) c.fillRect(px + 1 + t2 * 10, py - 4, 5, 3);
+      c.fillStyle = 'rgba(0,0,0,.6)';
+      for (var t3 = 0; t3 < 4; t3++) c.fillRect(px + 6 + t3 * 10, py - 4, 5, 3);
     }
   }
   function lowCover(c, B, b, x, y) {
@@ -829,7 +893,7 @@ XG.Gfx = (function () {
   }
 
   return {
-    TS: TS, REDUCED: REDUCED, hash: hash, rgbOf: rgbOf, biomeOf: biomeOf, BIOMES: BIOMES,
+    TS: TS, REDUCED: REDUCED, hash: hash, rgbOf: rgbOf, biomeOf: biomeOf, BIOMES: BIOMES, pitName: function (b) { return BIOMES[biomeOf(b)].pit.name; },
     terrain: terrain, decal: decal, ambient: ambient, motes: motes, fog: fog, lights: lights, vignette: vignette,
     unit: unit, icon: icon, portrait: portrait, pal: pal, emit: emit, particles: particles, FX: FX, bolt: bolt, tracer: tracer, banner: banner, sweep: sweep
   };

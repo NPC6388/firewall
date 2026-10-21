@@ -5,7 +5,7 @@ var XG = globalThis.XG = globalThis.XG || {};
 XG.Tac = (function () {
   var D = XG.DATA;
   var W = 22, H = 16, SIGHT = 11;
-  var FLOOR = 0, WALL = 1, LOW = 2, HIGH = 3;
+  var FLOOR = 0, WALL = 1, LOW = 2, HIGH = 3, PIT = 4; // PIT: impassable, but no cover and see-through
 
   // ------------------------------------------------------------ geometry
   function inB(x, y) { return x >= 0 && y >= 0 && x < W && y < H; }
@@ -19,9 +19,11 @@ XG.Tac = (function () {
     for (var i = 0; i < b.units.length; i++) { var u = b.units[i]; if (u.alive && u.x === x && u.y === y) return u; }
     return null;
   }
-  // The tile as cover: a live HALCYON Sentinel is a mech chassis, so it counts as half cover for whoever stands beside it.
+  // The tile as cover: a live HALCYON Sentinel is a mech chassis, so it counts as half cover for whoever stands beside it;
+  // a pit is no cover at all.
   function coverTile(b, x, y) {
     var t = tile(b, x, y), u;
+    if (t === PIT) return FLOOR;
     return t === FLOOR && (u = unitAt(b, x, y)) && u.kind === 'sentinel' ? LOW : t;
   }
   function free(b, x, y) { return inB(x, y) && tile(b, x, y) === FLOOR && !unitAt(b, x, y); }
@@ -117,41 +119,134 @@ XG.Tac = (function () {
   function moveRange(u) { return u.ap >= 2 ? u.mobility * 2 : u.ap === 1 ? u.mobility : 0; }
 
   // -------------------------------------------------------------- map gen
+  // Each map picks a layout, then 0-2 impassable features (PIT: sinkhole, chasm...), then scattered cover.
+  // Pits stop movement but give no cover and don't block sight. The deployment zone (x < 4) is always kept clear.
+  var LAYOUTS = ['compound', 'street', 'yard', 'plaza', 'blocks'];
   function genMap(b, rng) {
+    var layout = rng.pick(LAYOUTS);
     for (var attempt = 0; attempt < 40; attempt++) {
       var t = new Array(W * H).fill(FLOOR), doors = {};
       var set = function (x, y, v) { if (inB(x, y)) t[y * W + x] = v; };
       var get = function (x, y) { return inB(x, y) ? t[y * W + x] : WALL; };
-      var nb = rng.int(2, 4);
-      for (var k = 0, placed = 0; k < 60 && placed < nb; k++) {
-        var bw = rng.int(5, 8), bh = rng.int(4, 6), bx = rng.int(5, W - bw - 1), by = rng.int(1, H - bh - 1), ok = true;
-        for (var yy = by - 1; yy <= by + bh && ok; yy++) for (var xx = bx - 1; xx <= bx + bw && ok; xx++) if (get(xx, yy) !== FLOOR) ok = false;
-        if (!ok) continue;
-        placed++;
+      var nearDoor = function (x, y) { return doors[x + ',' + y] || doors[(x + 1) + ',' + y] || doors[(x - 1) + ',' + y] || doors[x + ',' + (y + 1)] || doors[x + ',' + (y - 1)]; };
+      // a walled building with 1-3 doorways; margin 1 keeps a lane around it (0 lets it touch the map edge)
+      var building = function (bx, by, bw, bh, margin) {
+        if (bx < 4 || bx + bw > W || by < 0 || by + bh > H) return false;
+        var m = margin === undefined ? 1 : margin;
+        for (var yy = by - m; yy < by + bh + m; yy++) for (var xx = bx - m; xx < bx + bw + m; xx++) if (inB(xx, yy) && get(xx, yy) !== FLOOR) return false;
         var per = [];
         for (var x2 = bx; x2 < bx + bw; x2++) for (var y2 = by; y2 < by + bh; y2++) {
-          var edge = x2 === bx || y2 === by || x2 === bx + bw - 1 || y2 === by + bh - 1;
-          if (!edge) continue;
+          if (x2 !== bx && y2 !== by && x2 !== bx + bw - 1 && y2 !== by + bh - 1) continue;
           set(x2, y2, WALL);
           var corner = (x2 === bx || x2 === bx + bw - 1) && (y2 === by || y2 === by + bh - 1);
-          if (!corner) per.push([x2, y2]);
+          var outside = x2 + (x2 === bx ? -1 : x2 === bx + bw - 1 ? 1 : 0), outsideY = y2 + (y2 === by ? -1 : y2 === by + bh - 1 ? 1 : 0);
+          if (!corner && inB(outside, outsideY)) per.push([x2, y2]); // no doors onto the map edge
         }
         rng.shuffle(per);
-        for (var di = 0; di < rng.int(2, 3); di++) { set(per[di][0], per[di][1], FLOOR); doors[per[di][0] + ',' + per[di][1]] = 1; }
+        var nd = bw * bh <= 16 ? rng.int(1, 2) : rng.int(2, 3);
+        for (var di = 0; di < per.length && nd > 0; di++) {
+          if (nearDoor(per[di][0], per[di][1])) continue; // no double-wide doorways
+          set(per[di][0], per[di][1], FLOOR); doors[per[di][0] + ',' + per[di][1]] = 1; nd--;
+        }
         if (bw > 5 && bh > 4) set(rng.int(bx + 2, bx + bw - 3), rng.int(by + 2, by + bh - 3), HIGH);
-      }
-      var nc = rng.int(16, 24);
-      for (var c = 0; c < nc; c++) {
-        var cx = rng.int(3, W - 1), cy = rng.int(0, H - 1), kind = rng.next();
-        var cells = [];
-        if (kind < 0.5) { var horiz = rng.next() < 0.5, len = rng.int(2, 3); for (var l = 0; l < len; l++) cells.push([cx + (horiz ? l : 0), cy + (horiz ? 0 : l), LOW]); }
-        else if (kind < 0.8) cells.push([cx, cy, HIGH]);
-        else { var h2 = rng.next() < 0.5; cells.push([cx, cy, HIGH], [cx + (h2 ? 1 : 0), cy + (h2 ? 0 : 1), HIGH]); }
-        cells.forEach(function (cc) {
-          if (get(cc[0], cc[1]) === FLOOR && !doors[cc[0] + ',' + cc[1]] && !doors[(cc[0] + 1) + ',' + cc[1]] && !doors[(cc[0] - 1) + ',' + cc[1]] &&
-              !doors[cc[0] + ',' + (cc[1] + 1)] && !doors[cc[0] + ',' + (cc[1] - 1)]) set(cc[0], cc[1], cc[2]);
+        return true;
+      };
+      // one piece of cover: a run of crates/barriers, a single tall block, or a pair of tall blocks
+      var piece = function (cx, cy, kind, horiz) {
+        var cells = [], len;
+        if (kind === 'low') { len = rng.int(2, 3); for (var l = 0; l < len; l++) cells.push([cx + (horiz ? l : 0), cy + (horiz ? 0 : l), LOW]); }
+        else if (kind === 'high') cells.push([cx, cy, HIGH]);
+        else { len = kind === 'long' ? rng.int(2, 3) : 2; for (var l2 = 0; l2 < len; l2++) cells.push([cx + (horiz ? l2 : 0), cy + (horiz ? 0 : l2), HIGH]); }
+        cells.forEach(function (cc) { if (cc[0] >= 3 && get(cc[0], cc[1]) === FLOOR && !nearDoor(cc[0], cc[1])) set(cc[0], cc[1], cc[2]); });
+      };
+      // true when a w x h box and a one-tile ring around it are all open floor (keeps vehicles from merging)
+      var clear = function (cx, cy, w, h) {
+        for (var yy = cy - 1; yy <= cy + h; yy++) for (var xx = cx - 1; xx <= cx + w; xx++) if (!inB(xx, yy) || get(xx, yy) !== FLOOR) return false;
+        return true;
+      };
+      var scatter = function (n, mix) {
+        for (var c = 0; c < n; c++) {
+          var k = rng.next(), kind = k < mix[0] ? 'low' : k < mix[0] + mix[1] ? 'high' : 'pair';
+          piece(rng.int(3, W - 1), rng.int(0, H - 1), kind, rng.next() < 0.5);
+        }
+      };
+      var k2, x, y;
+
+      if (layout === 'compound') { // a few large buildings in open ground
+        for (k2 = 0, x = 0, y = rng.int(2, 4); k2 < 60 && x < y; k2++) {
+          var bw = rng.int(5, 8), bh = rng.int(4, 6);
+          if (building(rng.int(5, W - bw - 1), rng.int(1, H - bh - 1), bw, bh)) x++;
+        }
+      } else if (layout === 'blocks') { // a dense district of small buildings and narrow lanes
+        for (k2 = 0, x = 0, y = rng.int(5, 7); k2 < 120 && x < y; k2++) {
+          var sw = rng.int(4, 5), sh = rng.int(3, 4);
+          if (building(rng.int(5, W - sw), rng.int(0, H - sh), sw, sh)) x++;
+        }
+      } else if (layout === 'street') { // a road through the middle, shopfronts along both edges, wrecks on the road
+        [[0, rng.int(3, 4)], [H - rng.int(3, 4), 0]].forEach(function (row, ri) {
+          var by = row[0], bh = ri ? H - row[0] : row[1];
+          for (var bx = rng.int(5, 7); bx < W - 2; bx += rng.int(1, 2)) {
+            var bw2 = Math.min(rng.int(3, 6), W - bx);
+            if (bw2 >= 3) building(bx, by, bw2, bh, 0);
+            bx += bw2;
+          }
+        });
+        var vehicle = function (horiz) { // cars and trucks along the road, barricades across it
+          for (var tr = 0; tr < 12; tr++) {
+            var vx = rng.int(5, W - 4), vy = rng.int(5, H - 7);
+            if (clear(vx, vy, horiz ? 3 : 1, horiz ? 1 : 3)) { piece(vx, vy, horiz && rng.next() < 0.4 ? 'long' : 'low', horiz); return; }
+          }
+        };
+        for (k2 = rng.int(4, 6); k2 > 0; k2--) vehicle(true);
+        for (k2 = rng.int(2, 3); k2 > 0; k2--) vehicle(false);
+      } else if (layout === 'yard') { // container stacks in rows, with gaps to slip through
+        var vert = rng.next() < 0.6, gap = rng.int(3, 4);
+        for (var lane = vert ? rng.int(5, 6) : rng.int(1, 2); lane < (vert ? W - 1 : H - 1); lane += gap) {
+          for (var p = rng.int(0, 2); p < (vert ? H : W); ) {
+            var run = rng.int(2, 4);
+            if (rng.next() < 0.75) for (var r2 = 0; r2 < run; r2++) {
+              var cx2 = vert ? lane : p + r2, cy2 = vert ? p + r2 : lane;
+              if (cx2 >= 5 && get(cx2, cy2) === FLOOR) set(cx2, cy2, HIGH);
+            }
+            p += run + rng.int(1, 3);
+          }
+        }
+        if (rng.next() < 0.5) building(rng.int(12, W - 5), rng.int(0, H - 4), 4, 4, 0);
+      } else { // plaza: an open square ringed by planters, buildings in the corners, a monument in the middle
+        var pcx = rng.int(11, 14), pcy = rng.int(6, H - 7), rad = rng.int(3, 4);
+        for (var a = 0; a < 360; a += 360 / (rad * 7)) {
+          var px = Math.round(pcx + Math.cos(a * Math.PI / 180) * rad * 1.3), py = Math.round(pcy + Math.sin(a * Math.PI / 180) * rad);
+          if (rng.next() < 0.6 && get(px, py) === FLOOR) set(px, py, LOW);
+        }
+        if (rng.next() < 0.6) { set(pcx, pcy, HIGH); if (rng.next() < 0.5) set(pcx + 1, pcy, HIGH); }
+        [[0, 0], [1, 0], [0, 1], [1, 1]].forEach(function (q) {
+          var qw = rng.int(4, 6), qh = rng.int(4, 5);
+          if (rng.next() < 0.65) building(q[0] ? W - qw : rng.int(5, 7), q[1] ? H - qh : 0, qw, qh, 0);
         });
       }
+
+      // 0-2 impassable features: an irregular blob or a trench, away from the deployment zone and doorways
+      for (var f = rng.int(0, 2); f > 0; f--) {
+        var fx = rng.int(6, W - 3), fy = rng.int(1, H - 2), cells = [[fx, fy]];
+        if (rng.next() < 0.6) { // blob of 3-7 cells grown from a seed
+          for (var g2 = rng.int(3, 7), tries = 0; cells.length < g2 && tries < 30; tries++) {
+            var base = rng.pick(cells), o = rng.pick([[1, 0], [-1, 0], [0, 1], [0, -1]]), nx = base[0] + o[0], ny = base[1] + o[1];
+            if (!cells.some(function (cc) { return cc[0] === nx && cc[1] === ny; })) cells.push([nx, ny]);
+          }
+        } else { // trench: a straight run of 3-6, sometimes with one bend
+          var hz = rng.next() < 0.5, tl = rng.int(3, 6), bend = rng.next() < 0.4 ? rng.int(1, tl - 2) : -1, cx3 = fx, cy3 = fy;
+          for (var s2 = 1; s2 < tl; s2++) {
+            if (s2 === bend) hz = !hz;
+            if (hz) cx3++; else cy3++;
+            cells.push([cx3, cy3]);
+          }
+        }
+        cells.forEach(function (cc) { if (cc[0] >= 5 && get(cc[0], cc[1]) === FLOOR && !nearDoor(cc[0], cc[1])) set(cc[0], cc[1], PIT); });
+      }
+
+      scatter(layout === 'compound' ? rng.int(16, 22) : layout === 'blocks' ? rng.int(6, 10) : layout === 'street' ? rng.int(4, 7) : layout === 'yard' ? rng.int(5, 8) : rng.int(8, 11),
+        layout === 'yard' ? [0.8, 0.15] : layout === 'street' ? [0.7, 0.2] : [0.5, 0.3]);
+
       // deployment zone with a little starting cover
       var mid = H >> 1;
       for (var sx = 0; sx < 3; sx++) for (var sy = mid - 3; sy <= mid + 3; sy++) set(sx, sy, FLOOR);
@@ -168,9 +263,9 @@ XG.Tac = (function () {
         });
       }
       t.forEach(function (v) { if (v === FLOOR) floors++; });
-      if (cnt >= floors * 0.9) { b.tiles = t; b.reachable = seen; return; }
+      if (cnt >= floors * 0.9) { b.tiles = t; b.reachable = seen; b.layout = layout; return; }
     }
-    b.tiles = new Array(W * H).fill(FLOOR); b.reachable = new Array(W * H).fill(true);
+    b.tiles = new Array(W * H).fill(FLOOR); b.reachable = new Array(W * H).fill(true); b.layout = 'open';
   }
 
   // -------------------------------------------------------------- units
@@ -1013,7 +1108,7 @@ XG.Tac = (function () {
   function abort(b) { if (!b.outcome) b.outcome = 'abort'; }
 
   return {
-    W: W, H: H, FLOOR: FLOOR, WALL: WALL, LOW: LOW, HIGH: HIGH, SIGHT: SIGHT,
+    W: W, H: H, FLOOR: FLOOR, WALL: WALL, LOW: LOW, HIGH: HIGH, PIT: PIT, SIGHT: SIGHT,
     create: create, createLattice: createLattice, createTraining: createTraining, refillAP: refillAP, act: act, endPlayerTurn: endPlayerTurn, enemyStep: enemyStep, ai: ai,
     endTurn: endTurn, aiStep: aiStep,
     reach: reach, pathTo: pathTo, moveRange: moveRange, hitInfo: hitInfo, targets: targets, tileOk: tileOk,

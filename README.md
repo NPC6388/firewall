@@ -53,7 +53,7 @@ Hover a tile to see its cover (shield icons: filled = full, half-filled = half; 
 | `js/state.js` | Seeded RNG, new-game state, soldier stats, save/load |
 | `js/strategy.js` | FIREWALL campaign rules: day clock, research, base, missions, Convergence, mission results |
 | `js/lattice.js` | LATTICE campaign rules: compute, protocols, the Array, forces, Detection/Trace, breaches, raids, strikes, the AI FIREWALL |
-| `js/tactical.js` | Pure battle engine (no DOM): map gen, LOS, cover, abilities, AI, turns. `b.human` is the side the person plays |
+| `js/tactical.js` | Pure battle engine (no DOM): map gen (five layouts: compound, street, yard, plaza, blocks; plus 0-2 impassable pits that give no cover), LOS, cover, abilities, AI, turns. `b.human` is the side the person plays |
 | `js/tactical-ui.js` | Tactical screen: input, HUD, event animation queue, draw order |
 | `js/gfx.js` | Procedural graphics, no image files: baked terrain for four biomes (city, relay, uplink, cyberspace), unit sprites, particles, fog, lights, banners |
 | `js/settings.js` | Player settings and tutorial progress (`firewall-settings-v1`, separate from saves) |
@@ -65,6 +65,7 @@ Hover a tile to see its cover (shield icons: filled = full, half-filled = half; 
 | `js/ui.js` | FIREWALL strategy screens, modals, story player |
 | `js/lattice-ui.js` | LATTICE strategy screens (magenta theme), squad picker, results |
 | `js/main.js` | Boot and click-action router |
+| `tools/map-sampler.js` | `node tools/map-sampler.js [maps]`: ASCII sample of each map layout plus cover/pit/open-floor stats |
 | `tests/smoke.js` | Headless test: rule checks, AI-vs-AI battles, auto-played campaigns |
 | `tests/browser/` | Headless-Edge driver (`drive.mjs`) plus scripted UI runs; screenshots go to `tests/browser/shots/` |
 
@@ -79,6 +80,7 @@ node tests/browser/drive.mjs tests/browser/playthrough.mjs
 node tests/browser/drive.mjs tests/browser/finale.mjs
 node tests/browser/drive.mjs tests/browser/lattice.mjs
 node tests/browser/drive.mjs tests/browser/gfx-gallery.mjs   # zoomed shots of every sprite in every biome, plus effects and fps
+node tests/browser/drive.mjs tests/browser/map-layouts.mjs   # one battle per map layout, pits hovered and zoomed
 node tests/browser/drive.mjs tests/browser/gfx-profile.mjs   # milliseconds per frame for each drawing stage
 node tests/browser/drive.mjs tests/browser/onboarding.mjs    # settings, help, tips, portraits, tutorial, hit breakdown, audio
 node tests/browser/drive.mjs tests/browser/audio-levels.mjs  # peak level of every sound and the music

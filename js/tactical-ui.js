@@ -490,7 +490,8 @@ XG.TacUI = (function () {
       }
     } else if (h && h.x >= 0 && h.x < W && h.y >= 0 && h.y < H) {
       var t = Tac.tile(b, h.x, h.y);
-      html = '<b>' + ['Floor', 'Wall', 'Low cover', 'High cover'][t] + '</b>' + (b.visible[h.y * W + h.x] ? '' : ' <span class="dim">(not in sight)</span>');
+      html = '<b>' + (t === Tac.PIT ? XG.Gfx.pitName(b) : ['Floor', 'Wall', 'Low cover', 'High cover'][t]) + '</b>' + (b.visible[h.y * W + h.x] ? '' : ' <span class="dim">(not in sight)</span>');
+      if (t === Tac.PIT) html += '<div class="dim">Impassable. Gives no cover and does not block line of sight.</div>';
       if (t === 0) {
         var cf = coverFacing(h.x, h.y), sides = SIDES.map(function (o) {
           var c = Tac.coverTile(b, h.x + o[0], h.y + o[1]), s = sideState(cf, o);

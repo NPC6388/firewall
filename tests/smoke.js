@@ -178,6 +178,27 @@ function autoBattle(g, m, squad) {
   sh.alive = false;
   check(Tac.coverValue(bc, 10, 10, 18, 10) === 0, 'a destroyed Sentinel gives no cover');
   sh.alive = true; sh.kind = sk;
+  // a pit: impassable, no cover, and you can see and shoot across it
+  sh.x = 15; sh.y = 15;
+  bc.tiles[10 * Tac.W + 11] = Tac.PIT; bc.tiles[10 * Tac.W + 12] = Tac.PIT;
+  check(Tac.coverValue(bc, 10, 10, 18, 10) === 0, 'a pit beside you is no cover');
+  check(Tac.los(bc, 10, 10, 18, 10), 'a pit does not block line of sight');
+  var walker = bc.units.filter(function (u) { return u.side === 'player' && u !== sh; })[0];
+  walker.x = 10; walker.y = 9; walker.ap = 2;
+  var rr = Tac.reach(bc, walker, 4);
+  check(rr.d[10 * Tac.W + 11] < 0 && rr.d[10 * Tac.W + 13] > 0, 'a pit cannot be entered, only walked around');
+  bc.tiles[10 * Tac.W + 11] = Tac.FLOOR; bc.tiles[10 * Tac.W + 12] = Tac.FLOOR;
+  // map layouts: all five turn up, the deployment zone stays clear, and some maps carry pits
+  var lay = {}, pitMaps = 0, deployOk = true;
+  for (var ms = 0; ms < 60; ms++) {
+    var bm = Tac.create(g, Object.assign({}, m, { kind: 'purge', diff: 2, seed: 900 + ms * 7919 }), g.soldiers.slice(0, 4));
+    lay[bm.layout] = 1;
+    if (bm.tiles.indexOf(Tac.PIT) >= 0) pitMaps++;
+    for (var dy = (Tac.H >> 1) - 3; dy <= (Tac.H >> 1) + 3; dy++) for (var dx = 0; dx < 3; dx++) if (bm.tiles[dy * Tac.W + dx] !== Tac.FLOOR) deployOk = false;
+  }
+  check(['compound', 'street', 'yard', 'plaza', 'blocks'].every(function (k) { return lay[k]; }), 'all five map layouts appear (' + Object.keys(lay).join(',') + ')');
+  check(pitMaps > 15 && pitMaps < 60, 'some but not all maps have impassable ground (' + pitMaps + '/60)');
+  check(deployOk, 'deployment zone is always open floor');
   // override flips sides then purges
   var b3 = Tac.create(g, Object.assign({}, m, { kind: 'purge', diff: 1, seed: 7 }), g.soldiers.slice(0, 4));
   var h3 = b3.units.filter(function (u) { return u.kind === 'hacker'; })[0], d3 = b3.units.filter(function (u) { return u.kind === 'drone'; })[0];
