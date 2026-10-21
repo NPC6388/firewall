@@ -468,8 +468,10 @@ XG.TacUI = (function () {
       var t = Tac.tile(b, h.x, h.y);
       html = '<b>' + ['Floor', 'Wall', 'Low cover', 'High cover'][t] + '</b>' + (b.visible[h.y * W + h.x] ? '' : ' <span class="dim">(not in sight)</span>');
       if (t === 0) {
-        var sides = [[0, -1, 'N'], [1, 0, 'E'], [0, 1, 'S'], [-1, 0, 'W']].map(function (o) {
-          var c = Tac.tile(b, h.x + o[0], h.y + o[1]); return c === 1 || c === 3 ? o[2] + ' full' : c === 2 ? o[2] + ' half' : null;
+        var cf = coverFacing(h.x, h.y), sides = SIDES.map(function (o) {
+          var c = Tac.tile(b, h.x + o[0], h.y + o[1]), s = sideState(cf, o);
+          var tag = s === 'idle' ? ' <span class="dim">(faces no visible enemy)</span>' : s === 'fading' ? ' <span class="warn">(angled)</span>' : '';
+          return c === 1 || c === 3 ? o[2] + ' full' + tag : c === 2 ? o[2] + ' half' + tag : null;
         }).filter(Boolean);
         html += '<div class="dim">Cover here: ' + (sides.length ? sides.join(', ') : 'none') + '</div>';
         if (u && !st.mode && canInput() && getReach(u).d[h.y * W + h.x] > 0) {
@@ -642,13 +644,42 @@ XG.TacUI = (function () {
     ctx.fillText(tag, cc[0], cc[1] + 32);
   }
 
+  // How each side's cover at (x, y) does against the hostiles you can see that could shoot that tile:
+  // 'full' (blocks one head-on), 'fading' (only at an angle), 'idle' (faces none of them). With no visible
+  // shooter at all, every side reads 'full' (nothing to judge it against). Cached per tile/state.
+  var SIDES = [[0, -1, 'N'], [1, 0, 'E'], [0, 1, 'S'], [-1, 0, 'W']];
+  function coverFacing(x, y) {
+    var b = st.b, key = [x, y, b.turn, b.log.length].join(',');
+    if (st.facingCache && st.facingCache.key === key) return st.facingCache;
+    var res = { key: key, threats: 0, side: {} }, sel = selUnit();
+    b.units.forEach(function (e) {
+      if (!e.alive || e.side === HS() || e.isStatic || !e.range || st.hidden[e.id] || !b.visible[e.y * W + e.x]) return;
+      if (Tac.dist(e.x, e.y, x, y) > e.range) return;
+      var ox, oy; if (sel) { ox = sel.x; oy = sel.y; sel.x = x; sel.y = y; } // judge it as if you stood there
+      var seen = Tac.los(b, e.x, e.y, x, y);
+      if (sel) { sel.x = ox; sel.y = oy; }
+      if (!seen) return;
+      res.threats++;
+      var cd = Tac.coverDetail(b, x, y, e.x, e.y);
+      if (!cd.side) return;
+      var k = cd.side.join(','), cur = res.side[k], st2 = cd.value >= cd.base ? 'full' : 'fading';
+      if (cur !== 'full') res.side[k] = st2;
+    });
+    st.facingCache = res;
+    return res;
+  }
+  function sideState(f, o) { return !f.threats ? 'full' : f.side[o[0] + ',' + o[1]] || 'idle'; }
   function drawCoverShields(x, y) {
-    [[0, -1], [1, 0], [0, 1], [-1, 0]].forEach(function (o) {
+    var f = coverFacing(x, y);
+    SIDES.forEach(function (o) {
       var t = Tac.tile(st.b, x + o[0], y + o[1]);
       if (t === 0) return;
-      var full = t === Tac.WALL || t === Tac.HIGH, c = center(x, y), sx = c[0] + o[0] * 14, sy = c[1] + o[1] * 14;
+      var full = t === Tac.WALL || t === Tac.HIGH, c = center(x, y), sx = c[0] + o[0] * 14, sy = c[1] + o[1] * 14, s = sideState(f, o);
+      var col = s === 'full' ? '79,209,255' : s === 'fading' ? '255,209,102' : '125,142,165';
+      ctx.globalAlpha = s === 'idle' ? .4 : 1;
       ctx.beginPath(); ctx.moveTo(sx - 5, sy - 5); ctx.lineTo(sx + 5, sy - 5); ctx.lineTo(sx + 5, sy); ctx.lineTo(sx, sy + 6); ctx.lineTo(sx - 5, sy); ctx.closePath();
-      ctx.fillStyle = full ? '#4fd1ff' : 'rgba(79,209,255,.15)'; ctx.strokeStyle = '#4fd1ff'; ctx.fill(); ctx.stroke();
+      ctx.fillStyle = full && s !== 'idle' ? 'rgb(' + col + ')' : 'rgba(' + col + ',.15)'; ctx.strokeStyle = 'rgb(' + col + ')'; ctx.fill(); ctx.stroke();
+      ctx.globalAlpha = 1;
     });
   }
 

@@ -73,11 +73,11 @@ XG.Tac = (function () {
   function coverDetail(b, tx, ty, fx, fy) {
     var ddx = fx - tx, ddy = fy - ty, best = { value: 0, base: 0, angle: 0 }, c;
     if (ddx !== 0 && Math.abs(ddx) >= Math.abs(ddy) / 2) {
-      c = coverAngled(coverOf(tile(b, tx + sign(ddx), ty)), ddx, ddy);
+      c = coverAngled(coverOf(tile(b, tx + sign(ddx), ty)), ddx, ddy); c.side = [sign(ddx), 0];
       if (c.value > best.value) best = c;
     }
     if (ddy !== 0 && Math.abs(ddy) >= Math.abs(ddx) / 2) {
-      c = coverAngled(coverOf(tile(b, tx, ty + sign(ddy))), ddy, ddx);
+      c = coverAngled(coverOf(tile(b, tx, ty + sign(ddy))), ddy, ddx); c.side = [0, sign(ddy)];
       if (c.value > best.value) best = c;
     }
     return best;
