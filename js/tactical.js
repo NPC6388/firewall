@@ -19,6 +19,11 @@ XG.Tac = (function () {
     for (var i = 0; i < b.units.length; i++) { var u = b.units[i]; if (u.alive && u.x === x && u.y === y) return u; }
     return null;
   }
+  // The tile as cover: a live HALCYON Sentinel is a mech chassis, so it counts as half cover for whoever stands beside it.
+  function coverTile(b, x, y) {
+    var t = tile(b, x, y), u;
+    return t === FLOOR && (u = unitAt(b, x, y)) && u.kind === 'sentinel' ? LOW : t;
+  }
   function free(b, x, y) { return inB(x, y) && tile(b, x, y) === FLOOR && !unitAt(b, x, y); }
 
   // Bresenham; walls always block, tall cover blocks unless it's next to either end (peeking).
@@ -73,11 +78,11 @@ XG.Tac = (function () {
   function coverDetail(b, tx, ty, fx, fy) {
     var ddx = fx - tx, ddy = fy - ty, best = { value: 0, base: 0, angle: 0 }, c;
     if (ddx !== 0 && Math.abs(ddx) >= Math.abs(ddy) / 2) {
-      c = coverAngled(coverOf(tile(b, tx + sign(ddx), ty)), ddx, ddy); c.side = [sign(ddx), 0];
+      c = coverAngled(coverOf(coverTile(b, tx + sign(ddx), ty)), ddx, ddy); c.side = [sign(ddx), 0];
       if (c.value > best.value) best = c;
     }
     if (ddy !== 0 && Math.abs(ddy) >= Math.abs(ddx) / 2) {
-      c = coverAngled(coverOf(tile(b, tx, ty + sign(ddy))), ddy, ddx); c.side = [0, sign(ddy)];
+      c = coverAngled(coverOf(coverTile(b, tx, ty + sign(ddy))), ddy, ddx); c.side = [0, sign(ddy)];
       if (c.value > best.value) best = c;
     }
     return best;
@@ -1013,6 +1018,6 @@ XG.Tac = (function () {
     endTurn: endTurn, aiStep: aiStep,
     reach: reach, pathTo: pathTo, moveRange: moveRange, hitInfo: hitInfo, targets: targets, tileOk: tileOk,
     abilityBlock: abilityBlock, coverValue: coverValue, coverDetail: coverDetail, los: los, isVisible: isVisible, unitAt: unitAt,
-    unitById: unitById, tile: tile, dist: dist, cheb: cheb, checkOutcome: checkOutcome, result: result, abort: abort
+    unitById: unitById, tile: tile, coverTile: coverTile, dist: dist, cheb: cheb, checkOutcome: checkOutcome, result: result, abort: abort
   };
 })();

@@ -493,9 +493,9 @@ XG.TacUI = (function () {
       html = '<b>' + ['Floor', 'Wall', 'Low cover', 'High cover'][t] + '</b>' + (b.visible[h.y * W + h.x] ? '' : ' <span class="dim">(not in sight)</span>');
       if (t === 0) {
         var cf = coverFacing(h.x, h.y), sides = SIDES.map(function (o) {
-          var c = Tac.tile(b, h.x + o[0], h.y + o[1]), s = sideState(cf, o);
+          var c = Tac.coverTile(b, h.x + o[0], h.y + o[1]), s = sideState(cf, o);
           var tag = s === 'idle' ? ' <span class="bad">(no use: faces no visible enemy)</span>' : s === 'fading' ? ' <span class="warn">(angled)</span>' : '';
-          var what = c === 1 ? 'wall' : c === 3 ? 'high cover' : 'crate';
+          var what = c === 1 ? 'wall' : c === 3 ? 'high cover' : Tac.tile(b, h.x + o[0], h.y + o[1]) === 0 ? 'Sentinel' : 'crate';
           return c ? '<br>· ' + o[3] + ': ' + what + ', <b>' + (c === 2 ? 'half cover −20' : 'full cover −40') + '</b>' + tag : null;
         }).filter(Boolean);
         html += '<div class="dim">Cover here: ' + (sides.length ? sides.join('') : 'none') + '</div>';
@@ -709,14 +709,14 @@ XG.TacUI = (function () {
     var dx = Math.cos(a), dy = Math.sin(a), best = 'open';
     for (var i = 0; i < SIDES.length; i++) {
       var o = SIDES[i], along = o[0] ? dx * o[0] : dy * o[1], across = o[0] ? dy : dx;
-      if (along <= 0 || along < Math.abs(across) / 2 - 1e-9 || Tac.tile(st.b, x + o[0], y + o[1]) === Tac.FLOOR) continue;
+      if (along <= 0 || along < Math.abs(across) / 2 - 1e-9 || Tac.coverTile(st.b, x + o[0], y + o[1]) === Tac.FLOOR) continue;
       if (Math.atan2(Math.abs(across), along) <= Math.PI / 6 + 1e-9) return 'full';
       best = 'fading';
     }
     return best;
   }
   function drawCoverCones(x, y) {
-    if (!SIDES.some(function (o) { return Tac.tile(st.b, x + o[0], y + o[1]) !== Tac.FLOOR; })) return;
+    if (!SIDES.some(function (o) { return Tac.coverTile(st.b, x + o[0], y + o[1]) !== Tac.FLOOR; })) return;
     var c = center(x, y), R = TS * 4.5, step = Math.PI / 60, a0 = 0, cls = coneClass(x, y, step / 2);
     var wedge = function (from, to, k) {
       ctx.fillStyle = 'rgba(' + CONE_COL[k] + ',' + (k === 'open' ? .05 : .09) + ')';
@@ -731,7 +731,7 @@ XG.TacUI = (function () {
   function drawCoverShields(x, y) {
     var f = coverFacing(x, y);
     SIDES.forEach(function (o) {
-      var t = Tac.tile(st.b, x + o[0], y + o[1]);
+      var t = Tac.coverTile(st.b, x + o[0], y + o[1]);
       if (t === 0) return;
       var full = t === Tac.WALL || t === Tac.HIGH, c = center(x, y), sx = c[0] + o[0] * 14, sy = c[1] + o[1] * 14, s = sideState(f, o);
       if (s === 'idle') return; // cover facing away from every enemy you can see is no cover at all

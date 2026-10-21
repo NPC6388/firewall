@@ -8,7 +8,7 @@ XG.Help = (function () {
   // [term, side ('both' | 'fw' | 'lat'), text]
   var TERMS = [
     ['Action points (AP)', 'both', 'Each unit gets 2 AP a turn. A move inside the blue range costs 1; a dash into the amber range costs 2. Shooting and most abilities end the turn.'],
-    ['Cover', 'both', 'Half cover (crates, barriers) is −20 to hit you, full cover (walls, racks) −40. Only the side facing the shooter counts. Shield icons show cover when you hover a tile.'],
+    ['Cover', 'both', 'Half cover (crates, barriers) is −20 to hit you, full cover (walls, racks) −40. A HALCYON Sentinel is a mech and counts as half cover for anyone beside it. Only the side facing the shooter counts. Shield icons show cover when you hover a tile.'],
     ['Cover angle', 'both', 'Cover counts in full when the shot comes within 30° of head-on, fades to half by about 63°, and gives nothing past that.'],
     ['Flanked', 'both', 'A target with no cover toward the shooter. Easier to hit and +25% crit chance. Odds shown in green on the move preview.'],
     ['Critical hit', 'both', 'Extra damage. Base crit comes from the weapon; flanking adds 25%.'],

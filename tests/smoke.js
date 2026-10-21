@@ -169,6 +169,15 @@ function autoBattle(g, m, squad) {
   tg.hunker = false; tg.marked = 0;
   bc.tiles[10 * Tac.W + 11] = Tac.LOW;
   check(Tac.coverValue(bc, 10, 10, 15, 15) < 20 && Tac.coverValue(bc, 10, 10, 15, 15) > 10, 'half cover also fades with angle');
+  // a HALCYON Sentinel (mech chassis) is half cover for whoever stands beside it; other units are not
+  bc.tiles[10 * Tac.W + 11] = Tac.FLOOR;
+  var sk = sh.kind; sh.x = 11; sh.y = 10;
+  check(Tac.coverValue(bc, 10, 10, 18, 10) === 0, 'a trooper beside you is no cover');
+  sh.kind = 'sentinel';
+  check(Tac.coverValue(bc, 10, 10, 18, 10) === 20, 'an adjacent Sentinel is half cover');
+  sh.alive = false;
+  check(Tac.coverValue(bc, 10, 10, 18, 10) === 0, 'a destroyed Sentinel gives no cover');
+  sh.alive = true; sh.kind = sk;
   // override flips sides then purges
   var b3 = Tac.create(g, Object.assign({}, m, { kind: 'purge', diff: 1, seed: 7 }), g.soldiers.slice(0, 4));
   var h3 = b3.units.filter(function (u) { return u.kind === 'hacker'; })[0], d3 = b3.units.filter(function (u) { return u.kind === 'drone'; })[0];
