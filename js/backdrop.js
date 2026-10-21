@@ -4,26 +4,84 @@ var XG = globalThis.XG = globalThis.XG || {};
 XG.Backdrop = (function () {
   var REDUCED = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // Stylised continents in the world map's 100 × 56.25 viewBox, keyed by region id.
-  var LAND = {
-    na: ['6,9 13,5 24,4 32,6 34,10 30,14 28,18 25,22 22,26 19,28 17,26 14,22 10,18 6,14', '36,3 43,2.5 42,7.5 37.5,9'],
-    sa: ['25,30 31,29 36,33 38,37 35,43 32,48 29,53.5 27.5,51 26.5,45 24,38 23,33'],
-    eu: ['42,9.5 46,6 54,5.5 58,9 57,13 54,16.5 50,18.5 46,18 43,15', '40,8 42.5,7 42,10.5 40.2,10.5'],
-    af: ['44,23 50,21 56,22 60,26 63,31 59,35 57,41 54,47 51,47.5 49,41 47,35 43,30'],
-    as: ['58.5,8 66,4 78,3.5 90,6 95,10 92,14 88,18 86,23 82,26 78,28 74,31 72,33 70,28 66,25 62,22 59.5,18 58,13'],
-    oc: ['78,37 85,35 90,38 91.5,43 86,47 80,46 77,42', '74,31.5 79,30.5 81,32 76,33', '93.5,45 95.5,47 94.5,50 93,48']
-  };
+  // Low-res Mercator world (Natural Earth 1:110m land, public domain), one character per 1 x 1 cell of the
+  // 100 x 56.25 viewBox, rows top to bottom from 78N to about 59S. The letter is the region that cell belongs to:
+  // n = na, s = sa, e = eu, f = af, a = as, o = oc; '.' is sea. Regenerate with tools/map-raster.js, don't hand-edit.
+  var REGION_OF = { n: 'na', s: 'sa', e: 'eu', f: 'af', a: 'as', o: 'oc' };
+  var LAND = [
+    '.........................nnn..nnnnnnnnnnnnnee.........e.e...........................................',
+    '................nn.....n.nnn..nnnnnnnnnnnnnee.........e.............a.........aaa...................',
+    '................nnnnnnn.n......nnnnnnnnnnnnee.....................eaa.......aaaaaa......aa..........',
+    '.................nnnn.nnnnnn......nnnnnnnnnee....................ee.......aaaaaaaa......aaaa........',
+    '...............nnn.....n..........nnnnnnnnnee....................e.......aaaaaaaa...................',
+    '...............nnnn.n.nnnnnnn.....nnnnnnnnne.....................e......aaaaaaaaaaaaaa...a..........',
+    '...............nnnnnn.nn.nnnn.....nnnnnnnnne....................ee...aaaaaaaaaaaaaaaaa..aaaa........',
+    'a....nnn.........nnnn..nnnnnnnn....nnnnnnnne.............ee......e..aaaaaaaaaaaaaaaaaaaaaaaaaa......',
+    '.....nnnnnn..nnnnnnnnnnnn.nnnnn....nnnnnnnne...........eeee........a.aaaaaaaaaaaaaaaaaaaaaaaaaaa.aa.',
+    'a...nnnnnnnnnnnnnnnnnn.nnnnn.nnn...nnnnnnn............eeeeeee.e.eeeaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    'aa..nnnnnnnnnnnnnnnnnnnnnnn..nnnn..nnnnnn.............eeeeeeeeeeeeeaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    'aaannnnnnnnnnnnnnnnnnnnnnnn..nn.n..nnnnn...eee.......eeeeeee.eeeeeeaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    '....nnnnnnnnnnnnnnnnnnnnn.nn.nnn...nnnn.....ee......eeeeeeeeeeeeeeeaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    '....nnnnnnnnnnnnnnnnnnnnn...nnnn....nn.............eeee.eeeeeeeeeeeaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.',
+    '....nnnnnnnnnnnnnnnnnnnn....nnn......n.............eeee.eeeeeeeeeeeaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaa..',
+    '.....nnn...nnnnnnnnnnnnn....nnnnn..................eeee.eeeeeeeeeeeaaaaaaaaaaaaaaaaaaaaaaaa.a.a.....',
+    '......nn.....nnnnnnnnnnnn...nnnnn...............ee..eee.eeeeeeeeeeeaaaaaaaaaaaaaaaaaaaaaa....aaa....',
+    '.............nnnnnnnnnnnnnn.nnnnnn.............eee..ee.eeeeeeeeeeeeaaaaaaaaaaaaaaaaaaaaa.....aa.....',
+    '..............nnnnnnnnnnnnn.nnnnnnn............eee.eeeeeeeeeeeeeeeeaaaaaaaaaaaaaaaaaaaaaaa...a......',
+    '..............nnnnnnnnnnnnnnnnnnnnn..............eeeeeeeeeeeeeeeeeeaaaaaaaaaaaaaaaaaaaaaaa..........',
+    '...............nnnnnnnnnnnnnnnnn..n..............eeeeeeeeeeeeeeeeeeaaaaaaaaaaaaaaaaaaaaaaa..........',
+    '...............nnnnnnnnnnnnnnnnnn................eeeeeeeeeeeeeeeeeeaaaaaaaaaaaaaaaaaaaaa.a..........',
+    '...............nnnnnnnnnnnnnnnn.................eeeeeeeeee...aa.aaaaaaaaaaaaaaaaaaaaaaaa.a..........',
+    '...............nnnnnnnnnnnnnnn.................eeee.e.eeeeeeeaaa.aaaaaaaaaaaaaaaaaaaaa..............',
+    '................nnnnnnnnnnnnn..................eee....e.eeeeeaaa.aaaaaaaaaaaaaaaaaaa.a..a...........',
+    '................nnnnnnnnnnnnn...................fffff.......aaaaaaaaaaaaaaaaaaaaaaa..a.aa...........',
+    '.................nnnnnnnnnnn...................ffffffff.ffffaaaaaaaaaaaaaaaaaaaaaaaa..a.............',
+    '..................nnnnnnn..n...................fffffffffffffaaaaaaaaaaaaaaaaaaaaaaaa................',
+    '...................nnnn.......................ffffffffffffffaaaa.aaaaaaaaaaaaaaaaaaa................',
+    '....................nnn..n..n................fffffffffffffff.aaaaaa..aaaaaaaaaaaaa..................',
+    '.....................nnnnn..n.n..............fffffffffffffffaaaaaa....aaaa..aaaa....................',
+    '.......................nnnn..................fffffffffffffffa.aaa.....aaa....aaa...a................',
+    '..........................n..ss..............fffffffffffffffaa.a.......aa....aaa....................',
+    '..........................n.nsssss............ffffffffffffffffff.......aa....a......a...............',
+    '............................ssssssss...........fff.fffffffffffff.............aa...o.................',
+    '............................ssssssss................fffffffffff..............aa.ooo.................',
+    '...........................ssssssssssss.............ffffffffff................o.oooo..oooo..........',
+    '...........................sssssssssssss.............ffffffff..................oo.......ooo.........',
+    '............................ssssssssssss.............ffffffff....................o..................',
+    '............................ssssssssssss.............fffffffff.f......................oo.o..........',
+    '.............................ssssssssss..............ffffffff.ff....................ooooooo.........',
+    '..............................sssssssss..............fffffff..ff...................oooooooo.........',
+    '..............................ssssssss................ffffff..f..................ooooooooooo........',
+    '..............................sssssss.................fffff......................oooooooooooo.......',
+    '..............................ssssss...................ffff.......................ooooooooooo.......',
+    '..............................ssssss...................fff........................ooo..ooooo........',
+    '..............................sssss.....................................................oooo........',
+    '.............................sssss.......................................................oo.......oo',
+    '.............................sss..........................................................o.......o.',
+    '.............................sss.................................................................o..',
+    '.............................sss................................................................o...',
+    '.............................sss....................................................................',
+    '.............................ss.....................................................................',
+    '.............................ss.....................................................................',
+    '...............................s....................................................................',
+    '....................................................................................................'
+  ];
 
-  // opts: { H, accent ('r,g,b'), packet ('#hex'), tint(regionId) -> [colour, opacity], pos {id: [x, y]}, links, signal }
+  // opts: { H, accent ('r,g,b'), packet ('#hex'), tint(regionId) -> [colour, opacity], pos {id: [x, y]}, links, signal,
+  //         key (id prefix, so two maps in one page don't share patterns) }
   function mapDecor(o) {
-    var s = '<defs><pattern id="landdots" width="1.1" height="1.1" patternUnits="userSpaceOnUse"><circle cx=".55" cy=".55" r=".2" fill="rgba(' + o.accent + ',.35)"/></pattern>' +
+    var s = '<defs>' +
       '<linearGradient id="sweepg" x1="0" x2="1"><stop offset="0" stop-color="rgba(' + o.accent + ',0)"/><stop offset="1" stop-color="rgba(' + o.accent + ',.09)"/></linearGradient></defs>';
-    Object.keys(LAND).forEach(function (id) {
-      var t = o.tint(id);
-      LAND[id].forEach(function (pts) {
-        s += '<polygon points="' + pts + '" fill="' + t[0] + '" fill-opacity="' + t[1] + '" stroke="rgba(' + o.accent + ',.22)" stroke-width=".18"/>';
-        s += '<polygon points="' + pts + '" fill="url(#landdots)"/>';
-      });
+    // land as pixels: one pattern per region (its tint), one rect per run of same-region cells in a row
+    Object.keys(REGION_OF).forEach(function (ch) {
+      var id = REGION_OF[ch], t = o.tint(id);
+      s += '<pattern id="px-' + (o.key || '') + id + '" width="1" height="1" patternUnits="userSpaceOnUse"><rect x=".1" y=".1" width=".8" height=".8" fill="' + t[0] + '" fill-opacity="' + Math.min(.85, .3 + t[1] * 1.5).toFixed(2) + '"/></pattern>';
+    });
+    LAND.forEach(function (row, y) {
+      for (var x = 0; x < row.length;) {
+        var ch = row[x], x0 = x; while (x < row.length && row[x] === ch) x++;
+        if (ch !== '.') s += '<rect x="' + x0 + '" y="' + y + '" width="' + (x - x0) + '" height="1" fill="url(#px-' + (o.key || '') + REGION_OF[ch] + ')"/>';
+      }
     });
     if (!REDUCED) {
       s += '<rect y="0" width="14" height="' + o.H + '" fill="url(#sweepg)"><animate attributeName="x" from="-14" to="100" dur="7s" repeatCount="indefinite"/></rect>';

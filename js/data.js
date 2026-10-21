@@ -145,12 +145,12 @@ XG.DATA = {
 
   // ---------------------------------------------------------------- world
   regions: [
-    { id: 'na', name: 'North America', x: 19, y: 32, cities: ['Seattle', 'Houston', 'Toronto', 'Monterrey'] },
-    { id: 'sa', name: 'South America', x: 30, y: 72, cities: ['São Paulo', 'Lima', 'Bogotá', 'Santiago'] },
-    { id: 'eu', name: 'Europe',        x: 49, y: 26, cities: ['Rotterdam', 'Warsaw', 'Lyon', 'Tallinn'] },
-    { id: 'af', name: 'Africa',        x: 52, y: 62, cities: ['Lagos', 'Nairobi', 'Cairo', 'Johannesburg'] },
-    { id: 'as', name: 'Asia',          x: 74, y: 34, cities: ['Shenzhen', 'Mumbai', 'Seoul', 'Almaty'] },
-    { id: 'oc', name: 'Oceania',       x: 84, y: 74, cities: ['Sydney', 'Auckland', 'Perth', 'Jakarta'] }
+    { id: 'na', name: 'North America', x: 22, y: 38, cities: ['Seattle', 'Houston', 'Toronto', 'Monterrey'] },
+    { id: 'sa', name: 'South America', x: 34, y: 69, cities: ['São Paulo', 'Lima', 'Bogotá', 'Santiago'] },
+    { id: 'eu', name: 'Europe',        x: 54, y: 35, cities: ['Rotterdam', 'Warsaw', 'Lyon', 'Tallinn'] },
+    { id: 'af', name: 'Africa',        x: 56, y: 61, cities: ['Lagos', 'Nairobi', 'Cairo', 'Johannesburg'] },
+    { id: 'as', name: 'Asia',          x: 76, y: 39, cities: ['Shenzhen', 'Mumbai', 'Seoul', 'Almaty'] },
+    { id: 'oc', name: 'Oceania',       x: 87, y: 76, cities: ['Sydney', 'Auckland', 'Perth', 'Jakarta'] }
   ],
   links: [['na', 'sa'], ['na', 'eu'], ['eu', 'af'], ['eu', 'as'], ['af', 'sa'], ['as', 'oc'], ['af', 'as'], ['na', 'as']],
 
