@@ -139,5 +139,15 @@ XG.Backdrop = (function () {
       '<circle cx="' + x + '" cy="' + y + '" r="' + r.toFixed(2) + '" fill="url(#halo-' + id + ')" stroke="' + col + '" stroke-opacity=".45" stroke-width=".18" stroke-dasharray=".7 .5"/>';
   }
 
-  return { mapDecor: mapDecor, LAND: LAND, halo: halo, haloRadius: haloRadius };
+  // Before infection is visible (FIREWALL, no Signal Analysis): a blurred grey halo in one of three sizes,
+  // a rough estimate that doesn't give the exact number away.
+  var ROUGH = [{ max: 25, inf: 15, label: '~LOW' }, { max: 50, inf: 37, label: '~MEDIUM' }, { max: Infinity, inf: 70, label: '~HIGH' }];
+  function roughBand(inf) { for (var i = 0; i < ROUGH.length; i++) if (inf < ROUGH[i].max) return ROUGH[i]; return ROUGH[ROUGH.length - 1]; }
+  function roughHalo(id, x, y, inf) {
+    var r = haloRadius(roughBand(inf).inf), col = '#7d8ea5';
+    return '<filter id="haze-' + id + '" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="' + (r * .18).toFixed(2) + '"/></filter>' +
+      '<circle class="halo-rough" cx="' + x + '" cy="' + y + '" r="' + r.toFixed(2) + '" fill="' + col + '" fill-opacity=".26" filter="url(#haze-' + id + ')"/>';
+  }
+
+  return { mapDecor: mapDecor, LAND: LAND, halo: halo, haloRadius: haloRadius, roughHalo: roughHalo, roughBand: roughBand };
 })();

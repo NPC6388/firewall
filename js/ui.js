@@ -134,8 +134,10 @@ XG.UI = (function () {
       tint: function (id) { var inf = St.region(g, id).infection; return vis ? [infColor(inf), .05 + inf / 300] : ['#4a5d78', .06]; } });
     D.links.forEach(function (l) { s += '<line class="link" x1="' + pos[l[0]][0] + '" y1="' + pos[l[0]][1] + '" x2="' + pos[l[1]][0] + '" y2="' + pos[l[1]][1] + '"/>'; });
     s += '<text x="50" y="4" fill="#2f4560" font-size="2" text-anchor="middle" letter-spacing=".4">HALCYON GLOBAL NETWORK VIEW</text>';
-    // infection halos first (area ∝ infection), so no halo covers another region's node or label
-    if (vis) D.regions.forEach(function (r) { var inf = St.region(g, r.id).infection; s += XG.Backdrop.halo(r.id, pos[r.id][0], pos[r.id][1], inf, infColor(inf)); });
+    // infection halos first (area ∝ infection), so no halo covers another region's node or label;
+    // until infection is visible, a blurred grey estimate in three sizes
+    D.regions.forEach(function (r) { var inf = St.region(g, r.id).infection, p = pos[r.id];
+      s += vis ? XG.Backdrop.halo(r.id, p[0], p[1], inf, infColor(inf)) : XG.Backdrop.roughHalo(r.id, p[0], p[1], inf); });
     D.regions.forEach(function (r) {
       var gr = St.region(g, r.id), p = pos[r.id], inf = gr.infection, col = vis ? infColor(inf) : '#4a5d78';
       var rad = 2.2;
@@ -147,7 +149,7 @@ XG.UI = (function () {
       s += '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="' + rad + '" fill="' + col + '" fill-opacity=".18" stroke="' + col + '" stroke-width=".3"/>';
       s += '<circle cx="' + p[0] + '" cy="' + p[1] + '" r=".7" fill="' + col + '"/>';
       s += '<text x="' + p[0] + '" y="' + (p[1] + rad + 2.6) + '" fill="#cfdbe9" font-size="2.1" text-anchor="middle">' + r.name.toUpperCase() + '</text>';
-      s += '<text x="' + p[0] + '" y="' + (p[1] + rad + 5) + '" fill="' + col + '" font-size="1.9" text-anchor="middle">' + (vis ? 'INFECTION ' + Math.round(inf) + '%' : 'INFECTION ??') + '</text>';
+      s += '<text x="' + p[0] + '" y="' + (p[1] + rad + 5) + '" fill="' + col + '" font-size="1.9" text-anchor="middle">' + (vis ? 'INFECTION ' + Math.round(inf) + '%' : 'INFECTION ' + XG.Backdrop.roughBand(inf).label) + '</text>';
       if (ms.length) s += '<text x="' + (p[0] + rad + 1) + '" y="' + (p[1] - rad + .6) + '" fill="#ff6b85" font-size="2">⚠ ' + ms.length + '</text>';
     });
     return s + '</svg>';

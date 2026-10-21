@@ -1,4 +1,4 @@
-// World-map infection halos: area proportional to infection, on both campaigns.
+// World-map infection halos: area proportional to infection, on both campaigns; a rough 3-size grey estimate before Signal Analysis.
 export default async function ({ ev, sleep, send }) {
   const fs = await import('node:fs');
   const grab = async (name) => {
@@ -9,6 +9,10 @@ export default async function ({ ev, sleep, send }) {
   await ev(`localStorage.clear(); localStorage.setItem('firewall-settings-v1', JSON.stringify({hints:false})); location.reload()`); await sleep(1200);
   await ev(`document.querySelector('[data-action="new-game"]').click()`); await sleep(300);
   await ev(`document.getElementById('story-next').click()`); await sleep(200);
+  await ev(`(function(){var g=XG.UI.g; var v=[2,27,3,4,5,60]; g.regions.forEach(function(r,i){ r.infection=v[i]; }); XG.UI.render();})()`); await sleep(300);
+  console.log('FIREWALL rough halos (no Signal Analysis):', await ev(`[...document.querySelectorAll('.worldmap circle.halo-rough')].map(c=>c.getAttribute('r')).join(', ')`),
+    '| labels', await ev(`[...document.querySelectorAll('.worldmap text')].map(t=>t.textContent).filter(t=>/^INFECTION/.test(t)).join(', ')`));
+  await grab('mh-firewall-rough');
   await ev(`(function(){var g=XG.UI.g; g.research.done.push('signal_analysis'); var v=[2,27,3,4,5,60]; g.regions.forEach(function(r,i){ r.infection=v[i]; }); XG.UI.render();})()`); await sleep(300);
   console.log('FIREWALL halo radii:', await ev(`[...document.querySelectorAll('.worldmap circle[fill^="url(#halo"]')].map(c=>c.getAttribute('r')).join(', ')`));
   await grab('mh-firewall');
