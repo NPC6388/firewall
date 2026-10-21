@@ -67,20 +67,32 @@ XG.Backdrop = (function () {
     '....................................................................................................'
   ];
 
-  // opts: { H, accent ('r,g,b'), packet ('#hex'), tint(regionId) -> [colour, opacity], pos {id: [x, y]}, links, signal,
+  // opts: { H, accent ('r,g,b'), packet ('#hex'), pos {id: [x, y]}, links, signal,
+  //         cell(regionId, frac) -> [colour, opacity] for a land pixel whose distance from its region's node is frac
+  //         (0 at the node, 1 at the region's farthest pixel, in steps of 1/20),
   //         key (id prefix, so two maps in one page don't share patterns) }
   function mapDecor(o) {
     var s = '<defs>' +
       '<linearGradient id="sweepg" x1="0" x2="1"><stop offset="0" stop-color="rgba(' + o.accent + ',0)"/><stop offset="1" stop-color="rgba(' + o.accent + ',.09)"/></linearGradient></defs>';
-    // land as pixels: one pattern per region (its tint), one rect per run of same-region cells in a row
-    Object.keys(REGION_OF).forEach(function (ch) {
-      var id = REGION_OF[ch], t = o.tint(id);
-      s += '<pattern id="px-' + (o.key || '') + id + '" width="1" height="1" patternUnits="userSpaceOnUse"><rect x=".1" y=".1" width=".8" height=".8" fill="' + t[0] + '" fill-opacity="' + Math.min(.85, .3 + t[1] * 1.5).toFixed(2) + '"/></pattern>';
-    });
+    // land as pixels: each cell's shade comes from o.cell(region, distance from the node); one pattern per distinct
+    // shade, one rect per run of equal shades in a row
+    var far = {}, shade = [], pats = {}, np = 0;
+    LAND.forEach(function (row, y) { for (var x = 0; x < row.length; x++) { var id = REGION_OF[row[x]]; if (!id) continue;
+      var p = o.pos[id], d = Math.hypot(x + .5 - p[0], y + .5 - p[1]); far[id] = Math.max(far[id] || 0, d); } });
     LAND.forEach(function (row, y) {
+      shade[y] = [];
+      for (var x = 0; x < row.length; x++) {
+        var id = REGION_OF[row[x]]; if (!id) { shade[y][x] = null; continue; }
+        var p = o.pos[id], f = Math.round(Math.hypot(x + .5 - p[0], y + .5 - p[1]) / far[id] * 20) / 20, t = o.cell(id, f), k = t[0] + '|' + t[1].toFixed(2);
+        if (!pats[k]) { pats[k] = 'px-' + (o.key || '') + (np++);
+          s += '<pattern id="' + pats[k] + '" width="1" height="1" patternUnits="userSpaceOnUse"><rect x=".1" y=".1" width=".8" height=".8" fill="' + t[0] + '" fill-opacity="' + t[1].toFixed(2) + '"/></pattern>'; }
+        shade[y][x] = pats[k];
+      }
+    });
+    shade.forEach(function (row, y) {
       for (var x = 0; x < row.length;) {
-        var ch = row[x], x0 = x; while (x < row.length && row[x] === ch) x++;
-        if (ch !== '.') s += '<rect x="' + x0 + '" y="' + y + '" width="' + (x - x0) + '" height="1" fill="url(#px-' + (o.key || '') + REGION_OF[ch] + ')"/>';
+        var k = row[x], x0 = x; while (x < row.length && row[x] === k) x++;
+        if (k) s += '<rect x="' + x0 + '" y="' + y + '" width="' + (x - x0) + '" height="1" fill="url(#' + k + ')"/>';
       }
     });
     if (!REDUCED) {
@@ -207,5 +219,18 @@ XG.Backdrop = (function () {
       '<circle class="halo-rough" cx="' + x + '" cy="' + y + '" r="' + r.toFixed(2) + '" fill="' + col + '" fill-opacity=".26" filter="url(#haze-' + id + ')"/>';
   }
 
-  return { mapDecor: mapDecor, LAND: LAND, halo: halo, haloRadius: haloRadius, roughHalo: roughHalo, roughBand: roughBand };
+  // Land heat scale: green (0%) -> yellow (50%) -> red (100%).
+  function heat(p) {
+    var t = Math.max(0, Math.min(100, p)) / 100, g = [80, 220, 110], y = [255, 209, 80], r = [255, 50, 70];
+    var a = t < .5 ? g : y, z = t < .5 ? y : r, k = t < .5 ? t * 2 : (t - .5) * 2;
+    return 'rgb(' + a.map(function (v, i) { return Math.round(v + (z[i] - v) * k); }).join(',') + ')';
+  }
+  // Infection spreading out from a region's node: the region's infection at the node, falling to 0% at the
+  // region's farthest pixel (frac 1), coloured on the heat scale.
+  function spread(inf, frac) {
+    var local = Math.max(0, Math.min(100, inf)) * (1 - frac);
+    return [heat(Math.round(local / 5) * 5), .5];
+  }
+
+  return { mapDecor: mapDecor, LAND: LAND, spread: spread, heat: heat, halo: halo, haloRadius: haloRadius, roughHalo: roughHalo, roughBand: roughBand };
 })();

@@ -19,7 +19,7 @@ export default async function ({ ev, sleep, send }) {
   await ev(`XG.UI.g=null; localStorage.clear(); localStorage.setItem('firewall-settings-v1', JSON.stringify({hints:false})); location.reload()`); await sleep(1200);
   await ev(`document.querySelector('[data-action="l-new-game"]').click()`); await sleep(300);
   await ev(`document.getElementById('story-next') && document.getElementById('story-next').click()`); await sleep(300);
-  await ev(`(function(){var g=XG.UI.g; var v=[90,10,45,20,70,1]; g.regions.forEach(function(r,i){ r.infection=v[i]; }); XG.UI.render();})()`); await sleep(300);
+  await ev(`(function(){var g=XG.UI.g; var v=[100,10,45,20,70,1]; g.regions.forEach(function(r,i){ r.infection=v[i]; }); XG.UI.render();})()`); await sleep(300);
   console.log('Lattice halo radii:', await ev(`[...document.querySelectorAll('.worldmap circle[fill^="url(#halo"]')].map(c=>c.getAttribute('r')).join(', ')`));
   await grab('mh-lattice');
 }
