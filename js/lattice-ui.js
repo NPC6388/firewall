@@ -227,8 +227,8 @@ XG.LUI = (function () {
         } else go();
       },
       'l-continue': function () { var g = Lat.load(); if (g) { UI.tab = 'network'; api.enterStrategy(g); } },
-      'l-advance': function () { api.commit(Lat.advanceUntilEvent(UI.g).map(function (e) { return e.msg; })); },
-      'l-advance-day': function () { api.commit(Lat.advanceDay(UI.g).map(function (e) { return e.msg; })); },
+      'l-advance': function () { var ev = Lat.advanceUntilEvent(UI.g); XG.Comms.strategy(UI.g, ev); api.commit(ev.map(function (e) { return e.msg; })); },
+      'l-advance-day': function () { var ev = Lat.advanceDay(UI.g); XG.Comms.strategy(UI.g, ev); api.commit(ev.map(function (e) { return e.msg; })); },
       'l-seed': function (id) { Lat.seed(UI.g, id); api.commit(); },
       'l-protocol': function (id) { Lat.startProtocol(UI.g, id); api.commit(); },
       'l-build': function (type) { if (Lat.build(UI.g, type, UI.slot)) UI.slot = null; api.commit(); },

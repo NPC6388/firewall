@@ -35,7 +35,7 @@ var XG = globalThis.XG = globalThis.XG || {};
       } else go();
     },
     'continue': function () { var g = S.load(); if (g) enterStrategy(g); },
-    'to-title': function () { if (UI.g && !UI.g.over) UI.save(UI.g); UI.closeModal(); titleScreen(); },
+    'to-title': function () { if (UI.g && !UI.g.over) UI.save(UI.g); UI.closeModal(); XG.Comms.clear(); titleScreen(); },
     'close': function () { UI.closeModal(); },
     'help': function () { XG.Help.open(); },
     'training': function () { UI.closeModal(); XG.Tutorial.startTraining(titleScreen); },
@@ -46,10 +46,12 @@ var XG = globalThis.XG = globalThis.XG || {};
     'advance': function () {
       XG.Audio.play('advance');
       var ev = St.advanceUntilEvent(UI.g);
+      XG.Comms.strategy(UI.g, ev);
       commit(ev.map(function (e) { return e.msg; }));
     },
     'advance-day': function () {
       var ev = St.advanceDay(UI.g);
+      XG.Comms.strategy(UI.g, ev);
       commit(ev.map(function (e) { return e.msg; }));
     },
     'research': function (id) { St.startResearch(UI.g, id); XG.Audio.play('research'); commit(); },

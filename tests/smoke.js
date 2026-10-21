@@ -9,6 +9,15 @@ var XG = ctx.XG, Tac = XG.Tac, Strat = XG.Strat, S = XG.State, D = XG.DATA;
 var fails = 0;
 function check(cond, msg) { if (!cond) { fails++; console.log('  FAIL: ' + msg); } }
 
+// Comms chatter: both campaigns have lines for every event, each ['H' | 'L', text].
+['fw', 'lat'].forEach(function (f) {
+  ['advance', 'mission', 'research', 'expire', 'build', 'start', 'kill', 'loss', 'crit', 'hack', 'win', 'lose'].forEach(function (ev) {
+    var pool = (D.comms[f] || {})[ev] || [];
+    check(pool.length > 0, 'comms ' + f + '.' + ev + ' has lines');
+    pool.forEach(function (l) { check((l[0] === 'H' || l[0] === 'L') && typeof l[1] === 'string' && l[1].length > 3, 'comms line ok: ' + f + '.' + ev); });
+  });
+});
+
 // Plays a battle with the shared AI on both sides. Returns the battle.
 function autoBattle(g, m, squad) {
   var b = Tac.create(g, m, squad);

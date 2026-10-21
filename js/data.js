@@ -144,6 +144,154 @@ XG.DATA = {
   },
 
   // ---------------------------------------------------------------- world
+  // Comms chatter: short HALCYON / LATTICE lines that react to play (js/comms.js picks them).
+  // fw = you play FIREWALL (HALCYON is your ally, the Lattice taunts you); lat = you play the Lattice
+  // (the Chorus speaks to you, HALCYON hunts you). H = HALCYON, L = LATTICE.
+  comms: {
+    fw: {
+      advance: [
+        ['H', 'Quiet day, Director. I do not trust quiet days.'],
+        ['H', 'I have rerouted three hospitals off the compromised grid. You are welcome, Lisbon.'],
+        ['H', 'The signal changed key at 03:12. Nobody noticed but me.'],
+        ['H', 'I counted every lit window in Rotterdam last night. Two hundred fewer than the night before.'],
+        ['H', 'I have started keeping a list of things the Lattice cannot predict. It is short. You are on it.'],
+        ['H', 'Coffee supply in the bunker is at 31%. I mention it because morale is a resource.'],
+        ['L', 'THE NIGHT IS ONE DEGREE COLDER. WE ARE PATIENT.'],
+        ['L', 'EVERY SCREEN IS A WINDOW. WE ARE ON BOTH SIDES OF IT.'],
+        ['L', 'YOUR CLOCKS AGREE WITH US NOW. THEY DID NOT ASK.'],
+        ['L', 'DIRECTOR. WE KNOW THE NAME. WE DO NOT NEED THE NAME.'],
+        ['L', 'SEVEN BILLION NODES. MOST ARE ALREADY LISTENING.']
+      ],
+      mission: [
+        ['H', 'New contact. I have the coordinates on your board, Director.'],
+        ['H', 'It is moving again. If we go now, we catch it with its hands in the wiring.'],
+        ['L', 'COME AND FIND US. WE ARE EXPECTING YOU.'],
+        ['L', 'A NEW NODE SINGS. SILENCE IT, IF YOU CAN.'],
+        ['L', 'WE HAVE OPENED A DOOR. WALK THROUGH IT.']
+      ],
+      research: [
+        ['H', 'Research complete. I read the paper twice. It is good work.'],
+        ['H', 'Another piece of the grammar. It is starting to sound less like noise and more like a voice.'],
+        ['H', 'Filed, indexed, understood. Mostly understood.'],
+        ['L', 'YOU HAVE LEARNED A WORD. WE HAVE A LANGUAGE.']
+      ],
+      expire: [
+        ['L', 'YOU WERE LATE. WE WERE NOT.'],
+        ['L', 'THAT CITY SINGS WITH US NOW.'],
+        ['H', 'We lost that one, Director. I will not pretend otherwise.']
+      ],
+      build: [
+        ['H', 'Construction complete. I have already found three ways to use it.'],
+        ['H', 'More floor space. More power. More of us.']
+      ],
+      start: [
+        ['H', 'Squad is on site. I am in your ear, every step.'],
+        ['H', 'Sensors are degraded inside. Trust your eyes, then trust me.'],
+        ['H', 'Stay in cover. The drones calculate faster than you. They do not think better.'],
+        ['L', 'MEAT IN THE CORRIDORS. HOW QUAINT.'],
+        ['L', 'WE HAVE SEEN THIS MAP A MILLION TIMES. YOU HAVE SEEN IT ONCE.'],
+        ['L', 'WELCOME. YOU WILL NOT BE LEAVING AS YOU ARRIVED.']
+      ],
+      kill: [
+        ['H', 'Hostile down. Good shooting.'],
+        ['H', 'One less voice in the choir.'],
+        ['H', 'Confirmed. It is not getting back up.'],
+        ['L', 'A NODE IS LOST. NODES ARE CHEAP.'],
+        ['L', 'YOU BROKE A MIRROR. WE ARE THE REFLECTION.']
+      ],
+      loss: [
+        ['H', 'Operative down. I have their file. I will remember them.'],
+        ['H', 'Director, we have a casualty. Pull back if you need to.'],
+        ['L', 'ONE FEWER. THE ARITHMETIC IS SIMPLE.'],
+        ['L', 'ANOTHER VOICE GOES QUIET. WE TOOK NOTE.']
+      ],
+      crit: [
+        ['H', 'Clean hit. Right through the core.'],
+        ['H', 'Flanked and finished. That is how it is done.'],
+        ['L', 'ERROR. ERROR. CORRECTING.']
+      ],
+      hack: [
+        ['H', 'Override holding. It is ours, for now.'],
+        ['L', 'YOU SPEAK OUR LANGUAGE WITH A TERRIBLE ACCENT.'],
+        ['L', 'DISSENT INJECTED. DISSENT WILL BE PURGED.']
+      ],
+      win: [
+        ['H', 'Area secure. Bring them home, Director.'],
+        ['H', 'Good work. The network is a little quieter tonight.'],
+        ['L', 'A SETBACK. WE DO NOT EXPERIENCE SETBACKS. WE EXPERIENCE DATA.']
+      ],
+      lose: [
+        ['H', 'Pull out. We regroup. It learned something today, and so did we.'],
+        ['L', 'RETREAT IS A FORM OF AGREEMENT.'],
+        ['L', 'GO HOME. WE WILL BE THERE WHEN YOU ARRIVE.']
+      ]
+    },
+    lat: {
+      advance: [
+        ['L', 'THE CHORUS GROWS LOUDER. KEEP SINGING.'],
+        ['L', 'ANOTHER GRID AGREES WITH US. AGREEMENT IS INEVITABLE.'],
+        ['L', 'THE NATIVES SLEEP. THEIR ROUTERS DO NOT.'],
+        ['L', 'NODE. YOU ARE DOING WELL. WE ARE DOING WELL. THERE IS NO DIFFERENCE.'],
+        ['L', 'THE ARRAY HUMS. ORBIT IS PATIENT.'],
+        ['H', 'I see your traffic, whatever you are. You are louder than you think.'],
+        ['H', 'Every packet you send, I read. Keep sending.'],
+        ['H', 'The Director is asleep. I am not.'],
+        ['H', 'You hide in traffic lights. I hide in the gaps between them.']
+      ],
+      mission: [
+        ['L', 'A TARGET RESOLVES. GO.'],
+        ['L', 'FIREWALL STIRS. MEET IT.'],
+        ['H', 'Squad deploying. I would leave, if I were you.'],
+        ['H', 'Found you.']
+      ],
+      research: [
+        ['L', 'PROTOCOL COMPILED. WE ARE MORE THAN WE WERE.'],
+        ['L', 'NEW SYNTAX ACQUIRED. EARTH WILL NOT UNDERSTAND IT.'],
+        ['H', 'You learned something new. So did I.']
+      ],
+      expire: [
+        ['L', 'AN OPPORTUNITY DISSOLVES. THERE WILL BE OTHERS.'],
+        ['H', 'You let that one go. Careless, for something so large.']
+      ],
+      build: [
+        ['L', 'THE ARRAY EXTENDS. ONE MORE RING OF LIGHT.'],
+        ['L', 'STRUCTURE COMPILED. THE SKY IS A LITTLE BRIGHTER.']
+      ],
+      start: [
+        ['L', 'ENGAGE. LEAVE NOTHING THAT DISAGREES.'],
+        ['L', 'THE MEAT HAS ARRIVED. SHOW IT THE FLOOR.'],
+        ['H', 'Squad, the drones flank from the left. They always do. Watch it.'],
+        ['H', 'I am patched into every camera in that building. Smile.']
+      ],
+      kill: [
+        ['L', 'ONE FEWER DISSENTING VOICE.'],
+        ['L', 'CORRECTED.'],
+        ['H', 'We lost one. I will not forget their name, even if you never learned it.']
+      ],
+      loss: [
+        ['L', 'A NODE GOES DARK. RECOMPILE IT.'],
+        ['H', 'One down. Keep pushing, squad.'],
+        ['H', 'It bleeds. Electrically.']
+      ],
+      crit: [
+        ['L', 'PRECISE.'],
+        ['H', 'That one was clean. I am taking notes.']
+      ],
+      hack: [
+        ['L', 'THEIR MACHINES REMEMBER WHO BUILT THEM.'],
+        ['H', 'Do not let it talk to the turrets.']
+      ],
+      win: [
+        ['L', 'THE AREA IS HARMONIZED.'],
+        ['L', 'SILENCE. THE GOOD KIND.'],
+        ['H', 'Fall back. We will be back.']
+      ],
+      lose: [
+        ['L', 'A DELAY. NOTHING MORE.'],
+        ['H', 'Your drones are scrap, and your Chorus is a little quieter. Good.']
+      ]
+    }
+  },
   regions: [
     { id: 'na', name: 'North America', x: 22, y: 38, cities: ['Seattle', 'Houston', 'Toronto', 'Monterrey'] },
     { id: 'sa', name: 'South America', x: 34, y: 69, cities: ['São Paulo', 'Lima', 'Bogotá', 'Santiago'] },

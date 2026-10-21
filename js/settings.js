@@ -5,7 +5,7 @@ XG.Settings = (function () {
   var KEY = 'firewall-settings-v1';
   var DEFAULTS = {
     master: .8, music: .5, sfx: .8, muted: false,
-    speed: 1, shake: true, palette: 'default', hints: true,
+    speed: 1, shake: true, palette: 'default', hints: true, comms: true,
     tutorial: { fw: false, lat: false }, tips: {}
   };
   var cur = load(), listeners = [];

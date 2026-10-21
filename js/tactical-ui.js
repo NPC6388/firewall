@@ -27,6 +27,7 @@ XG.TacUI = (function () {
     if (b.side !== b.human) banner(lat() ? 'FIREWALL TURN' : 'LATTICE TURN', 'enemy');
     XG.Audio.scene(lat() ? 'battle-lat' : 'battle');
     if (XG.Tutorial) XG.Tutorial.battleStart(g, b, { hud: function () { hud(); } });
+    if (XG.Comms) XG.Comms.battle(g, b, 'start');
     hud();
     var loop = st.loop = {};
     requestAnimationFrame(function tick(now) { if (st && st.loop === loop) { frame(now); requestAnimationFrame(tick); } });
@@ -328,6 +329,7 @@ XG.TacUI = (function () {
     var b = st.b, o = b.outcome;
     var won = lat() ? XG.Lat.latticeWon(b.mission.lkind, o) : o === 'win';
     XG.Audio.play(won ? 'victory' : 'defeat');
+    if (XG.Comms) XG.Comms.battle(st.g, b, won ? 'win' : 'lose');
     setTimeout(function () {
       var head = b.training ? '<h1 class="good">TRAINING COMPLETE</h1>' : lat()
         ? (XG.Lat.latticeWon(b.mission.lkind, o) ? '<h1 class="good">' + (b.mission.lkind === 'breach' ? 'SYSTEM BREACHED' : b.mission.lkind === 'strike' ? 'SAFEHOUSE HARMONIZED' : b.mission.lkind === 'uplink' ? 'UPLINK HOLDS' : 'CELL HOLDS') + '</h1>'
@@ -852,6 +854,10 @@ XG.TacUI = (function () {
     var b = st.b, G = XG.Gfx, A = XG.Audio, L = st.parts, u = e.id && Tac.unitById(b, e.id);
     var seen = function (x, y) { return b.visible[y * W + x]; };
     XG.Tutorial.event(e, b);
+    var cm = function (k) { if (XG.Comms) XG.Comms.battle(st.g, b, k); };
+    if (e.t === 'death' && u && !u.isStatic) cm(u.side === HS() ? 'loss' : 'kill');
+    else if (e.t === 'dmg' && e.crit && u && u.side !== HS()) cm('crit');
+    else if (e.t === 'hack' && Tac.unitById(b, e.from) && Tac.unitById(b, e.from).side === HS()) cm('hack');
     if (e.t === 'dmg') {
       st.flash[e.id] = now;
       if (e.crit) { shake(3, now); A.play('crit'); }

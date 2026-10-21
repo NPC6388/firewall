@@ -150,6 +150,12 @@ td { padding: 7px 6px; border-bottom: 1px solid #121c2b; }
 .voice.lattice { border-left-color: var(--red); background: rgba(255,42,85,.07); color: #ffb3c1; letter-spacing: .05em; }
 .voice .who { font-size: 11px; letter-spacing: .25em; color: var(--violet); margin-bottom: 4px; }
 .voice.lattice .who { color: var(--red); }
+#comms { position: fixed; left: 16px; bottom: 76px; z-index: 55; max-width: min(380px, calc(100vw - 32px)); margin: 0; font-size: 13px; line-height: 1.5;
+  background: rgba(8, 14, 24, .95); box-shadow: 0 4px 18px rgba(0,0,0,.5); cursor: pointer; }
+#comms.lattice { background: rgba(24, 6, 12, .95); }
+#comms.pop { animation: pop .25s ease-out; }
+#comms .dim { letter-spacing: .1em; }
+@media (prefers-reduced-motion: reduce) { #comms.pop { animation: none; } }
 .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; flex-wrap: wrap; }
 .pick { display: flex; align-items: center; gap: 10px; padding: 8px; border: 1px solid var(--line); margin-bottom: 6px; cursor: pointer; }
 .pick.on { border-color: var(--cyan); background: #0e1c2e; }

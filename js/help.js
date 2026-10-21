@@ -104,7 +104,7 @@ XG.Help = (function () {
       check('shake', 'Screen shake') +
       '<label class="set"><span>Colour palette</span><select data-set="palette"><option value="default"' + (v.palette === 'default' ? ' selected' : '') + '>Default (cyan / red / green)</option>' +
       '<option value="contrast"' + (v.palette === 'contrast' ? ' selected' : '') + '>High contrast (blue / orange)</option></select></label>' +
-      '<h3>Help</h3>' + check('hints', 'Tutorial and tips') +
+      '<h3>Help</h3>' + check('hints', 'Tutorial and tips') + check('comms', 'HALCYON / Lattice comms chatter') +
       '<div class="advance-row"><button id="set-reset">Replay tutorials and tips</button><span class="dim" id="set-reset-msg"></span></div>' +
       '<div class="modal-actions"><button class="primary" data-action="close">Done</button></div>');
     document.querySelectorAll('[data-set]').forEach(function (el) {
