@@ -1,0 +1,46 @@
+# Changelog
+
+All notable changes to FIREWALL, newest first. Add a line under **Unreleased** with every change you push; when a
+version is cut, rename that heading to the version and date. Write for players: what changed in the game, not how.
+
+The in-game **Help → Patch notes** tab is a placeholder for now. It gets filled from this file once the game nears its
+Steam release.
+
+## Unreleased
+
+### 2026-10-21
+- **Help:** a Patch notes tab next to Field manual (a placeholder until the game nears release).
+- **Maps:** five battle map layouts (compound, street, container yard, plaza, dense blocks) instead of one.
+- **Maps:** 0–2 impassable features per map (sinkhole, Lattice chasm, coolant breach or null sector, by biome). Nothing
+  crosses them, but they give no cover and don't block line of sight.
+- **Battle:** hovering one of your units shows its AP left as small diamonds beside it, and "N AP left" in the hover panel.
+- **Battle:** the HALCYON Sentinel counts as half cover for anyone standing next to it.
+- **Battle:** every unit except the HALCYON Sentinel can hunker. Short ability labels keep five abilities on one row.
+- **Battle:** Aegis Shield has no range limit and needs no line of sight. It reaches any ally on the map.
+- **Battle:** restart a mission from the Abort dialog or the end-of-battle screen.
+- **Battle:** Overwatch all ends the turn, and its button shows the Y hotkey. Space ends a turn once every unit is spent.
+- **Battle:** cover shields under the cursor judge each side against the enemies you can see. Cover facing no visible
+  enemy shows no shield, and half cover shows a half-filled shield.
+- **Battle:** hovered tiles show faint colour-coded cones for which directions their cover protects.
+- **Combat training:** guided steps, a pulsing tile and arrow mark where to move, markers never leave you in the open,
+  and Space presses the coach's Next / Finish button.
+- **World map:** a low-res pixel map drawn from real coastlines, land shaded by each region's infection in each
+  campaign's own colours, and rough grey infection halos until Signal Analysis is researched.
+- **Comms:** HALCYON and the Lattice speak up during play.
+- **Performance:** no more stalled video in other browser tabs. Dialogs no longer blur the background, map animations
+  pause under dialogs, and idle battles redraw less often.
+
+### 2026-10-20
+- **First playable build:** an X-COM-style campaign as Earth's FIREWALL against the alien AI, the Lattice.
+- **Play the Lattice:** a second campaign as the alien AI, with its own tech tree, the Array and its forces.
+- **Battle:** cover scales with the viewing angle. Corner peeking lets units beside a wall or tall cover lean out to see
+  and shoot.
+- **Battle:** enemy pods patrol while unaware. A hacked drone on your side can be shot, listed last among targets.
+- **Battle:** Overwatch all (Y) with a confirm step. Space confirms any armed ability.
+- **Battle:** each turn starts on the leader (most HP), and Tab cycles in HP order. Hunker shows how much it helps.
+- **Combat training:** a guided range that teaches cover and hit odds.
+- **Graphics:** procedural terrain for four biomes, unit sprites, particles, fog and lighting. Squad-bar sprite portraits.
+- **Audio and onboarding:** synthesized sound effects, a generative score (phonk in battle, reacting to contact), a
+  tutorial coach, tips, a glossary and settings.
+- **Strategy:** sortable Barracks, minimum mission credits, and world-map infection halos sized by infection.
+- **Web:** playable on GitHub Pages.

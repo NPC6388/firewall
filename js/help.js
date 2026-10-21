@@ -1,4 +1,4 @@
-// FIREWALL: help (glossary, controls, field manual) and the settings modal. Opens from ? / F1 or the ? and ⚙ buttons.
+// FIREWALL: help (glossary, controls, field manual, patch notes placeholder) and the settings modal. Opens from ? / F1 or the ? and ⚙ buttons.
 var XG = globalThis.XG = globalThis.XG || {};
 
 XG.Help = (function () {
@@ -68,12 +68,14 @@ XG.Help = (function () {
   function open(tab) {
     tab = tab || 'glossary';
     var side = XG.UI && XG.UI.g ? (XG.UI.g.faction === 'lattice' ? 'lat' : 'fw') : 'both';
-    var tabs = [['glossary', 'Glossary'], ['controls', 'Controls'], ['manual', 'Field manual']];
+    var tabs = [['glossary', 'Glossary'], ['controls', 'Controls'], ['manual', 'Field manual'], ['notes', 'Patch notes']];
     var body = '';
     if (tab === 'glossary') {
       body = '<input id="gl-q" class="gl-q" placeholder="Search terms…" autocomplete="off"><div id="gl-list" class="gl-list"></div>';
     } else if (tab === 'controls') {
       body = '<table>' + CONTROLS.map(function (c) { return '<tr><td><b>' + c[0] + '</b></td><td>' + c[1] + '</td></tr>'; }).join('') + '</table>';
+    } else if (tab === 'notes') { // placeholder: filled from CHANGELOG.md once the game nears its Steam release
+      body = '<p class="dim">Patch notes will appear here as FIREWALL gets closer to release.</p>';
     } else {
       body = '<p><b>FIREWALL:</b> research your way to the Lattice uplink and sever it before Convergence hits 100%. Take missions as they appear; skipped ones and infected regions speed the clock up.</p>' +
         '<p><b>LATTICE:</b> push Convergence to 100%. If Trace reaches 100% first, FIREWALL comes for the Uplink Core and you must hold it. Breach systems early, then hold your cells against FIREWALL raids and strike their safehouses.</p>' +

@@ -3,7 +3,7 @@ An X-COM-style game: turn-based squad combat, a tech tree, base building, and a 
 An alien AI signal has hit Earth's satellites and is converting every networked device into more of
 itself. Soldiers, hackers, field scientists and **HALCYON**, an Earth-born AI, fight back.
 
-**Status: MVP, both sides.** Play **FIREWALL** (defend Earth) or the **LATTICE** (be the alien AI). Each is a full campaign with its own tech tree, base and story, and they save separately. See [PLAN.md](PLAN.md) for the design and the roadmap toward head-to-head versus.
+**Status: MVP, both sides.** Play **FIREWALL** (defend Earth) or the **LATTICE** (be the alien AI). Each is a full campaign with its own tech tree, base and story, and they save separately. See [PLAN.md](PLAN.md) for the design and the roadmap toward head-to-head versus, and [CHANGELOG.md](CHANGELOG.md) for what changed and when.
 
 ## Play
 **▶ Play in your browser: https://npc6388.github.io/firewall/**
