@@ -2,7 +2,7 @@
 // Loads the game scripts into a sandbox, plays AI-vs-AI battles and auto-plays campaigns.
 var fs = require('fs'), path = require('path'), vm = require('vm');
 var ctx = vm.createContext({ console: console, Math: Math, Date: Date, JSON: JSON });
-['data.js', 'state.js', 'strategy.js', 'tactical.js', 'lattice.js'].forEach(function (f) {
+['data.js', 'state.js', 'strategy.js', 'tactical.js', 'lattice.js', 'comms.js'].forEach(function (f) {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', f), 'utf8'), ctx, { filename: f });
 });
 var XG = ctx.XG, Tac = XG.Tac, Strat = XG.Strat, S = XG.State, D = XG.DATA;
@@ -199,6 +199,16 @@ function autoBattle(g, m, squad) {
   check(['compound', 'street', 'yard', 'plaza', 'blocks'].every(function (k) { return lay[k]; }), 'all five map layouts appear (' + Object.keys(lay).join(',') + ')');
   check(pitMaps > 15 && pitMaps < 60, 'some but not all maps have impassable ground (' + pitMaps + '/60)');
   check(deployOk, 'deployment zone is always open floor');
+  // comms mood follows Convergence (and Trace pulls the Lattice campaign back a step); lines never break mood
+  var Cm = XG.Comms;
+  check(Cm.mood({ convergence: 10 }) === 'calm' && Cm.mood({ convergence: 50 }) === 'uneasy' && Cm.mood({ convergence: 85 }) === 'dire', 'comms mood tiers by Convergence');
+  check(Cm.mood({ faction: 'lattice', convergence: 85, trace: 80 }) === 'uneasy' && Cm.mood({ faction: 'lattice', convergence: 30, trace: 90 }) === 'calm', 'high Trace pulls the Lattice mood back');
+  var moodOk = true, direSeen = 0;
+  ['fw', 'lat'].forEach(function (sd) { ['calm', 'uneasy', 'dire'].forEach(function (md) { Object.keys(D.comms[sd]).forEach(function (evn) {
+    for (var k = 0; k < 30; k++) { var l = Cm.pick(sd, evn, md); if (!l) break; if (l[2] && l[2].split(' ').indexOf(md) < 0) moodOk = false; if (md === 'dire' && l[2] === 'dire') direSeen++; }
+  }); }); });
+  check(moodOk, 'comms never pick a line tagged for another mood');
+  check(direSeen > 50, 'dire mood actually uses its own lines (' + direSeen + ')');
   // override flips sides then purges
   var b3 = Tac.create(g, Object.assign({}, m, { kind: 'purge', diff: 1, seed: 7 }), g.soldiers.slice(0, 4));
   var h3 = b3.units.filter(function (u) { return u.kind === 'hacker'; })[0], d3 = b3.units.filter(function (u) { return u.kind === 'drone'; })[0];

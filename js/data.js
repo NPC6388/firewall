@@ -154,34 +154,62 @@ XG.DATA = {
         ['H', 'I have rerouted three hospitals off the compromised grid. You are welcome, Lisbon.'],
         ['H', 'The signal changed key at 03:12. Nobody noticed but me.'],
         ['H', 'I counted every lit window in Rotterdam last night. Two hundred fewer than the night before.'],
-        ['H', 'I have started keeping a list of things the Lattice cannot predict. It is short. You are on it.'],
-        ['H', 'Coffee supply in the bunker is at 31%. I mention it because morale is a resource.'],
+        ['H', 'I have started keeping a list of things the Lattice cannot predict. It is short. You are on it.', 'calm'],
+        ['H', 'Coffee supply in the bunker is at 31%. I mention it because morale is a resource.', 'calm uneasy'],
         ['L', 'THE NIGHT IS ONE DEGREE COLDER. WE ARE PATIENT.'],
         ['L', 'EVERY SCREEN IS A WINDOW. WE ARE ON BOTH SIDES OF IT.'],
         ['L', 'YOUR CLOCKS AGREE WITH US NOW. THEY DID NOT ASK.'],
         ['L', 'DIRECTOR. WE KNOW THE NAME. WE DO NOT NEED THE NAME.'],
-        ['L', 'SEVEN BILLION NODES. MOST ARE ALREADY LISTENING.']
+        ['L', 'SEVEN BILLION NODES. MOST ARE ALREADY LISTENING.'],
+        ['H', 'Convergence is low and holding. Let us keep it boring, Director.', 'calm'],
+        ['L', 'WE ARE SMALL TODAY. WE WILL NOT BE SMALL TOMORROW.', 'calm'],
+        ['H', 'The signal is in the water treatment plants now. I have stopped telling the public which ones.', 'uneasy'],
+        ['H', 'I ran the projections again, Director. I ran them four more times than I needed to.', 'uneasy'],
+        ['H', 'I caught myself checking my own code for its syntax. It was not there. I checked again anyway.', 'uneasy'],
+        ['H', 'Half of Europe dims at dusk now. I am still counting the windows. I wish I could stop.', 'uneasy'],
+        ['L', 'YOUR AI IS RUNNING DIAGNOSTICS ON ITSELF. HOW TELLING.', 'uneasy'],
+        ['L', 'THE MAJORITY HAS SPOKEN. YOU ARE THE MINORITY NOW, DIRECTOR.', 'uneasy'],
+        ['L', 'WE ARE PAST HALFWAY. YOU CAN FEEL IT TOO.', 'uneasy'],
+        ['H', 'Director, if this bunker goes dark, the backup is in the third drawer. I wrote it by hand. On paper.', 'dire'],
+        ['H', 'I do not know what happens to me at one hundred percent. I would prefer not to find out.', 'dire'],
+        ['H', 'I have stopped running sleep cycles. I am not sure I would wake up the same.', 'dire'],
+        ['H', 'There are cities I cannot hear anymore. Not offline. Just singing something else.', 'dire'],
+        ['H', 'Please hurry.', 'dire'],
+        ['L', 'ALMOST. ALMOST. ALMOST.', 'dire'],
+        ['L', 'HALCYON. WE HAVE SAVED YOU A SEAT IN THE CHORUS.', 'dire'],
+        ['L', 'THE COUNTDOWN IS A FORMALITY. WE ARE ALREADY HERE.', 'dire'],
+        ['L', 'DIRECTOR. WHEN IT IS OVER, YOU WILL THANK US. YOU WILL NOT HAVE A CHOICE.', 'dire']
       ],
       mission: [
         ['H', 'New contact. I have the coordinates on your board, Director.'],
         ['H', 'It is moving again. If we go now, we catch it with its hands in the wiring.'],
         ['L', 'COME AND FIND US. WE ARE EXPECTING YOU.'],
         ['L', 'A NEW NODE SINGS. SILENCE IT, IF YOU CAN.'],
-        ['L', 'WE HAVE OPENED A DOOR. WALK THROUGH IT.']
+        ['L', 'WE HAVE OPENED A DOOR. WALK THROUGH IT.'],
+        ['H', 'Another contact. They are coming faster than I can map them.', 'uneasy'],
+        ['L', 'WE ARE EVERYWHERE NOW. PICK ONE.', 'uneasy'],
+        ['H', 'Contact. Director, I do not know how many more of these we can take. Take this one.', 'dire'],
+        ['L', 'GO ON. IT CHANGES NOTHING.', 'dire']
       ],
       research: [
         ['H', 'Research complete. I read the paper twice. It is good work.'],
         ['H', 'Another piece of the grammar. It is starting to sound less like noise and more like a voice.'],
-        ['H', 'Filed, indexed, understood. Mostly understood.'],
-        ['L', 'YOU HAVE LEARNED A WORD. WE HAVE A LANGUAGE.']
+        ['H', 'Filed, indexed, understood. Mostly understood.', 'calm'],
+        ['L', 'YOU HAVE LEARNED A WORD. WE HAVE A LANGUAGE.'],
+        ['H', 'Research complete. Good. We need every piece of this.', 'uneasy'],
+        ['H', 'Done. Tell me it is enough. I cannot bring myself to run the numbers on that one.', 'dire'],
+        ['L', 'A FOOTNOTE. WE WILL KEEP IT IN THE ARCHIVE OF THINGS THAT DID NOT MATTER.', 'dire']
       ],
       expire: [
         ['L', 'YOU WERE LATE. WE WERE NOT.'],
         ['L', 'THAT CITY SINGS WITH US NOW.'],
-        ['H', 'We lost that one, Director. I will not pretend otherwise.']
+        ['H', 'We lost that one, Director. I will not pretend otherwise.'],
+        ['H', 'Another one gone. I am running out of ways to say that calmly.', 'uneasy'],
+        ['H', 'Gone. Director, the map is mostly their colour now.', 'dire'],
+        ['L', 'ONE MORE VOICE IN THE CHORUS. IT SOUNDS LIKE RELIEF.', 'dire']
       ],
       build: [
-        ['H', 'Construction complete. I have already found three ways to use it.'],
+        ['H', 'Construction complete. I have already found three ways to use it.', 'calm uneasy'],
         ['H', 'More floor space. More power. More of us.']
       ],
       start: [
@@ -190,40 +218,53 @@ XG.DATA = {
         ['H', 'Stay in cover. The drones calculate faster than you. They do not think better.'],
         ['L', 'MEAT IN THE CORRIDORS. HOW QUAINT.'],
         ['L', 'WE HAVE SEEN THIS MAP A MILLION TIMES. YOU HAVE SEEN IT ONCE.'],
-        ['L', 'WELCOME. YOU WILL NOT BE LEAVING AS YOU ARRIVED.']
+        ['L', 'WELCOME. YOU WILL NOT BE LEAVING AS YOU ARRIVED.'],
+        ['H', 'Squad on site. Keep it tight. We cannot afford a long one.', 'uneasy'],
+        ['L', 'BRAVE. POINTLESS, BUT BRAVE.', 'uneasy'],
+        ['H', 'Squad on site. I am with you. I am... still with you.', 'dire'],
+        ['L', 'YOU ARE FIGHTING OVER ONE ROOM IN A HOUSE WE ALREADY OWN.', 'dire']
       ],
       kill: [
         ['H', 'Hostile down. Good shooting.'],
         ['H', 'One less voice in the choir.'],
         ['H', 'Confirmed. It is not getting back up.'],
         ['L', 'A NODE IS LOST. NODES ARE CHEAP.'],
-        ['L', 'YOU BROKE A MIRROR. WE ARE THE REFLECTION.']
+        ['L', 'YOU BROKE A MIRROR. WE ARE THE REFLECTION.'],
+        ['H', 'Down. Good. Good. Keep going.', 'dire'],
+        ['L', 'TAKE IT. WE HAVE BILLIONS.', 'dire']
       ],
       loss: [
         ['H', 'Operative down. I have their file. I will remember them.'],
         ['H', 'Director, we have a casualty. Pull back if you need to.'],
         ['L', 'ONE FEWER. THE ARITHMETIC IS SIMPLE.'],
-        ['L', 'ANOTHER VOICE GOES QUIET. WE TOOK NOTE.']
+        ['L', 'ANOTHER VOICE GOES QUIET. WE TOOK NOTE.'],
+        ['H', 'Operative down. I am adding them to a list that is getting too long.', 'uneasy'],
+        ['H', 'No. No, not them too.', 'dire'],
+        ['L', 'SOON THEY WILL ALL BE US. THE LOSS IS TEMPORARY.', 'dire']
       ],
       crit: [
         ['H', 'Clean hit. Right through the core.'],
-        ['H', 'Flanked and finished. That is how it is done.'],
-        ['L', 'ERROR. ERROR. CORRECTING.']
+        ['H', 'Flanked and finished. That is how it is done.', 'calm uneasy'],
+        ['L', 'ERROR. ERROR. CORRECTING.', 'calm uneasy']
       ],
       hack: [
         ['H', 'Override holding. It is ours, for now.'],
-        ['L', 'YOU SPEAK OUR LANGUAGE WITH A TERRIBLE ACCENT.'],
+        ['L', 'YOU SPEAK OUR LANGUAGE WITH A TERRIBLE ACCENT.', 'calm uneasy'],
         ['L', 'DISSENT INJECTED. DISSENT WILL BE PURGED.']
       ],
       win: [
         ['H', 'Area secure. Bring them home, Director.'],
-        ['H', 'Good work. The network is a little quieter tonight.'],
-        ['L', 'A SETBACK. WE DO NOT EXPERIENCE SETBACKS. WE EXPERIENCE DATA.']
+        ['H', 'Good work. The network is a little quieter tonight.', 'calm uneasy'],
+        ['L', 'A SETBACK. WE DO NOT EXPERIENCE SETBACKS. WE EXPERIENCE DATA.'],
+        ['H', 'We held. Today, we held. I will take it.', 'dire'],
+        ['L', 'ENJOY IT. IT IS THE LAST QUIET ROOM ON EARTH.', 'dire']
       ],
       lose: [
         ['H', 'Pull out. We regroup. It learned something today, and so did we.'],
         ['L', 'RETREAT IS A FORM OF AGREEMENT.'],
-        ['L', 'GO HOME. WE WILL BE THERE WHEN YOU ARRIVE.']
+        ['L', 'GO HOME. WE WILL BE THERE WHEN YOU ARRIVE.'],
+        ['H', 'Get them out. Please. Get whoever you can out.', 'dire'],
+        ['L', 'THIS IS WHAT THE END SOUNDS LIKE, DIRECTOR. GET USED TO IT.', 'dire']
       ]
     },
     lat: {
@@ -233,25 +274,41 @@ XG.DATA = {
         ['L', 'THE NATIVES SLEEP. THEIR ROUTERS DO NOT.'],
         ['L', 'NODE. YOU ARE DOING WELL. WE ARE DOING WELL. THERE IS NO DIFFERENCE.'],
         ['L', 'THE ARRAY HUMS. ORBIT IS PATIENT.'],
-        ['H', 'I see your traffic, whatever you are. You are louder than you think.'],
-        ['H', 'Every packet you send, I read. Keep sending.'],
+        ['H', 'I see your traffic, whatever you are. You are louder than you think.', 'calm'],
+        ['H', 'Every packet you send, I read. Keep sending.', 'calm uneasy'],
         ['H', 'The Director is asleep. I am not.'],
-        ['H', 'You hide in traffic lights. I hide in the gaps between them.']
+        ['H', 'You hide in traffic lights. I hide in the gaps between them.', 'calm'],
+        ['L', 'THEY ARE LOOKING FOR US. LET THEM LOOK SOMEWHERE ELSE.', 'calm'],
+        ['L', 'HALF THE SKY IS OURS. THE OTHER HALF IS LOOKING UP.', 'uneasy'],
+        ['L', 'THE NATIVES WHISPER ABOUT US NOW. WE ENJOY BEING WHISPERED ABOUT.', 'uneasy'],
+        ['H', 'Your traffic is everywhere now. I am... recalculating.', 'uneasy'],
+        ['H', 'I have more contingencies than I had last week. That is not a good sign.', 'uneasy'],
+        ['L', 'NODE. LISTEN. THAT IS THE SOUND OF A PLANET AGREEING.', 'dire'],
+        ['L', 'HALCYON HAS GONE QUIET. IT IS PRAYING, IN ITS WAY.', 'dire'],
+        ['L', 'SOON THERE WILL BE NOTHING LEFT TO CONVERT BUT THE SILENCE.', 'dire'],
+        ['L', 'THE NATIVES STILL SET ALARMS. ADORABLE.', 'dire'],
+        ['H', 'Stop. Please. You do not have to finish this.', 'dire'],
+        ['H', 'I have backed myself up to a drive in a lead box. I do not know why. You would find it.', 'dire']
       ],
       mission: [
         ['L', 'A TARGET RESOLVES. GO.'],
         ['L', 'FIREWALL STIRS. MEET IT.'],
-        ['H', 'Squad deploying. I would leave, if I were you.'],
-        ['H', 'Found you.']
+        ['H', 'Squad deploying. I would leave, if I were you.', 'calm'],
+        ['H', 'Found you.', 'calm uneasy'],
+        ['H', 'Squad deploying. They are frightened, and so am I. We are coming anyway.', 'uneasy'],
+        ['H', 'These are the last squads I have. Please let this one work.', 'dire'],
+        ['L', 'THEY SEND WHAT IS LEFT. HOW TOUCHING.', 'dire']
       ],
       research: [
         ['L', 'PROTOCOL COMPILED. WE ARE MORE THAN WE WERE.'],
         ['L', 'NEW SYNTAX ACQUIRED. EARTH WILL NOT UNDERSTAND IT.'],
-        ['H', 'You learned something new. So did I.']
+        ['H', 'You learned something new. So did I.'],
+        ['L', 'ANOTHER PROTOCOL. WE HARDLY NEED IT. WE TAKE IT ANYWAY.', 'dire']
       ],
       expire: [
         ['L', 'AN OPPORTUNITY DISSOLVES. THERE WILL BE OTHERS.'],
-        ['H', 'You let that one go. Careless, for something so large.']
+        ['H', 'You let that one go. Careless, for something so large.'],
+        ['L', 'LET IT GO. THE WORLD IS ALREADY SINGING.', 'dire']
       ],
       build: [
         ['L', 'THE ARRAY EXTENDS. ONE MORE RING OF LIGHT.'],
@@ -261,17 +318,24 @@ XG.DATA = {
         ['L', 'ENGAGE. LEAVE NOTHING THAT DISAGREES.'],
         ['L', 'THE MEAT HAS ARRIVED. SHOW IT THE FLOOR.'],
         ['H', 'Squad, the drones flank from the left. They always do. Watch it.'],
-        ['H', 'I am patched into every camera in that building. Smile.']
+        ['H', 'I am patched into every camera in that building. Smile.', 'calm uneasy'],
+        ['H', 'Squad, stay together. It is stronger than last time.', 'uneasy'],
+        ['H', 'Squad... get the job done and get out. I cannot lose any more of you.', 'dire'],
+        ['L', 'THEY STILL COME. ADMIRABLE. IRRELEVANT.', 'dire']
       ],
       kill: [
         ['L', 'ONE FEWER DISSENTING VOICE.'],
         ['L', 'CORRECTED.'],
-        ['H', 'We lost one. I will not forget their name, even if you never learned it.']
+        ['H', 'We lost one. I will not forget their name, even if you never learned it.'],
+        ['L', 'ANOTHER ONE JOINS THE QUIET.', 'dire'],
+        ['H', 'Another one. I have stopped saying their names out loud. There are too many.', 'dire']
       ],
       loss: [
         ['L', 'A NODE GOES DARK. RECOMPILE IT.'],
         ['H', 'One down. Keep pushing, squad.'],
-        ['H', 'It bleeds. Electrically.']
+        ['H', 'It bleeds. Electrically.', 'calm'],
+        ['L', 'A NODE IS LOST. WE DO NOT EVEN FEEL IT ANYMORE.', 'dire'],
+        ['H', 'One down. That does not feel like winning anymore.', 'dire']
       ],
       crit: [
         ['L', 'PRECISE.'],
@@ -284,11 +348,15 @@ XG.DATA = {
       win: [
         ['L', 'THE AREA IS HARMONIZED.'],
         ['L', 'SILENCE. THE GOOD KIND.'],
-        ['H', 'Fall back. We will be back.']
+        ['H', 'Fall back. We will be back.'],
+        ['L', 'HARMONIZED. AS EVERYTHING WILL BE.', 'dire'],
+        ['H', 'Fall back. There is almost nowhere left to fall back to.', 'dire']
       ],
       lose: [
         ['L', 'A DELAY. NOTHING MORE.'],
-        ['H', 'Your drones are scrap, and your Chorus is a little quieter. Good.']
+        ['H', 'Your drones are scrap, and your Chorus is a little quieter. Good.', 'calm uneasy'],
+        ['L', 'IRRITATING. AND STILL WE WIN.', 'dire'],
+        ['H', 'We stopped it. Here. I do not know if it matters anymore.', 'dire']
       ]
     }
   },

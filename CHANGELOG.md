@@ -9,6 +9,8 @@ Steam release.
 ## Unreleased
 
 ### 2026-10-21
+- **Comms:** HALCYON grows more afraid and the Lattice more smug as Convergence climbs toward 100%, and both swing
+  back when it falls. In the Lattice campaign, a high Trace takes the edge off the Lattice's smugness.
 - **Help:** a Patch notes tab next to Field manual (a placeholder until the game nears release).
 - **Maps:** five battle map layouts (compound, street, container yard, plaza, dense blocks) instead of one.
 - **Maps:** 0–2 impassable features per map (sinkhole, Lattice chasm, coolant breach or null sector, by biome). Nothing

@@ -9,10 +9,24 @@ XG.Comms = (function () {
 
   function on() { return !XG.Settings || XG.Settings.get('comms') !== false; }
   function side(g) { return g && g.faction === 'lattice' ? 'lat' : 'fw'; }
-  // A line for this event, avoiding the last few said.
-  function pick(f, event) {
-    var pool = (XG.DATA.comms[f] || {})[event] || [], fresh = pool.filter(function (l) { return recent.indexOf(l[1]) < 0; });
-    var list = fresh.length ? fresh : pool;
+  // Mood follows Convergence in both campaigns: HALCYON grows afraid and the Lattice smug as it climbs toward 100%,
+  // and both swing back when it falls. In the Lattice campaign a high Trace (FIREWALL closing in) pulls it back a step.
+  var MOODS = ['calm', 'uneasy', 'dire'];
+  function mood(g) {
+    if (!g) return 'calm';
+    var c = g.convergence || 0, m = c >= 70 ? 2 : c >= 40 ? 1 : 0;
+    if (g.faction === 'lattice' && g.trace >= 75) m = Math.max(0, m - 1);
+    return MOODS[m];
+  }
+  // A line's optional third field lists the moods it fits ('calm uneasy'); untagged lines fit any mood.
+  function fits(l, md) { return !l[2] || l[2].split(' ').indexOf(md) >= 0; }
+  // A line for this event in this mood, avoiding the last few said. Lines written for the mood win two times in three.
+  function pick(f, event, md) {
+    md = md || 'calm';
+    var pool = ((XG.DATA.comms[f] || {})[event] || []).filter(function (l) { return fits(l, md); });
+    var fresh = pool.filter(function (l) { return recent.indexOf(l[1]) < 0; });
+    var list = fresh.length ? fresh : pool, tagged = list.filter(function (l) { return l[2]; });
+    if (tagged.length && Math.random() < .67) list = tagged;
     if (!list.length) return null;
     var l = list[Math.floor(Math.random() * list.length)];
     recent.push(l[1]); if (recent.length > 8) recent.shift();
@@ -20,7 +34,7 @@ XG.Comms = (function () {
   }
   function say(g, event) {
     if (!on() || typeof document === 'undefined') return;
-    var l = pick(side(g), event);
+    var l = pick(side(g), event, mood(g));
     if (!l) return;
     queue.push(l); if (queue.length > 2) queue.shift();
     if (!showing) next();
@@ -58,5 +72,5 @@ XG.Comms = (function () {
   }
   function clear() { queue = []; clearTimeout(timer); showing = false; var el = typeof document !== 'undefined' && document.getElementById('comms'); if (el) el.classList.add('hidden'); }
 
-  return { say: say, strategy: strategy, battle: battle, clear: clear, pick: pick };
+  return { say: say, strategy: strategy, battle: battle, clear: clear, pick: pick, mood: mood };
 })();

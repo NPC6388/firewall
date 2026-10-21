@@ -11,6 +11,14 @@ export default async function ({ ev, shot, sleep }) {
     await ev(`XG.Comms.clear()`);
   }
   await shot('comms-fw');
+  // late game: Convergence 85% should make HALCYON afraid and the Lattice smug (mood 'dire')
+  await ev(`XG.UI.g.convergence = 85`);
+  for (let i = 0; i < 4; i++) {
+    await ev(`XG.UI.isModal() && XG.UI.closeModal()`); await ev(`document.querySelector('[data-action="advance-day"]').click()`); await sleep(400);
+    console.log('FW at', await ev(`Math.round(XG.UI.g.convergence)`) + '%, mood', await ev(`XG.Comms.mood(XG.UI.g)`), '->', await card());
+    await ev(`XG.Comms.clear()`);
+  }
+  await ev(`XG.UI.g.convergence = 20`);
   await ev(`XG.UI.isModal() && XG.UI.closeModal(); (function(){var g=XG.UI.g, r=XG.State.rng(g); XG.Strat.spawnMission(g,r,'purge'); XG.State.saveRng(g,r); XG.UI.render();})()`);
   await ev(`document.querySelector('[data-action="deploy"]').click()`); await sleep(300);
   await ev(`document.getElementById('sq-go').click()`); await sleep(700);
