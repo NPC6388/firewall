@@ -584,7 +584,7 @@ XG.Tac = (function () {
       return b.units.filter(function (t) {
         if (!t.alive || t.side !== u.side) return false;
         if (id === 'medkit') return !t.machine && t.hp < t.maxHp && cheb(u.x, u.y, t.x, t.y) <= 1;
-        if (id === 'shield') return t.id === u.id || (dist(u.x, u.y, t.x, t.y) <= A.range && los(b, u.x, u.y, t.x, t.y));
+        if (id === 'shield') return true; // HALCYON projects it over the network: any ally, any distance, no line of sight
         return false;
       });
     }

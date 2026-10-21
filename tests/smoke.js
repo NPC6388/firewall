@@ -104,6 +104,12 @@ function autoBattle(g, m, squad) {
   b.visible[core.y * Tac.W + core.x] = true;
   check(Tac.act.sever(b, tr, core) === null, 'trooper cannot sever');
   check(Tac.targets(b, hk, 'sever').indexOf(core) >= 0, 'adjacent hacker can sever');
+  // Aegis Shield has no range limit and needs no line of sight
+  tr.abilities = tr.abilities.concat('shield'); tr.ap = 2;
+  var far = b.units.filter(function (u) { return u.side === 'player' && u !== tr && u.alive; })[0];
+  far.x = (tr.x + 20) % b.W; far.y = (tr.y + 12) % b.H;
+  check(!!Tac.act.shield(b, tr, far) && far.shield === 3, 'Aegis Shield reaches an ally anywhere on the map');
+  tr.abilities = tr.abilities.filter(function (a) { return a !== 'shield'; }); tr.ap = 2; tr.cooldowns = {}; far.shield = 0;
   // frag grenade clears cover
   var b2 = Tac.create(g, Object.assign({}, m, { kind: 'purge', diff: 1 }), g.soldiers.slice(0, 4));
   var t2 = b2.units.filter(function (u) { return u.kind === 'trooper'; })[0];

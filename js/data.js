@@ -47,7 +47,7 @@ XG.DATA = {
     hack:      { name: 'Hack',         key: '3', target: 'enemy', ends: true,  range: 10, desc: 'Stun a Lattice machine for 2 turns, or override it (Lattice Grammar).' },
     medkit:    { name: 'Medkit',       key: '3', target: 'ally',  ends: false, range: 1, charges: 2, desc: 'Heal an adjacent ally for 4. Costs 1 AP.' },
     scan:      { name: 'Sensor Scan',  key: '4', target: 'tile',  ends: false, range: 12, cooldown: 3, desc: 'Reveal a 5-tile radius and mark hostiles (+15 aim vs them). 1 AP.' },
-    shield:    { name: 'Aegis Shield', key: '3', target: 'ally',  ends: false, range: 6, cooldown: 2, desc: 'Give an ally (or self) 3 shield points. 1 AP.' },
+    shield:    { name: 'Aegis Shield', key: '3', target: 'ally',  ends: false, cooldown: 2, desc: 'Give any ally on the map (or self) 3 shield points. No range limit, no line of sight needed. 1 AP.' },
     spike:     { name: 'Data Spike',   key: '2', target: 'enemy', ends: true,  range: 14, cooldown: 3, desc: 'Lattice: 3 damage that ignores cover and never misses. Cooldown 3.' },
     detonate:  { name: 'Detonate',     key: '3', target: 'self',  ends: true,  desc: 'Lattice drone: explode for 3 damage in 3×3 and destroy cover. The drone is lost.' },
     sever:     { name: 'Sever Uplink', key: '5', target: 'enemy', ends: true,  range: 1, desc: 'Hacker only, adjacent to the Uplink Core. 3 successes cuts it.' }

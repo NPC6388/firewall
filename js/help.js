@@ -19,7 +19,7 @@ XG.Help = (function () {
     ['Hack', 'fw', 'Hackers can stun a Lattice machine for 2 turns. With Lattice Grammar researched, a successful hack takes control of it instead. Each success raises that hacker\'s skill by 1.'],
     ['Sensor Scan', 'fw', 'Scientist ability: reveals a 5-tile radius and marks hostiles there (+15 to hit them). 1 AP, cooldown 3.'],
     ['Medkit', 'fw', 'Heals an adjacent ally (or yourself) for 4. 1 AP, two per mission.'],
-    ['Aegis Shield', 'fw', 'HALCYON Sentinel ability: gives an ally 3 shield points that soak damage first.'],
+    ['Aegis Shield', 'fw', 'HALCYON Sentinel ability: gives any ally on the map 3 shield points that soak damage first. No range limit.'],
     ['Overclock', 'fw', 'HALCYON gives one operative +1 AP. Limited uses per mission (O key).'],
     ['Sever', 'fw', 'A hacker next to the Uplink Core can try to cut it. Three successes end the mission.'],
     ['Convergence', 'fw', 'The doomsday clock. At 100% the Lattice owns Earth\'s networks and you lose. Infection, failed and skipped missions speed it up.'],
