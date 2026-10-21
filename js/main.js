@@ -13,11 +13,13 @@ var XG = globalThis.XG = globalThis.XG || {};
   function commit(toast) {
     UI.save(UI.g); UI.render();
     if (toast && toast.length) UI.toast(toast);
+    if (toast && toast.some(function (t) { return /mission|target|raid|strike|uplink|found|detected/i.test(t); })) XG.Audio.play('mission');
     UI.playStory(function () { UI.render(); });
   }
   function titleScreen() {
     UI.g = null;
     document.body.classList.remove('lattice');
+    XG.Audio.scene('title');
     var saved = S.load(), lsaved = XG.Lat.load();
     document.getElementById('btn-continue').classList.toggle('hidden', !saved || !!saved.over);
     document.getElementById('btn-l-continue').classList.toggle('hidden', !lsaved || !!lsaved.over);
@@ -35,8 +37,12 @@ var XG = globalThis.XG = globalThis.XG || {};
     'continue': function () { var g = S.load(); if (g) enterStrategy(g); },
     'to-title': function () { if (UI.g && !UI.g.over) UI.save(UI.g); UI.closeModal(); titleScreen(); },
     'close': function () { UI.closeModal(); },
+    'help': function () { XG.Help.open(); },
+    'settings': function () { XG.Help.settings(); },
+    'tip-ok': function (id) { XG.Settings.markTip(id); UI.render(); },
     'tab': function (arg) { UI.tab = arg; UI.slot = null; UI.render(); },
     'advance': function () {
+      XG.Audio.play('advance');
       var ev = St.advanceUntilEvent(UI.g);
       commit(ev.map(function (e) { return e.msg; }));
     },
@@ -44,9 +50,9 @@ var XG = globalThis.XG = globalThis.XG || {};
       var ev = St.advanceDay(UI.g);
       commit(ev.map(function (e) { return e.msg; }));
     },
-    'research': function (id) { St.startResearch(UI.g, id); commit(); },
+    'research': function (id) { St.startResearch(UI.g, id); XG.Audio.play('research'); commit(); },
     'slot': function (i) { UI.slot = +i; UI.render(); },
-    'build': function (type) { if (St.build(UI.g, type, UI.slot)) UI.slot = null; commit(); },
+    'build': function (type) { if (St.build(UI.g, type, UI.slot)) { UI.slot = null; XG.Audio.play('build'); } commit(); },
     'cancel-build': function () { if (St.cancelBuild(UI.g, UI.slot)) UI.slot = null; commit(); },
     'demolish': function () {
       var f = XG.DATA.facilities[UI.g.base[UI.slot].type], ref = St.demolishRefund(UI.g.base[UI.slot].type);
@@ -86,7 +92,15 @@ var XG = globalThis.XG = globalThis.XG || {};
     var el = e.target.closest('[data-action]');
     if (!el || el.disabled) return;
     var fn = actions[el.getAttribute('data-action')];
+    XG.Audio.play('click');
     if (fn) fn(el.getAttribute('data-arg'));
+  });
+  // Outside battle: ? / F1 opens help, M mutes. (The battle screen has its own key handler.)
+  document.addEventListener('keydown', function (e) {
+    if (!document.getElementById('screen-tactical').classList.contains('hidden') || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
+    if (e.key === '?' || e.key === 'F1') { e.preventDefault(); XG.Help.open(); }
+    else if (e.key === 'm' || e.key === 'M') XG.Settings.set('muted', !XG.Settings.get('muted'));
+    else if (e.key === 'Escape' && UI.isModal() && document.querySelector('#modal-box [data-action="close"]')) UI.closeModal();
   });
 
   titleScreen();

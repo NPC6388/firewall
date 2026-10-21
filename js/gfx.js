@@ -389,8 +389,13 @@ XG.Gfx = (function () {
 
   // ------------------------------------------------------------ unit sprites
   // o: { facing (radians, 0 = east), now, alpha, flash (0..1), human (side the person plays), myTurn, hp }
+  var PALETTES = {
+    'default': { fw: '79,209,255', lat: '255,42,85', hpFw: '#7dff9b', hpLat: '#ff4d6d', flank: '#7dff9b' },
+    contrast: { fw: '90,160,255', lat: '255,160,40', hpFw: '#6cb4ff', hpLat: '#ffa133', flank: '#6cb4ff' }
+  };
+  function pal() { return PALETTES[(XG.Settings && XG.Settings.get('palette')) || 'default'] || PALETTES['default']; }
   function unit(c, u, cx, cy, o) {
-    var now = o.now, col = u.color, team = u.side === 'player' ? '79,209,255' : '255,42,85', R = u.isStatic ? 16 : 13;
+    var P = pal(), now = o.now, col = u.color, team = u.side === 'player' ? P.fw : P.lat, R = u.isStatic ? 16 : 13;
     var hover = u.kind === 'drone' || u.kind === 'sentinel' || u.kind === 'harmonic', bob = hover && !REDUCED ? Math.sin(now / 320 + u.id) * 2 : 0;
     c.save(); c.globalAlpha = Math.max(0, o.alpha);
     // ground shadow and team ring
@@ -419,6 +424,60 @@ XG.Gfx = (function () {
     c.translate(w / 2, h / 2); c.scale(w / 34, h / 34);
     var draw = SPRITES[u.kind];
     if (draw) draw(c, u.color, -Math.PI / 2, 0, u); else fallback(c, u, 13);
+  }
+  // Operative portrait, front view, seeded by soldier id so it never changes. 40×40 drawing space.
+  var SKIN = ['#f1c9a8', '#e0ac85', '#c48a62', '#9a6545', '#6e4630', '#4a2e1f'];
+  var HAIR = ['#151515', '#2e1d12', '#5a3a1f', '#8f6a3a', '#cfc09a', '#9b3324', '#3a3f4a'];
+  function portrait(cv, sol, C) {
+    var dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1, w = cv.clientWidth || 36, h = cv.clientHeight || 36;
+    cv.width = w * dpr; cv.height = h * dpr;
+    var c = cv.getContext('2d'); c.setTransform(dpr * w / 40, 0, 0, dpr * h / 40, 0, 0);
+    var col = C.color, rgb = rgbOf(col), id = sol.id * 7 + (sol.name || '').length, r = function (k) { return hash(id, k, 77); };
+    var bg = c.createRadialGradient(20, 16, 2, 20, 20, 26); bg.addColorStop(0, rgba(rgb, .28)); bg.addColorStop(1, '#070b12');
+    c.fillStyle = bg; c.fillRect(0, 0, 40, 40);
+    c.strokeStyle = rgba(rgb, .12); for (var y = 2; y < 40; y += 3) { c.beginPath(); c.moveTo(0, y + .5); c.lineTo(40, y + .5); c.stroke(); }
+    var kind = sol.cls;
+    if (kind === 'sentinel') {
+      c.fillStyle = '#2a2240'; c.beginPath(); c.moveTo(6, 40); c.lineTo(10, 30); c.lineTo(30, 30); c.lineTo(34, 40); c.fill();
+      c.fillStyle = '#3a3058'; c.beginPath(); if (c.roundRect) c.roundRect(11, 8, 18, 20, 5); else c.rect(11, 8, 18, 20); c.fill();
+      c.strokeStyle = col; c.lineWidth = 1; c.stroke();
+      var gl = .6 + .4 * Math.sin(id);
+      c.fillStyle = rgba(rgb, .9 * gl); c.fillRect(13, 15, 14, 3.5);
+      c.fillStyle = '#fff'; c.fillRect(15 + r(1) * 9, 15.5, 2, 2.5);
+      c.strokeStyle = '#6a5a90'; c.beginPath(); c.moveTo(20, 8); c.lineTo(20, 3); c.stroke(); c.fillStyle = col; circle(c, 20, 3, 1.3); c.fill();
+      c.fillStyle = 'rgba(0,0,0,.35)'; c.fillRect(15, 23, 10, 1.2);
+      return;
+    }
+    var skin = SKIN[Math.floor(r(2) * SKIN.length)], hair = HAIR[Math.floor(r(3) * HAIR.length)], long = r(4) < .4, beard = r(5) < .2;
+    // shoulders / outfit
+    var body = kind === 'trooper' ? '#26384f' : kind === 'hacker' ? '#163024' : '#d5dbe3';
+    c.fillStyle = body; c.beginPath(); c.moveTo(3, 40); c.quadraticCurveTo(5, 29, 20, 28); c.quadraticCurveTo(35, 29, 37, 40); c.fill();
+    if (kind === 'trooper') { c.fillStyle = rgba(rgb, .8); c.fillRect(5, 33, 7, 3); c.fillRect(28, 33, 7, 3); }
+    if (kind === 'scientist') { c.strokeStyle = '#9aa6b4'; c.beginPath(); c.moveTo(16, 29); c.lineTo(20, 36); c.lineTo(24, 29); c.stroke(); c.fillStyle = col; c.fillRect(26, 33, 4, 2); }
+    // neck and head
+    c.fillStyle = skin; c.fillRect(17, 24, 6, 6);
+    if (long && kind !== 'trooper') { c.fillStyle = hair; c.beginPath(); c.ellipse(20, 20, 9.5, 11, 0, 0, Math.PI * 2); c.fill(); }
+    c.fillStyle = skin; c.beginPath(); c.ellipse(20, 18, 7, 8.5, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = 'rgba(0,0,0,.12)'; c.beginPath(); c.ellipse(22.5, 19, 4, 7, 0, 0, Math.PI * 2); c.fill();
+    if (beard) { c.fillStyle = hair; c.beginPath(); c.ellipse(20, 23, 5.5, 3.6, 0, 0, Math.PI); c.fill(); }
+    // eyes, brows, mouth
+    c.fillStyle = '#111'; c.fillRect(16.4, 17.2, 2, 1.8); c.fillRect(21.6, 17.2, 2, 1.8);
+    c.fillStyle = hair; c.fillRect(15.8, 15.4, 3, .9); c.fillRect(21.2, 15.4, 3, .9);
+    c.fillStyle = 'rgba(80,30,30,.55)'; c.fillRect(18.3, 22.6, 3.4, .9);
+    if (kind === 'trooper') { // helmet with a visor band
+      c.fillStyle = shadeHex(col, -.55); c.beginPath(); c.arc(20, 15.5, 8.2, Math.PI, 0); c.lineTo(28.2, 17); c.lineTo(11.8, 17); c.closePath(); c.fill();
+      c.strokeStyle = col; c.lineWidth = .8; c.stroke(); c.fillStyle = rgba(rgb, .7); c.fillRect(12, 12.6, 16, 1.6);
+    } else if (kind === 'hacker') { // hood and glowing glasses
+      c.strokeStyle = '#1f4a34'; c.lineWidth = 3; c.beginPath(); c.arc(20, 18, 9.5, Math.PI * 1.05, Math.PI * 1.95); c.stroke();
+      c.fillStyle = '#163024'; c.beginPath(); c.moveTo(10.5, 18); c.quadraticCurveTo(9, 28, 13, 30); c.lineTo(11, 30); c.quadraticCurveTo(7, 24, 10.5, 15); c.fill();
+      c.beginPath(); c.moveTo(29.5, 18); c.quadraticCurveTo(31, 28, 27, 30); c.lineTo(29, 30); c.quadraticCurveTo(33, 24, 29.5, 15); c.fill();
+      c.fillStyle = rgba(rgb, .85); c.fillRect(15.4, 16.6, 4, 2.6); c.fillRect(20.6, 16.6, 4, 2.6); c.fillRect(19.4, 17.4, 1.2, .8);
+    } else { // scientist: hair, goggles pushed up
+      c.fillStyle = hair; c.beginPath(); c.arc(20, 15, 7.4, Math.PI * 1.02, Math.PI * 1.98); c.lineTo(27, 13); c.quadraticCurveTo(20, 9.5, 13, 13); c.fill();
+      c.fillStyle = rgba(rgb, .9); circle(c, 17, 11.5, 2); c.fill(); circle(c, 23, 11.5, 2); c.fill();
+      c.strokeStyle = '#3a3420'; c.lineWidth = .8; c.beginPath(); c.moveTo(12.5, 12); c.lineTo(27.5, 12); c.stroke();
+    }
+    c.lineWidth = 1;
   }
   function fallback(c, u, R) {
     c.fillStyle = '#10141c'; c.strokeStyle = u.color; c.lineWidth = 2; circle(c, 0, 0, R); c.fill(); c.stroke();
@@ -587,9 +646,9 @@ XG.Gfx = (function () {
 
   // HP plate, shield, and status icons around a unit.
   function badges(c, u, cx, cy, o) {
-    var enemy = u.side === 'enemy', n = u.maxHp, hp = o.hp, pw = Math.min(5, 30 / n), w = n * pw, x0 = cx - w / 2, y0 = cy - 23;
+    var P = pal(), enemy = u.side === 'enemy', n = u.maxHp, hp = o.hp, pw = Math.min(5, 30 / n), w = n * pw, x0 = cx - w / 2, y0 = cy - 23;
     c.fillStyle = 'rgba(0,0,0,.65)'; c.fillRect(x0 - 2, y0 - 2, w + 3, 7);
-    for (var i = 0; i < n; i++) { c.fillStyle = i < hp ? (enemy ? '#ff4d6d' : '#7dff9b') : '#2a1820'; c.fillRect(x0 + i * pw, y0, pw - 1, 3); }
+    for (var i = 0; i < n; i++) { c.fillStyle = i < hp ? (enemy ? P.hpLat : P.hpFw) : '#2a1820'; c.fillRect(x0 + i * pw, y0, pw - 1, 3); }
     for (var s = 0; s < u.shield; s++) { c.fillStyle = '#c792ff'; c.fillRect(x0 + s * pw, y0 - 4, pw - 1, 2); }
     if (u.shield) { c.strokeStyle = 'rgba(199,146,255,' + (.45 + .25 * Math.sin(o.now / 200)) + ')'; c.lineWidth = 1.5; circle(c, cx, cy, 19); c.stroke(); c.lineWidth = 1; }
     if (u.overwatch) eye(c, cx - 15, cy + 17, '#4fd1ff');
@@ -772,6 +831,6 @@ XG.Gfx = (function () {
   return {
     TS: TS, REDUCED: REDUCED, hash: hash, rgbOf: rgbOf, biomeOf: biomeOf, BIOMES: BIOMES,
     terrain: terrain, decal: decal, ambient: ambient, motes: motes, fog: fog, lights: lights, vignette: vignette,
-    unit: unit, icon: icon, emit: emit, particles: particles, FX: FX, bolt: bolt, tracer: tracer, banner: banner, sweep: sweep
+    unit: unit, icon: icon, portrait: portrait, pal: pal, emit: emit, particles: particles, FX: FX, bolt: bolt, tracer: tracer, banner: banner, sweep: sweep
   };
 })();

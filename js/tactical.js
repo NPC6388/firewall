@@ -390,16 +390,21 @@ XG.Tac = (function () {
     opts = opts || {};
     var d = dist(a.x, a.y, t.x, t.y);
     if (d > a.range || !los(b, a.x, a.y, t.x, t.y)) return { chance: 0, crit: 0, cover: 0, coverBase: 0, coverAngle: 0, d: d, ok: false };
-    var cd = coverDetail(b, t.x, t.y, a.x, a.y), cov = cd.value;
-    var ch = a.aim - cov - (t.defense || 0) - (t.hunker ? 25 : 0);
-    if (d <= 3) ch += a.close || 0;
-    if (t.marked > 0) ch += 15;
-    if (opts.overwatch) ch -= 15;
-    if (d > 10) ch -= Math.round((d - 10) * 3);
+    var cd = coverDetail(b, t.x, t.y, a.x, a.y), cov = cd.value, parts = [['Aim', a.aim]];
+    var add = function (label, v) { if (v) parts.push([label, v]); };
+    add(cd.base ? (cd.base >= 40 ? 'Full' : 'Half') + ' cover' + (cov < cd.base ? ' at ' + cd.angle + '°' : '') : '', -cov);
+    add('Target defense', -(t.defense || 0));
+    add('Hunkered down', t.hunker ? -25 : 0);
+    add('Close range', d <= 3 ? a.close || 0 : 0);
+    add('Marked by scan', t.marked > 0 ? 15 : 0);
+    add('Overwatch shot', opts.overwatch ? -15 : 0);
+    add('Long range', d > 10 ? -Math.round((d - 10) * 3) : 0);
+    var ch = parts.reduce(function (s, p) { return s + p[1]; }, 0), raw = ch;
     if (t.isStatic) ch = Math.max(ch, 85);
     ch = Math.max(5, Math.min(95, Math.round(ch)));
+    if (ch !== Math.round(raw)) parts.push([t.isStatic && raw < 85 ? 'Structure (min 85)' : ch === 95 ? 'Cap (max 95)' : 'Floor (min 5)', ch - Math.round(raw)]);
     var crit = (a.crit || 0) + (cov === 0 && !t.isStatic ? 25 : 0);
-    return { chance: ch, crit: Math.min(100, crit), cover: cov, coverBase: cd.base, coverAngle: cd.angle, d: d, ok: true };
+    return { chance: ch, crit: Math.min(100, crit), cover: cov, coverBase: cd.base, coverAngle: cd.angle, d: d, ok: true, parts: parts, flankCrit: cov === 0 && !t.isStatic };
   }
 
   function log(b, ev, msg, cls) {

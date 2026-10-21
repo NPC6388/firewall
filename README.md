@@ -35,6 +35,10 @@ they assault the Uplink: hold it or lose.
 | `O` | HALCYON Overclock: +1 AP (after HALCYON Integration) |
 | `Enter` | End turn |
 | `Esc` / right-click | Cancel |
+| `M` | Mute or unmute |
+| `?` / `F1` | Help: glossary, controls, field manual |
+
+Your first battle on each side runs a short tutorial (skip it any time), and each strategy tab shows a tip the first time you open it. The ⚙ button (title screen, strategy tabs, battle bar) holds volume, animation speed, screen shake, a high-contrast blue/orange palette, and a switch to replay the tutorials. All sound is synthesized in the browser and starts after your first click.
 
 The game honours your system's *reduce motion* setting: no screen shake, fewer particles, a still title globe.
 
@@ -50,6 +54,10 @@ Hover a tile to see its cover (shield icons: filled = full, hollow = half). Hove
 | `js/tactical.js` | Pure battle engine (no DOM): map gen, LOS, cover, abilities, AI, turns. `b.human` is the side the person plays |
 | `js/tactical-ui.js` | Tactical screen: input, HUD, event animation queue, draw order |
 | `js/gfx.js` | Procedural graphics, no image files: baked terrain for four biomes (city, relay, uplink, cyberspace), unit sprites, particles, fog, lights, banners |
+| `js/settings.js` | Player settings and tutorial progress (`firewall-settings-v1`, separate from saves) |
+| `js/audio.js` | WebAudio synth: every sound effect plus a generative score per scene; no sound files |
+| `js/tutorial.js` | First-battle coach for each side and one-time strategy tips |
+| `js/help.js` | Help modal (searchable glossary, controls, field manual) and the settings modal |
 | `js/backdrop.js` | World-map continents, data packets and satellite; the animated title globe |
 | `js/ui.js` | FIREWALL strategy screens, modals, story player |
 | `js/lattice-ui.js` | LATTICE strategy screens (magenta theme), squad picker, results |
@@ -69,6 +77,8 @@ node tests/browser/drive.mjs tests/browser/finale.mjs
 node tests/browser/drive.mjs tests/browser/lattice.mjs
 node tests/browser/drive.mjs tests/browser/gfx-gallery.mjs   # zoomed shots of every sprite in every biome, plus effects and fps
 node tests/browser/drive.mjs tests/browser/gfx-profile.mjs   # milliseconds per frame for each drawing stage
+node tests/browser/drive.mjs tests/browser/onboarding.mjs    # settings, help, tips, portraits, tutorial, hit breakdown, audio
+node tests/browser/drive.mjs tests/browser/audio-levels.mjs  # peak level of every sound and the music
 ```
 Add `PAGE_URL=https://npc6388.github.io/firewall/` in front of either command to test the live site.
 The smoke test prints win/loss per mission type and difficulty, and how each simulated campaign ended. Exit code 1 means a check failed.

@@ -107,6 +107,12 @@ function autoBattle(g, m, squad) {
   var c45 = Tac.coverDetail(bc, 10, 10, 15, 15);
   check(c45.value > 20 && c45.value < 40 && c45.base === 40 && c45.angle === 45, '45° shot gets partial full cover (' + c45.value + ')');
   check(Tac.coverValue(bc, 10, 10, 13, 18) === 0, 'steep shot past 63° flanks the cover');
+  // the hit breakdown always adds up to the shown chance
+  var sh = bc.units.filter(function (u) { return u.side === 'player'; })[0], tg = bc.units.filter(function (u) { return u.side === 'enemy'; })[0];
+  sh.x = 15; sh.y = 15; tg.x = 10; tg.y = 10; tg.hunker = true; tg.marked = 1;
+  var hi = Tac.hitInfo(bc, sh, tg);
+  check(hi.ok && hi.parts.reduce(function (s, p) { return s + p[1]; }, 0) === hi.chance, 'hit breakdown sums to the chance (' + JSON.stringify(hi.parts) + ')');
+  tg.hunker = false; tg.marked = 0;
   bc.tiles[10 * Tac.W + 11] = Tac.LOW;
   check(Tac.coverValue(bc, 10, 10, 15, 15) < 20 && Tac.coverValue(bc, 10, 10, 15, 15) > 10, 'half cover also fades with angle');
   // override flips sides then purges

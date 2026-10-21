@@ -83,10 +83,25 @@ XG.UI = (function () {
   UI.render = function () {
     var g = UI.g; if (!g) return;
     document.body.classList.toggle('lattice', g.faction === 'lattice');
-    if (g.faction === 'lattice') { XG.LUI.render(); return; }
-    renderTop(g); renderTabs(g);
-    var v = { command: viewCommand, research: viewResearch, engineering: viewEngineering, barracks: viewBarracks, archive: viewArchive }[UI.tab];
-    $('strat-main').innerHTML = v(g);
+    XG.Audio.scene(g.faction === 'lattice' ? 'lat' : 'fw');
+    if (g.faction === 'lattice') XG.LUI.render();
+    else {
+      renderTop(g); renderTabs(g);
+      var v = { command: viewCommand, research: viewResearch, engineering: viewEngineering, barracks: viewBarracks, archive: viewArchive }[UI.tab];
+      $('strat-main').innerHTML = v(g);
+    }
+    // shared: help/settings buttons, first-visit tip, portraits
+    $('tabs').insertAdjacentHTML('beforeend', '<div class="util-btns"><button data-action="help" title="Help and glossary (?)">?</button><button data-action="settings" title="Settings">⚙</button></div>');
+    $('strat-main').insertAdjacentHTML('afterbegin', XG.Tutorial.stratTip(g.faction, UI.tab));
+    UI.paintPortraits();
+  };
+  UI.portrait = function (s) { return '<canvas class="portrait" data-portrait="' + s.id + '"></canvas>'; };
+  UI.paintPortraits = function () {
+    if (!UI.g || !UI.g.soldiers) return;
+    document.querySelectorAll('canvas[data-portrait]').forEach(function (cv) {
+      var id = +cv.getAttribute('data-portrait'), s = UI.g.soldiers.filter(function (x) { return x.id === id; })[0];
+      if (s) XG.Gfx.portrait(cv, s, D.classes[s.cls]);
+    });
   };
 
   function renderTop(g) {
@@ -227,7 +242,7 @@ XG.UI = (function () {
     var rows = g.soldiers.map(function (s) {
       var st = S.stats(g, s), C = D.classes[s.cls], ok = S.available(g, s);
       var heal = St.built(g, 'infirmary') ? 2 : 1;
-      return '<tr><td><span class="glyph" style="color:' + C.color + '">' + C.glyph + '</span>' + s.name + '</td><td>' + C.name + '</td><td>' + S.rankName(s) + ' <span class="dim">(' + s.xp + ' xp)</span></td>' +
+      return '<tr><td class="who">' + UI.portrait(s) + s.name + '</td><td>' + C.name + '</td><td>' + S.rankName(s) + ' <span class="dim">(' + s.xp + ' xp)</span></td>' +
         '<td>' + hpBar(s.hp, st.maxHp) + '</td><td>' + (ok ? '<span class="good">Ready</span>' : '<span class="warn">' + (C.machine ? 'Repairing' : 'Wounded') + ' ' + Math.ceil((st.maxHp - s.hp) / heal) + 'd</span>') + '</td>' +
         '<td>' + st.aim + '</td><td>' + (st.hackSkill ? st.hackSkill + (s.hacks ? ' <span class="dim">(' + s.hacks + ' hacks)</span>' : '') : '<span class="dim">—</span>') + '</td><td>' + s.missions + '</td><td>' + s.kills + '</td></tr>';
     }).join('');
@@ -257,7 +272,8 @@ XG.UI = (function () {
       '<p><b>Combat:</b> each operative has 2 AP. Moving costs 1 (blue range) or 2 (amber dash range). Shooting and most abilities end the turn. Medkit, Scan, Shield cost 1 AP.</p>' +
       '<p><b>Cover:</b> half cover −20 aim, full cover −40, judged from the side facing the shooter. Cover only counts in full when the shot comes in within 30° of head-on; it fades to half value as the angle steepens to about 63°, and past that the side gives nothing. No cover means you\'re flanked: easier to hit, +25 crit.</p>' +
       '<p><b>Controls:</b> click an operative to select (or Tab; with an ability armed, Tab cycles its targets). Click a tile to move. Click an enemy to aim, click again to fire. Keys 1–5 pick abilities (press the same key again to fire), O = Overclock, Enter = end turn, Esc / right-click = cancel.</p>' +
-      '<p><b>Hacking:</b> drones are easy, Wardens hard, Harmonics impossible. With Lattice Grammar, a successful hack hands you the machine for 2 turns.</p></div></div>';
+      '<p><b>Hacking:</b> drones are easy, Wardens hard, Harmonics impossible. With Lattice Grammar, a successful hack hands you the machine for 2 turns.</p>' +
+      '<p class="dim">Press <b>?</b> any time for the searchable glossary, or ⚙ for sound, speed and palette settings.</p></div></div>';
   }
 
   // ------------------------------------------------------- squad select
@@ -268,10 +284,11 @@ XG.UI = (function () {
       UI.modal('<h1>' + m.name + '</h1><p class="dim">' + m.city + ' · ' + m.brief + '</p><p>Select up to <b>' + size + '</b> operatives (' + chosen.length + ' chosen).</p>' +
         g.soldiers.map(function (s) {
           var C = D.classes[s.cls], st = S.stats(g, s), ok = S.available(g, s), on = chosen.indexOf(s.id) >= 0;
-          return '<div class="pick ' + (on ? 'on' : '') + (ok ? '' : ' off') + '" data-pick="' + s.id + '"><span class="glyph" style="color:' + C.color + '">' + C.glyph + '</span><span style="flex:1">' +
+          return '<div class="pick ' + (on ? 'on' : '') + (ok ? '' : ' off') + '" data-pick="' + s.id + '">' + UI.portrait(s) + '<span style="flex:1">' +
             s.name + '<br><span class="dim">' + S.rankName(s) + ' ' + C.name + ' · aim ' + st.aim + (st.hackSkill ? ' · hack ' + st.hackSkill : '') + ' · HP ' + s.hp + '/' + st.maxHp + (ok ? '' : ' · not fit for duty') + '</span></span>' + (on ? '✓' : '') + '</div>';
         }).join('') +
         '<div class="modal-actions"><button id="sq-cancel">Cancel</button><button class="primary" id="sq-go"' + (chosen.length ? '' : ' disabled') + '>Launch ▸</button></div>');
+      UI.paintPortraits();
       document.querySelectorAll('[data-pick]').forEach(function (el) {
         el.onclick = function () {
           var id = +el.getAttribute('data-pick'), s = g.soldiers.filter(function (x) { return x.id === id; })[0];

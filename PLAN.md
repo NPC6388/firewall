@@ -116,9 +116,19 @@ Each sprint ends with something playable. **Sprints 0–4 = the MVP.**
 - G5 Strategy and title: continents on the world map, data packets along links, the satellite and signal; an animated
   globe behind the title screen. Respects `prefers-reduced-motion`.
 
-**Sprint 5: Juice and onboarding**
-- WebAudio synth SFX and ambient score, portraits, hit-chance breakdown tooltip.
-- Guided first mission (tutorial), glossary, settings (animation speed, colorblind palette).
+✅ **Sprint 5: Audio and onboarding** (done 2026-10-20)
+- A1 `js/audio.js`: WebAudio, all synthesized (no sound files). SFX for every battle event, UI clicks, turn stingers,
+  victory/defeat; a generative ambient score per scene (title, FIREWALL HQ, Lattice network, battle) that tightens up
+  when hostiles are in sight. Master/music/SFX volume and mute (M).
+- A2 `js/settings.js`: one settings store (`firewall-settings-v1`) with a settings modal reachable from the title,
+  the strategy top bar and the battle bar: volumes, animation speed (1×–3×), screen shake, colour palette
+  (default or a blue/orange high-contrast palette), tutorial hints on/off and reset.
+- O1 Hit-chance breakdown: `Tac.hitInfo` returns its modifiers; the hover panel lists them (aim, cover and angle,
+  defense, hunker, range, mark, overwatch, clamps).
+- O2 `js/tutorial.js`: a guided first battle for each side (coach panel with steps that complete as you play,
+  skippable), plus one-time tips the first time you open each strategy tab.
+- O3 Glossary and help (`?` / F1): searchable terms, controls, the field manual.
+- O4 Procedural portraits for operatives in the Barracks and squad picker.
 
 **Sprint 6: Tactical depth**
 - Ammo/reload, elevation (rooftops = aim bonus), destructible walls, explosive barrels / overloaded servers.

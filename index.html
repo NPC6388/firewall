@@ -19,6 +19,7 @@
         <button class="big" data-action="new-game">New campaign: FIREWALL <span class="dim">(defend Earth)</span></button>
         <button class="big lat" data-action="l-new-game">New campaign: LATTICE <span class="dim">(be the alien AI)</span></button>
       </div>
+      <div class="title-util"><button data-action="help">Help &amp; glossary</button><button data-action="settings">Settings ⚙</button></div>
       <div class="title-foot">
         An alien AI is rewriting Earth's networks. Soldiers, hackers, scientists and one Earth-born AI stand in the way.<br>
         Play either side · each campaign autosaves separately in this browser
@@ -46,6 +47,8 @@
       <div class="squad" id="tac-squad"></div>
       <div class="abilities" id="tac-abilities"></div>
       <div class="tac-end">
+        <button data-action="help" title="Help and glossary (?)">?</button>
+        <button data-action="settings" title="Settings">⚙</button>
         <button id="tac-overclock" class="hidden" title="HALCYON gives the selected operative +1 AP (O)">Overclock</button>
         <button class="primary" id="tac-endturn" title="End turn (Enter)">End Turn ⏎</button>
         <button class="danger" id="tac-abort" title="Pull the squad out. The mission counts as failed.">Abort</button>
@@ -56,14 +59,18 @@
   <div id="modal" class="modal hidden"><div class="modal-box" id="modal-box"></div></div>
 
   <script src="js/data.js"></script>
+  <script src="js/settings.js"></script>
   <script src="js/state.js"></script>
   <script src="js/strategy.js"></script>
   <script src="js/tactical.js"></script>
   <script src="js/lattice.js"></script>
+  <script src="js/audio.js"></script>
   <script src="js/backdrop.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/lattice-ui.js"></script>
   <script src="js/gfx.js"></script>
+  <script src="js/tutorial.js"></script>
+  <script src="js/help.js"></script>
   <script src="js/tactical-ui.js"></script>
   <script src="js/main.js"></script>
 </body>
