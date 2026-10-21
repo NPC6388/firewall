@@ -521,9 +521,20 @@ XG.TacUI = (function () {
   }
 
   // ------------------------------------------------------------ render
+  // While nothing is animating and you haven't touched the mouse or keys for a moment, redraw less often: the ambient
+  // shimmer doesn't need 60 fps, and a full-rate canvas loads the browser's shared GPU process (video in other tabs stalls).
+  var lastInput = 0, IDLE_MS = 2000, LONG_IDLE_MS = 15000;
+  if (typeof document !== 'undefined') ['pointermove', 'pointerdown', 'keydown', 'wheel'].forEach(function (n) {
+    document.addEventListener(n, function () { lastInput = performance.now(); }, { capture: true, passive: true });
+  });
   function frame(now) {
     pump(now);
-    if (st) draw(now);
+    if (!st) return;
+    var busy = st.cur || st.queue.length || st.fx.length || st.parts.length || st.floaters.length ||
+      (st.shake && now - st.shake.t0 < 500) || (bannerEl && now - bannerEl.t0 < 2500);
+    var quiet = now - lastInput, gap = busy || quiet < IDLE_MS ? 0 : quiet < LONG_IDLE_MS ? 33 : 83; // full, 30 fps, 12 fps
+    if (gap && now - (st.lastDraw || 0) < gap - 4) return;
+    st.lastDraw = now; draw(now);
   }
 
   function center(x, y) { return [x * TS + TS / 2, y * TS + TS / 2]; }

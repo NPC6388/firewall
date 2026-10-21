@@ -144,6 +144,8 @@ XG.Backdrop = (function () {
   function loop(now) {
     requestAnimationFrame(loop);
     if (document.getElementById('screen-title').classList.contains('hidden')) return;
+    if (now - (cv.last || 0) < 29) return; // a slow globe looks the same at 30 fps, at half the GPU load
+    cv.last = now;
     var dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
     if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
     if (REDUCED && cv.drawn) return;

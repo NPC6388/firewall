@@ -23,8 +23,11 @@ XG.UI = (function () {
   };
 
   // ------------------------------------------------------------ modal
-  UI.modal = function (html) { $('modal-box').innerHTML = html; $('modal').classList.remove('hidden'); $('modal-box').scrollTop = 0; };
-  UI.closeModal = function () { $('modal').classList.add('hidden'); $('modal-box').innerHTML = ''; };
+  // A dialog freezes the world map's SVG animations underneath it: animating content behind a full-screen overlay
+  // keeps the browser's GPU process busy for nothing (and stalls video playing in other tabs).
+  function svgAnim(run) { document.body.classList.toggle('modal-open', !run); document.querySelectorAll('svg').forEach(function (s) { if (s.pauseAnimations) s[run ? 'unpauseAnimations' : 'pauseAnimations'](); }); }
+  UI.modal = function (html) { $('modal-box').innerHTML = html; $('modal').classList.remove('hidden'); $('modal-box').scrollTop = 0; svgAnim(false); };
+  UI.closeModal = function () { $('modal').classList.add('hidden'); $('modal-box').innerHTML = ''; svgAnim(true); };
   UI.isModal = function () { return !$('modal').classList.contains('hidden'); };
 
   UI.toast = function (lines) {
