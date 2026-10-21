@@ -540,6 +540,7 @@ XG.Tac = (function () {
     var A = D.abilities[id];
     if (u.abilities.indexOf(id) < 0) return [];
     if (A.target === 'enemy') {
+      var hacked = id === 'shoot' ? b.units.filter(function (t) { return t.alive && t !== u && t.side === u.side && t.override > 0 && hitInfo(b, u, t).ok; }) : [];
       return foesOf(b, u).filter(function (t) {
         if (!isVisible(b, t) && u.side === b.human) return false;
         if (id === 'shoot') return hitInfo(b, u, t).ok;
@@ -548,7 +549,7 @@ XG.Tac = (function () {
           dist(u.x, u.y, t.x, t.y) <= A.range && los(b, u.x, u.y, t.x, t.y);
         if (id === 'sever') return t.kind === 'core' && cheb(u.x, u.y, t.x, t.y) <= 1;
         return false;
-      });
+      }).concat(hacked); // a hacked machine on your side can still be shot down; it always comes last
     }
     if (A.target === 'ally') {
       return b.units.filter(function (t) {

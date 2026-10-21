@@ -144,6 +144,8 @@ XG.TacUI = (function () {
   }
   // While an ability is armed, Tab / Shift+Tab steps through its valid targets instead of squadmates.
   // Enemies are ordered best odds first (same as the auto-aim), allies nearest first.
+  // Your own hacked machines are valid Shoot targets but always sort after real hostiles.
+  function hackedLast(a, c) { return (a.side === HS() ? 1 : 0) - (c.side === HS() ? 1 : 0); }
   function cycleTarget(dir) {
     var u = selUnit(); if (!canInput() || !u || !st.mode) return;
     var A = D.abilities[st.mode];
@@ -151,7 +153,7 @@ XG.TacUI = (function () {
     var ts = Tac.targets(st.b, u, st.mode);
     if (!ts.length) return;
     ts.sort(A.target === 'enemy'
-      ? function (a, c) { return Tac.hitInfo(st.b, u, c).chance - Tac.hitInfo(st.b, u, a).chance || a.id - c.id; }
+      ? function (a, c) { return hackedLast(a, c) || Tac.hitInfo(st.b, u, c).chance - Tac.hitInfo(st.b, u, a).chance || a.id - c.id; }
       : function (a, c) { return Tac.dist(u.x, u.y, a.x, a.y) - Tac.dist(u.x, u.y, c.x, c.y) || a.id - c.id; });
     var i = ts.map(function (t) { return t.id; }).indexOf(st.aim);
     st.aim = ts[(i + dir + ts.length) % ts.length].id;
@@ -165,7 +167,7 @@ XG.TacUI = (function () {
     if (st.mode === id && confirmMode(u, id, A)) return;
     st.mode = id; st.aim = null;
     if (A.target === 'enemy') {
-      var ts = Tac.targets(st.b, u, id).map(function (t) { return { t: t, c: Tac.hitInfo(st.b, u, t).chance }; }).sort(function (a, c) { return c.c - a.c; });
+      var ts = Tac.targets(st.b, u, id).map(function (t) { return { t: t, c: Tac.hitInfo(st.b, u, t).chance }; }).sort(function (a, c) { return hackedLast(a.t, c.t) || c.c - a.c; });
       if (ts.length) st.aim = ts[0].t.id;
     }
     if (A.target === 'ally' && id === 'shield' && Tac.targets(st.b, u, id).length === 1) { run(id, u); return; }

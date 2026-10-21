@@ -115,6 +115,17 @@ function autoBattle(g, m, squad) {
   check(!Tac.los(bc, 5, 8, 10, 8), 'peeking does not see through the middle of a wall');
   for (var cy2 = 0; cy2 < Tac.H; cy2++) for (var cx2 = 0; cx2 < Tac.W; cx2++) bc.tiles[cy2 * Tac.W + cx2] = Tac.FLOOR;
   bc.tiles[10 * Tac.W + 11] = Tac.HIGH;
+  // a hacked drone on your side can be shot, and is listed after real hostiles
+  var bh = Tac.create(g, Object.assign({}, m, { kind: 'purge', diff: 2, seed: 11 }), g.soldiers.slice(0, 4));
+  for (var hy = 0; hy < Tac.H; hy++) for (var hx = 0; hx < Tac.W; hx++) bh.tiles[hy * Tac.W + hx] = Tac.FLOOR;
+  var sh2 = bh.units.filter(function (u) { return u.kind === 'trooper'; })[0], ds = bh.units.filter(function (u) { return u.kind === 'drone'; });
+  ds[0].x = sh2.x + 3; ds[0].y = sh2.y; ds[0].side = 'player'; ds[0].origSide = 'enemy'; ds[0].override = 2;
+  ds[1].x = sh2.x + 4; ds[1].y = sh2.y + 1;
+  bh.units.forEach(function (u) { if (u.side === 'enemy' && u !== ds[1]) u.alive = false; });
+  bh.visible = bh.visible.map(function () { return true; });
+  var tl = Tac.targets(bh, sh2, 'shoot');
+  check(tl.indexOf(ds[0]) >= 0 && tl[tl.length - 1] === ds[0], 'a hacked drone is a Shoot target, listed last');
+  check(Tac.targets(bh, sh2, 'hack').indexOf(ds[0]) < 0, 'other abilities still ignore your hacked drone');
   // unaware pods walk their patrol routes on the Lattice turn
   var moved = 0, routes = 0;
   for (var ps = 1; ps <= 6; ps++) {
