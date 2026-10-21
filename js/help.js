@@ -56,7 +56,7 @@ XG.Help = (function () {
     ['1–5', 'Arm an ability; press the same key again (or Space) to use it'],
     ['Tab (ability armed)', 'Cycle that ability\'s targets'],
     ['Space', 'Confirm the armed ability (same as pressing its key again); ends the turn once nobody has AP left'],
-    ['Y', 'Overwatch all (asks first)'],
+    ['Y', 'Overwatch all, then end the turn (asks first)'],
     ['O', 'Overclock (HALCYON +1 AP)'],
     ['Enter', 'End turn'],
     ['Esc / right-click', 'Cancel'],

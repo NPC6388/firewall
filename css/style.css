@@ -186,7 +186,7 @@ td { padding: 7px 6px; border-bottom: 1px solid #121c2b; }
 .abilities { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; flex: 1; }
 .abilities button { min-width: 92px; }
 .abilities button.on { border-color: var(--amber); color: var(--amber); }
-.abilities button .key { color: var(--dim); margin-right: 5px; }
+.abilities button .key, #tac-owall .key, #tac-overclock .key { color: var(--dim); margin-right: 5px; }
 .tac-end { display: flex; gap: 6px; align-items: center; }
 @media (max-width: 980px) {
   .tac-body { flex-direction: column; }

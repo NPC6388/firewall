@@ -1,4 +1,4 @@
-// Overwatch all (Y): asks first, Esc cancels, Space confirms and every unit with AP goes on overwatch.
+// Overwatch all (Y): asks first, Esc cancels, Space confirms, every unit with AP goes on overwatch and the turn ends.
 // Also: 1 arms Shoot and Space fires it.
 export default async function ({ ev, sleep, send, shot }) {
   const key = async (k, code) => { await send('Input.dispatchKeyEvent', { type: 'keyDown', key: k, code: code || '', text: k === ' ' ? ' ' : k.length === 1 ? k : undefined }); await send('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code: code || '' }); };
@@ -16,8 +16,11 @@ export default async function ({ ev, sleep, send, shot }) {
   await key('Escape', 'Escape'); await sleep(150);
   console.log('after Esc: modal open', await ev(`XG.UI.isModal()`), 'overwatch', await ow());
   await key('Y'); await sleep(200); await space(); await sleep(600);
-  console.log('after Y + Space: modal open', await ev(`XG.UI.isModal()`), 'overwatch', await ow());
+  console.log('after Y + Space: modal open', await ev(`XG.UI.isModal()`), 'overwatch', await ow(), '| side', await ev(`XG.TacUI.debug().b.side`));
   await shot('ow2-all');
+  // Overwatch all ends the turn: wait for the Lattice turn to finish and our next turn to begin
+  for (let i = 0; i < 60 && !(await ev(`(function(){var s=XG.TacUI.debug();return s.b.side==='player'&&!s.cur&&!s.queue.length&&s.b.turn>1})()`)); i++) await sleep(250);
+  console.log('turn ended, now turn', await ev(`XG.TacUI.debug().b.turn`), 'side', await ev(`XG.TacUI.debug().b.side`));
   // a fresh battle: 1 arms Shoot at the best target, Space fires
   await ev(`(function(){var s=XG.TacUI.debug(), b=s.b; b.units.forEach(u=>{ if(u.side==='player'){ u.overwatch=false; u.ap=2; } });
     var u=b.units.find(x=>x.side==='player'&&x.kind==='trooper'), d=b.units.find(x=>x.side==='enemy'&&!x.isStatic);

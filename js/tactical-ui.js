@@ -223,14 +223,14 @@ XG.TacUI = (function () {
     var b = st.b, list = b.units.filter(function (u) { return u.alive && u.side === HS() && !u.isStatic && u.ap > 0 && !Tac.abilityBlock(b, u, 'overwatch'); });
     if (!list.length) { XG.UI.modal('<h1>Overwatch all</h1><p>No one can go on overwatch right now.</p><div class="modal-actions"><button class="primary" id="owa-no">OK</button></div>'); $('owa-no').onclick = XG.UI.closeModal; $('owa-no').focus(); return; }
     st.mode = null; st.aim = null; hud();
-    XG.UI.modal('<h1>Overwatch all?</h1><p>Are you sure? <b>' + list.length + '</b> unit' + (list.length > 1 ? 's go' : ' goes') + ' on overwatch and end' + (list.length > 1 ? '' : 's') + ' the turn: ' +
+    XG.UI.modal('<h1>Overwatch all?</h1><p>Are you sure? <b>' + list.length + '</b> unit' + (list.length > 1 ? 's go' : ' goes') + ' on overwatch, then your turn ends: ' +
       list.map(function (u) { return u.short || u.name; }).join(', ') + '.</p>' +
       '<div class="modal-actions"><button id="owa-no">Cancel (Esc)</button><button class="primary" id="owa-yes">Overwatch all (Space)</button></div>');
     $('owa-no').onclick = XG.UI.closeModal;
     $('owa-yes').onclick = function () {
       XG.UI.closeModal();
       list.forEach(function (u) { if (u.alive && u.ap > 0) { var ev = Tac.act.overwatch(st.b, u); if (ev) enqueue(ev); } });
-      hud();
+      endTurn(true); // the overwatch events play first, then the other side moves
     };
     $('owa-yes').focus(); // Space / Enter press the focused button
   }
@@ -238,8 +238,9 @@ XG.TacUI = (function () {
     var u = selUnit(); if (!canInput() || !u || !allowed('overclock')) return;
     var ev = Tac.act.overclock(st.b, u); if (ev) { enqueue(ev); hud(); }
   }
-  function endTurn() {
-    if (!canInput() || !allowed('end')) return;
+  // force: end it even while events are still queued (Overwatch all ends the turn behind its own events).
+  function endTurn(force) {
+    if (force !== true && (!canInput() || !allowed('end'))) return;
     st.mode = null; st.aim = null;
     banner(lat() ? 'FIREWALL TURN' : 'LATTICE TURN', 'enemy');
     enqueue(Tac.endTurn(st.b));
