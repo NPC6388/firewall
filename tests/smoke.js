@@ -107,6 +107,14 @@ function autoBattle(g, m, squad) {
   var c45 = Tac.coverDetail(bc, 10, 10, 15, 15);
   check(c45.value > 20 && c45.value < 40 && c45.base === 40 && c45.angle === 45, '45° shot gets partial full cover (' + c45.value + ')');
   check(Tac.coverValue(bc, 10, 10, 13, 18) === 0, 'steep shot past 63° flanks the cover');
+  // corner peeking: wall at x=6, y=5..10; a unit at (5,5) leans out north and can see (10,5); one at (4,5) can't
+  for (var py = 0; py < Tac.H; py++) for (var px = 0; px < Tac.W; px++) bc.tiles[py * Tac.W + px] = Tac.FLOOR;
+  for (var wy = 5; wy <= 10; wy++) bc.tiles[wy * Tac.W + 6] = Tac.WALL;
+  check(Tac.los(bc, 5, 5, 10, 5), 'a unit on the corner of a wall can fire down the line past it');
+  check(!Tac.los(bc, 4, 5, 10, 5), 'a unit a step back from the corner cannot');
+  check(!Tac.los(bc, 5, 8, 10, 8), 'peeking does not see through the middle of a wall');
+  for (var cy2 = 0; cy2 < Tac.H; cy2++) for (var cx2 = 0; cx2 < Tac.W; cx2++) bc.tiles[cy2 * Tac.W + cx2] = Tac.FLOOR;
+  bc.tiles[10 * Tac.W + 11] = Tac.HIGH;
   // unaware pods walk their patrol routes on the Lattice turn
   var moved = 0, routes = 0;
   for (var ps = 1; ps <= 6; ps++) {

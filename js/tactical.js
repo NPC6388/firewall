@@ -36,7 +36,30 @@ XG.Tac = (function () {
     }
     return true;
   }
-  function los(b, ax, ay, bx, by) { return lineClear(b, ax, ay, bx, by) || lineClear(b, bx, by, ax, ay); }
+  function clearEither(b, ax, ay, bx, by) { return lineClear(b, ax, ay, bx, by) || lineClear(b, bx, by, ax, ay); }
+  // Peeking: a unit beside a wall or tall cover can lean one tile out to either side of it, so it can see and fire
+  // down a line it stands on the corner of. Works for both ends of the line (the target can be peeking too).
+  function peekSpots(b, x, y) {
+    var out = [];
+    [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (o) {
+      var t = tile(b, x + o[0], y + o[1]);
+      if (t !== WALL && t !== HIGH) return;
+      [[o[1], o[0]], [-o[1], -o[0]]].forEach(function (q) {
+        var px = x + q[0], py = y + q[1], pt = inB(px, py) ? tile(b, px, py) : WALL;
+        if (pt !== WALL && pt !== HIGH && !out.some(function (p) { return p[0] === px && p[1] === py; })) out.push([px, py]);
+      });
+    });
+    return out;
+  }
+  function los(b, ax, ay, bx, by) {
+    if (clearEither(b, ax, ay, bx, by)) return true;
+    var A = peekSpots(b, ax, ay), i;
+    for (i = 0; i < A.length; i++) if (clearEither(b, A[i][0], A[i][1], bx, by)) return true;
+    if (!unitAt(b, bx, by)) return false; // only a unit leans; an empty tile is seen or not from where you stand
+    var B = peekSpots(b, bx, by);
+    for (i = 0; i < B.length; i++) if (clearEither(b, ax, ay, B[i][0], B[i][1])) return true;
+    return false;
+  }
 
   // Directional cover: the cover tile on the side facing the attacker counts, scaled by the viewing angle.
   // Head-on (up to 30° off the cover's axis) gives full value, fading to half at the flank cutoff
