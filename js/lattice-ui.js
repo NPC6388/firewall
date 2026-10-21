@@ -48,8 +48,10 @@ XG.LUI = (function () {
       tint: function (id) { var inf = Lat.region(g, id).infection; return [infColor(inf), .05 + inf / 300]; } });
     D.links.forEach(function (l) { s += '<line class="link" x1="' + pos[l[0]][0] + '" y1="' + pos[l[0]][1] + '" x2="' + pos[l[1]][0] + '" y2="' + pos[l[1]][1] + '"/>'; });
     s += '<text x="50" y="4" fill="#5a2a55" font-size="2" text-anchor="middle" letter-spacing=".4">LATTICE SUBSTRATE MAP</text>';
+    // infection halos first (area ∝ infection), so no halo covers another region's node or label
+    D.regions.forEach(function (r) { var inf = Lat.region(g, r.id).infection; s += XG.Backdrop.halo('l' + r.id, pos[r.id][0], pos[r.id][1], inf, infColor(inf)); });
     D.regions.forEach(function (r) {
-      var gr = Lat.region(g, r.id), p = pos[r.id], inf = gr.infection, col = infColor(inf), rad = 2.2 + inf / 25;
+      var gr = Lat.region(g, r.id), p = pos[r.id], inf = gr.infection, col = infColor(inf), rad = 2.2;
       var ms = g.missions.filter(function (m) { return m.region === r.id; });
       ms.forEach(function (m) {
         var mc = m.kind === 'raid' ? '#4fd1ff' : m.kind === 'strike' || m.kind === 'breach' ? '#ffd166' : '#ff2a55';

@@ -134,9 +134,11 @@ XG.UI = (function () {
       tint: function (id) { var inf = St.region(g, id).infection; return vis ? [infColor(inf), .05 + inf / 300] : ['#4a5d78', .06]; } });
     D.links.forEach(function (l) { s += '<line class="link" x1="' + pos[l[0]][0] + '" y1="' + pos[l[0]][1] + '" x2="' + pos[l[1]][0] + '" y2="' + pos[l[1]][1] + '"/>'; });
     s += '<text x="50" y="4" fill="#2f4560" font-size="2" text-anchor="middle" letter-spacing=".4">HALCYON GLOBAL NETWORK VIEW</text>';
+    // infection halos first (area ∝ infection), so no halo covers another region's node or label
+    if (vis) D.regions.forEach(function (r) { var inf = St.region(g, r.id).infection; s += XG.Backdrop.halo(r.id, pos[r.id][0], pos[r.id][1], inf, infColor(inf)); });
     D.regions.forEach(function (r) {
       var gr = St.region(g, r.id), p = pos[r.id], inf = gr.infection, col = vis ? infColor(inf) : '#4a5d78';
-      var rad = 2.2 + (vis ? inf / 25 : 1.2);
+      var rad = 2.2;
       var ms = g.missions.filter(function (m) { return m.region === r.id; });
       ms.forEach(function (m) {
         var mc = m.kind === 'purge' ? '#ff2a55' : m.kind === 'relay' ? '#c792ff' : '#ff3df2';

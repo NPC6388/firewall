@@ -128,5 +128,16 @@ XG.Backdrop = (function () {
   if (typeof document !== 'undefined') {
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startTitle); else startTitle();
   }
-  return { mapDecor: mapDecor, LAND: LAND };
+  // Infection halo around a region node: its AREA is proportional to infection (radius ∝ √infection),
+  // so 25% covers a quarter of what 100% does. 100% reaches HALO_MAX map units.
+  var HALO_MAX = 13;
+  function haloRadius(inf) { return Math.sqrt(Math.max(0, Math.min(100, inf)) / 100) * HALO_MAX; }
+  function halo(id, x, y, inf, col) {
+    var r = haloRadius(inf); if (r < .3) return '';
+    return '<radialGradient id="halo-' + id + '"><stop offset="0" stop-color="' + col + '" stop-opacity=".42"/><stop offset=".7" stop-color="' + col + '" stop-opacity=".16"/>' +
+      '<stop offset="1" stop-color="' + col + '" stop-opacity=".03"/></radialGradient>' +
+      '<circle cx="' + x + '" cy="' + y + '" r="' + r.toFixed(2) + '" fill="url(#halo-' + id + ')" stroke="' + col + '" stroke-opacity=".45" stroke-width=".18" stroke-dasharray=".7 .5"/>';
+  }
+
+  return { mapDecor: mapDecor, LAND: LAND, halo: halo, haloRadius: haloRadius };
 })();
