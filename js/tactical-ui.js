@@ -110,6 +110,8 @@ XG.TacUI = (function () {
   }
 
   // ------------------------------------------------------------ input
+  // Combat training can refuse an input that isn't part of the current lesson.
+  function allowed(kind, a1, a2) { return !XG.Tutorial || XG.Tutorial.allow(kind, st.b, a1, a2); }
   function click(t) {
     if (!canInput() || t.x < 0 || t.y < 0 || t.x >= W || t.y >= H) return;
     var b = st.b, u = selUnit(), at = unitAtVisible(t.x, t.y), A = st.mode && D.abilities[st.mode];
@@ -130,10 +132,10 @@ XG.TacUI = (function () {
       }
     }
     if (at && at.side === HS()) { select(at.id); return; }
-    if (at && u && Tac.targets(b, u, 'shoot').indexOf(at) >= 0) { st.mode = 'shoot'; st.aim = at.id; hud(); return; }
+    if (at && u && Tac.targets(b, u, 'shoot').indexOf(at) >= 0) { if (allowed('arm', 'shoot')) { st.mode = 'shoot'; st.aim = at.id; hud(); } return; }
     if (u && !at) {
       var r = getReach(u), d = r.d[t.y * W + t.x];
-      if (d > 0) {
+      if (d > 0 && allowed('move', t.x, t.y)) {
         var ev = Tac.act.move(b, u, t.x, t.y);
         if (ev) { enqueue(ev); hud(); }
       }
@@ -168,6 +170,7 @@ XG.TacUI = (function () {
   function pickAbility(id) {
     var u = selUnit(); if (!canInput() || !u) return;
     var why = Tac.abilityBlock(st.b, u, id); if (why) return;
+    if (st.mode !== id && !allowed('arm', id)) return;
     var A = D.abilities[id];
     if (st.mode === id && confirmMode(u, id, A)) return;
     st.mode = id; st.aim = null;
@@ -201,6 +204,7 @@ XG.TacUI = (function () {
 
   function run(id, a1, a2) {
     var u = selUnit(); if (!u) return;
+    if (!allowed('fire', id, a1)) return;
     var ev = Tac.act[id](st.b, u, a1, a2);
     st.mode = null; st.aim = null;
     if (ev) enqueue(ev);
@@ -213,7 +217,7 @@ XG.TacUI = (function () {
   }
   // Overwatch all: every unit of yours with AP left that can take overwatch, after an "are you sure?".
   function overwatchAll() {
-    if (!canInput()) return;
+    if (!canInput() || !allowed('overwatchAll')) return;
     var b = st.b, list = b.units.filter(function (u) { return u.alive && u.side === HS() && !u.isStatic && u.ap > 0 && !Tac.abilityBlock(b, u, 'overwatch'); });
     if (!list.length) { XG.UI.modal('<h1>Overwatch all</h1><p>No one can go on overwatch right now.</p><div class="modal-actions"><button class="primary" id="owa-no">OK</button></div>'); $('owa-no').onclick = XG.UI.closeModal; $('owa-no').focus(); return; }
     st.mode = null; st.aim = null; hud();
@@ -229,11 +233,11 @@ XG.TacUI = (function () {
     $('owa-yes').focus(); // Space / Enter press the focused button
   }
   function overclock() {
-    var u = selUnit(); if (!canInput() || !u) return;
+    var u = selUnit(); if (!canInput() || !u || !allowed('overclock')) return;
     var ev = Tac.act.overclock(st.b, u); if (ev) { enqueue(ev); hud(); }
   }
   function endTurn() {
-    if (!canInput()) return;
+    if (!canInput() || !allowed('end')) return;
     st.mode = null; st.aim = null;
     banner(lat() ? 'FIREWALL TURN' : 'LATTICE TURN', 'enemy');
     enqueue(Tac.endTurn(st.b));

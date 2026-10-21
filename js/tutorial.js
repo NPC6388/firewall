@@ -58,10 +58,10 @@ XG.Tutorial = (function () {
     if (!run || run.b !== b) return;
     var list = steps(), st = list[run.step];
     if (typeof st.done === 'function' && st.done(run, b, unit, mode, aim)) {
-      run.step++; run.turn = b.turn; st = list[run.step];
+      run.step++; run.nudge = null; run.turn = b.turn; st = list[run.step];
       if (XG.Audio) XG.Audio.play('select');
     }
-    if (run.side === 'train' && st.refill && unit && unit.ap <= 0 && b.side === b.human && !b.outcome) XG.Tac.refillAP(b, unit);
+    if (run.side === 'train' && unit && unit.ap <= 0 && b.side === b.human && !b.outcome) XG.Tac.refillAP(b, unit);
     if (b.outcome) { if (run.side === 'train') { run = null; hide(); return; } finish(run.step >= list.length - 2); return; }
     show();
   }
@@ -83,12 +83,12 @@ XG.Tutorial = (function () {
     if (!el) { el = document.createElement('div'); el.id = 'coach'; el.className = 'coach'; document.querySelector('.canvas-wrap').appendChild(el); }
     var btn = st.done === 'next' ? '<button class="primary coach-go" id="coach-next">Next ▸' + (train ? ' <span class="dim">Space</span>' : '') + '</button>' : !st.done ? '<button class="primary" id="coach-ok">' + (st.finish || 'Got it') + (train ? ' <span class="dim">Space</span>' : '') + '</button>' : '';
     el.innerHTML = '<div class="coach-h"><span>' + (train ? 'COMBAT TRAINING ' : 'TRAINING ') + (run.step + 1) + '/' + list.length + '</span><button id="coach-skip" title="' + (train ? 'Leave the range' : 'Turn the tutorial off') + '">' +
-      (train ? 'Leave' : 'Skip tutorial') + '</button></div><div class="coach-t">' + text + '</div>' + (btn ? '<div class="coach-a">' + btn + '</div>' : '');
+      (train ? 'Leave' : 'Skip tutorial') + '</button></div><div class="coach-t">' + text + '</div>' + (run.nudge ? '<div class="coach-nudge warn">' + run.nudge + '</div>' : '') + (btn ? '<div class="coach-a">' + btn + '</div>' : '');
     el.classList.remove('hidden');
     if (el.getAttribute('data-step') !== key) { el.setAttribute('data-step', key); el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
     $('coach-skip').onclick = function () { finish(true); };
     if ($('coach-ok')) $('coach-ok').onclick = function () { finish(true); };
-    if ($('coach-next')) $('coach-next').onclick = function () { run.step++; run.turn = run.b.turn; if (XG.Audio) XG.Audio.play('select'); battleUpdate(run.b, null, null, null); };
+    if ($('coach-next')) $('coach-next').onclick = function () { run.step++; run.nudge = null; run.turn = run.b.turn; if (XG.Audio) XG.Audio.play('select'); battleUpdate(run.b, null, null, null); };
   }
   // Space in combat training presses the coach's button (Next / Finish) when there is one; otherwise it fires as usual.
   function advance() {
@@ -102,12 +102,14 @@ XG.Tutorial = (function () {
 
   // ---------------------------------------------------------- combat training (title screen / help)
   // A guided range: Tac.createTraining builds the map (trooper at 3,8; target drone at 13,8 behind a crate on its
-  // west side; gunner drone at 17,12; tall cover at 10,12-13). Step text can be a function so numbers stay live.
+  // west side; gunner drone at 17,12; tall cover at 10,12-13; crates at 10,3 and 13,4 for the angle and flank spots). Step text can be a function so numbers stay live.
   function T(b) {
     var tr = b.units.filter(function (u) { return u.side === 'player' && u.alive; })[0];
     var tg = b.units.filter(function (u) { return u.dummy === 'passive'; })[0], gn = b.units.filter(function (u) { return u.dummy === 'gunner'; })[0];
     return { tr: tr, tg: tg, gn: gn, hi: tr && tg && tg.alive ? XG.Tac.hitInfo(b, tr, tg) : null, gi: tr && gn && gn.alive ? XG.Tac.hitInfo(b, gn, tr) : null };
   }
+  // A marked tile never leaves you in the open: real cover must face the Gunner Drone.
+  function covered(k) { return k.gi && k.gi.ok && k.gi.cover > 0; }
   function partsLine(hi) {
     if (!hi || !hi.ok) return '<span class="dim">no line of fire from here</span>';
     return hi.parts.map(function (p, i) { return i ? (p[1] > 0 ? '+' : '−') + Math.abs(p[1]) + ' ' + p[0].toLowerCase() : p[0] + ' ' + p[1]; }).join(' ') + ' = <b>' + hi.chance + '%</b>';
@@ -121,21 +123,21 @@ XG.Tutorial = (function () {
     { t: function () { return '<b>Welcome to the range.</b> One trooper, two training drones. The <b>Target Drone</b> stands behind a crate; the <b>Gunner Drone</b> (bottom right) shoots back but can\'t hurt you much. You\'ll learn how cover works and where your hit chance comes from.'; }, done: 'next' },
     { t: function () { return '<b>Cover protects one side.</b> The crate is on the target\'s <b>west</b> side, so it only helps against shots from the west. Crates and barriers are <b>half cover (−20)</b>; walls and racks are <b>full cover (−40)</b>. Hover any floor tile to see its shield icons: filled = full, hollow = half.'; }, done: 'next', show: 'cover' },
     { t: function () { return '<b>Aim.</b> Press <b>1</b> to arm Shoot, or click the Target Drone. The yellow ring is the aimed target; <b>Tab</b> cycles targets.'; },
-      done: function (r, b, u, mode, aim) { var k = T(b); return mode === 'shoot' && k.tg && aim === k.tg.id; } },
-    { t: function (r, b) { var k = T(b); return '<b>Where the number comes from.</b> ' + partsLine(k.hi) + '.<br>' + angleLine(k.hi) + ' The same list is on the right under the target. Every modifier simply adds up, then the total is kept between 5% and 95%.'; }, done: 'next', show: 'angle' },
-    { t: function (r, b) { var k = T(b); return '<b>Change the angle.</b> Press <b>Esc</b>, then move your trooper to the <b class="good">marked tile</b> to the north. The cones on the target show the rule: inside <span class="good">30°</span> the crate counts in full, up to <span class="warn">63°</span> it fades toward half, past that you\'re flanking.<br>Now: ' + angleLine(k.hi) + ' ' + (k.hi && k.hi.ok ? 'Hit chance ' + k.hi.chance + '%.' : ''); },
-      done: function (r, b) { var k = T(b); return k.hi && k.hi.ok && k.hi.cover > 0 && k.hi.cover < k.hi.coverBase; }, show: 'angle', refill: true,
-      goal: { ok: function (k) { return k.hi && k.hi.ok && k.hi.cover > 0 && k.hi.cover <= k.hi.coverBase * .75; } } }, // a fade you can see
-    { t: function (r, b) { var k = T(b); return '<b>Flank it.</b> Keep circling north and east to the <b class="good">marked tile</b>, where no cover sits between you and the target. The move preview shows <span class="good">green</span> odds for flanked shots.<br>Now: ' + angleLine(k.hi) + ' ' + (k.hi && k.hi.ok ? partsLine(k.hi) : ''); },
-      done: function (r, b) { var k = T(b); return k.hi && k.hi.ok && k.hi.cover === 0; }, show: 'angle', refill: true,
-      goal: { ok: function (k) { return k.hi && k.hi.ok && k.hi.cover === 0; } } },
-    { t: function (r, b) { var k = T(b); return '<b>Other modifiers.</b> Within 3 tiles: <b>+close range</b> (rifle +10). Past 10 tiles: <b>−3% per tile</b>. A <b>hunkered</b> target: −25. A target <b>marked</b> by a scientist\'s scan: +15. <b>Overwatch</b> shots: −15. Some targets have <b>defense</b> (drones −10).<br>Your shot now: ' + partsLine(k.hi) + (k.hi && k.hi.ok ? ' · distance ' + k.hi.d.toFixed(1) : ''); }, done: 'next', refill: true },
-    { t: function () { return '<b>Take the shot.</b> Press <b>1</b>, then <b>1</b> again or <b>Space</b>.'; }, done: function (r) { return r.shots > 0; }, refill: true },
+      done: function (r, b, u, mode, aim) { var k = T(b); return mode === 'shoot' && k.tg && aim === k.tg.id; }, arm: true },
+    { t: function (r, b) { var k = T(b); return '<b>Where the number comes from.</b> ' + partsLine(k.hi) + '.<br>' + angleLine(k.hi) + ' The same list is on the right under the target. Every modifier simply adds up, then the total is kept between 5% and 95%.'; }, done: 'next', show: 'angle', arm: true },
+    { t: function (r, b) { var k = T(b); return '<b>Change the angle.</b> Press <b>Esc</b>, then move your trooper to the <b class="good">marked tile</b> to the north, behind a crate so the Gunner can\'t catch you in the open. The cones on the target show the rule: inside <span class="good">30°</span> the crate counts in full, up to <span class="warn">63°</span> it fades toward half, past that you\'re flanking.<br>Now: ' + angleLine(k.hi) + ' ' + (k.hi && k.hi.ok ? 'Hit chance ' + k.hi.chance + '%.' : ''); },
+      done: function (r, b) { var k = T(b); return k.hi && k.hi.ok && k.hi.cover > 0 && k.hi.cover < k.hi.coverBase; }, show: 'angle',
+      goal: { ok: function (k) { return k.hi && k.hi.ok && k.hi.cover > 0 && k.hi.cover <= k.hi.coverBase * .75 && covered(k); } } }, // a fade you can see
+    { t: function (r, b) { var k = T(b); return '<b>Flank it.</b> Keep circling north and east to the <b class="good">marked tile</b>: no cover sits between you and the target, and a crate still shields you from the Gunner. Never end a move in the open if you can help it. The move preview shows <span class="good">green</span> odds for flanked shots.<br>Now: ' + angleLine(k.hi) + ' ' + (k.hi && k.hi.ok ? partsLine(k.hi) : ''); },
+      done: function (r, b) { var k = T(b); return k.hi && k.hi.ok && k.hi.cover === 0; }, show: 'angle',
+      goal: { ok: function (k) { return k.hi && k.hi.ok && k.hi.cover === 0 && covered(k); } } },
+    { t: function (r, b) { var k = T(b); return '<b>Other modifiers.</b> Within 3 tiles: <b>+close range</b> (rifle +10). Past 10 tiles: <b>−3% per tile</b>. A <b>hunkered</b> target: −25. A target <b>marked</b> by a scientist\'s scan: +15. <b>Overwatch</b> shots: −15. Some targets have <b>defense</b> (drones −10).<br>Your shot now: ' + partsLine(k.hi) + (k.hi && k.hi.ok ? ' · distance ' + k.hi.d.toFixed(1) : ''); }, done: 'next' },
+    { t: function () { return '<b>Take the shot.</b> Press <b>1</b> to aim at the Target Drone, then <b>1</b> again to fire.'; }, done: function (r) { return r.shots > 0; }, arm: true, fire: true },
     { t: function (r, b) { var k = T(b), g = k.gi; return '<b>Cover works for you too.</b> The Gunner Drone shoots on its turn. Its chance to hit you right now: ' + (g && g.ok ? '<b>' + g.chance + '%</b>' + (g.cover ? ' (your cover −' + g.cover + ')' : ' <span class="bad">(you\'re in the open)</span>') : '<span class="dim">it has no shot at you</span>') + '.<br>Move to the <b class="good">marked tile</b>: behind the <b>tall cover</b> near the bottom middle, on the side away from the gunner, so full cover (−40) faces it.'; },
-      done: function (r, b) { var k = T(b); return k.gi && k.gi.ok && k.gi.cover >= 40; }, show: 'defense', refill: true,
+      done: function (r, b) { var k = T(b); return k.gi && k.gi.ok && k.gi.cover >= 40; }, show: 'defense',
       goal: { ok: function (k) { return k.tr.x === 9 && k.gi && k.gi.ok && k.gi.cover >= 40; } } }, // behind the tall cover at 10,12-13
     { t: function (r, b) { var k = T(b), g = k.gi; return '<b>Good: full cover facing it.</b> Its chance on you is down to <b>' + (g && g.ok ? g.chance : '—') + '%</b>. End the turn (<b>Enter</b>) and watch it try.'; },
-      done: function (r, b) { return b.turn > r.turn; }, show: 'defense' },
+      done: function (r, b) { return b.turn > r.turn; }, show: 'defense', endTurn: true },
     { t: function () { return '<b>That\'s the whole rule.</b> Hit chance = aim − cover (by angle) − defense − hunker + close range + scan mark − overwatch − long range, kept between 5% and 95%. Move cover to cover, flank what you can\'t outshoot, and check the breakdown before you fire. Press <b>?</b> in any battle for the glossary.'; }, done: null, finish: 'Finish training' }
   ];
   var trainExit = null;
@@ -166,6 +168,25 @@ XG.Tutorial = (function () {
     tr.x = ox; tr.y = oy;
     goalCache = { key: key, tile: bestIn || best };
     return goalCache.tile;
+  }
+  // Combat training is guided: each step only allows what it teaches. kind: 'move' (x, y), 'arm' (ability id),
+  // 'fire' (ability id, target), 'end' (end turn), or anything else (overwatch all, overclock), which is never allowed.
+  // A refused input re-pops the coach with a one-line nudge. Outside training everything is allowed.
+  function allow(kind, b, a1, a2) {
+    if (!run || run.side !== 'train' || run.b !== b) return true;
+    var st = TRAIN_STEPS[run.step], k = T(b), ok = false, why;
+    var waiting = st.done === 'next' ? 'Press <b>Space</b> for the next lesson.' : !st.done ? 'Press <b>Space</b> to finish.' : 'Follow the step above.';
+    if (kind === 'move' && st.goal && k.tr) {
+      var g = goalTile(b, st, k), ox = k.tr.x, oy = k.tr.y;
+      k.tr.x = a1; k.tr.y = a2; ok = st.goal.ok(T(b)); k.tr.x = ox; k.tr.y = oy;
+      if (!ok && g && g.d > XG.Tac.moveRange(k.tr)) ok = true; // marker out of reach this move: any step toward it is fine
+      why = 'Move to the <b>marked tile</b>.';
+    } else if (kind === 'arm') { ok = !!st.arm && a1 === 'shoot'; why = st.goal ? 'Move to the <b>marked tile</b> first.' : waiting; }
+    else if (kind === 'fire') { ok = !!st.fire && a1 === 'shoot' && a2 === k.tg; why = st.fire ? 'Aim at the <b>Target Drone</b> (<b>Tab</b> switches targets).' : waiting; }
+    else if (kind === 'end') { ok = !!st.endTurn; why = st.goal ? 'Move to the <b>marked tile</b> first.' : waiting; }
+    else why = 'Not in this lesson. ' + waiting;
+    if (!ok) { run.nudge = why; if (XG.Audio) XG.Audio.play('click'); var el = $('coach'); if (el) el.setAttribute('data-step', ''); show(); }
+    return ok;
   }
   // Pulsing tile marker plus a curved arrow from the trooper, like a coach's sketch on the map.
   function drawGoal(c, b, st, k, now, TS) {
@@ -252,6 +273,6 @@ XG.Tutorial = (function () {
     return '<div class="tip"><span class="tip-i">TIP</span><span class="tip-t">' + text + '</span><button data-action="tip-ok" data-arg="' + id + '">Got it</button></div>';
   }
 
-  return { startTraining: startTraining, overlay: overlay, battleStart: battleStart, battleUpdate: battleUpdate, advance: advance, event: event, finish: finish, stratTip: stratTip, STEPS: STEPS,
+  return { startTraining: startTraining, overlay: overlay, battleStart: battleStart, battleUpdate: battleUpdate, advance: advance, allow: allow, event: event, finish: finish, stratTip: stratTip, STEPS: STEPS,
     goal: function () { var st = run && run.side === 'train' && TRAIN_STEPS[run.step], k = st && st.goal && T(run.b); return k && k.tr ? goalTile(run.b, st, k) : null; }, TIPS: TIPS, state: function () { return run && { side: run.side, step: run.step, shots: run.shots }; } };
 })();

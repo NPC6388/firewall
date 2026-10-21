@@ -286,6 +286,7 @@ XG.Tac = (function () {
     for (var y = 0; y <= 3; y++) put(16, y, WALL);
     put(18, 3, FLOOR);
     put(19, 11, LOW);
+    put(10, 3, LOW); put(13, 4, LOW);                  // crates at the angle and flank spots, facing the gunner
     makeSquadUnit(b, g, squad[0], 3, 8);
     var tgt = makeEnemy(b, 'drone', 13, 8), gun = makeEnemy(b, 'drone', 17, 12);
     tgt.name = 'Target Drone'; tgt.short = 'Target'; tgt.dummy = 'passive'; tgt.hp = tgt.maxHp = 30; tgt.alerted = true;

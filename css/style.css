@@ -240,6 +240,7 @@ table.odds tr.tot td { color: #fff; border-top: 1px solid var(--line-2); padding
 .coach-h { display: flex; justify-content: space-between; align-items: center; color: var(--cyan); font-size: 11px; letter-spacing: .2em; margin-bottom: 6px; }
 .coach-h button { font-size: 11px; padding: 2px 8px; color: var(--dim); }
 .coach-a { text-align: right; margin-top: 8px; }
+.coach-nudge { margin-top: 6px; font-size: 12px; }
 .coach-go { animation: coach-go 1.4s ease-in-out infinite; }
 @keyframes coach-go { 50% { box-shadow: 0 0 14px rgba(79,209,255,.7); } }
 .coach .cy { color: var(--cyan); }
