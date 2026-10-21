@@ -561,6 +561,7 @@ XG.TacUI = (function () {
         ctx.strokeStyle = dash ? '#ffd166' : '#4fd1ff'; ctx.lineWidth = 2; ctx.beginPath();
         var c0 = center(u.x, u.y); ctx.moveTo(c0[0], c0[1]);
         p.forEach(function (q) { var c = center(q[0], q[1]); ctx.lineTo(c[0], c[1]); }); ctx.stroke(); ctx.lineWidth = 1;
+        drawCoverCones(h.x, h.y);
         drawCoverShields(h.x, h.y);
         drawMoveOdds(u, h.x, h.y);
       }
@@ -670,6 +671,33 @@ XG.TacUI = (function () {
     return res;
   }
   function sideState(f, o) { return !f.threats ? 'full' : f.side[o[0] + ',' + o[1]] || 'idle'; }
+  // Faint cones around a tile with cover, one wedge per direction a shot could come from, using the same rule as
+  // Tac.coverDetail: green = some side counts in full (within 30 degrees of head-on), yellow = it fades toward half
+  // (out to about 63 degrees), red = nothing covers that direction (flanked). Sampled every 3 degrees.
+  var CONE_COL = { full: '125,255,155', fading: '255,209,102', open: '255,107,133' };
+  function coneClass(x, y, a) {
+    var dx = Math.cos(a), dy = Math.sin(a), best = 'open';
+    for (var i = 0; i < SIDES.length; i++) {
+      var o = SIDES[i], along = o[0] ? dx * o[0] : dy * o[1], across = o[0] ? dy : dx;
+      if (along <= 0 || along < Math.abs(across) / 2 - 1e-9 || Tac.tile(st.b, x + o[0], y + o[1]) === Tac.FLOOR) continue;
+      if (Math.atan2(Math.abs(across), along) <= Math.PI / 6 + 1e-9) return 'full';
+      best = 'fading';
+    }
+    return best;
+  }
+  function drawCoverCones(x, y) {
+    if (!SIDES.some(function (o) { return Tac.tile(st.b, x + o[0], y + o[1]) !== Tac.FLOOR; })) return;
+    var c = center(x, y), R = TS * 4.5, step = Math.PI / 60, a0 = 0, cls = coneClass(x, y, step / 2);
+    var wedge = function (from, to, k) {
+      ctx.fillStyle = 'rgba(' + CONE_COL[k] + ',' + (k === 'open' ? .05 : .09) + ')';
+      ctx.beginPath(); ctx.moveTo(c[0], c[1]); ctx.arc(c[0], c[1], R, from, to); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(' + CONE_COL[k] + ',.22)'; ctx.beginPath(); ctx.arc(c[0], c[1], R, from, to); ctx.stroke();
+    };
+    for (var a = step; a < Math.PI * 2 + step / 2; a += step) {
+      var k = a < Math.PI * 2 ? coneClass(x, y, a + step / 2) : null;
+      if (k !== cls) { wedge(a0, a, cls); a0 = a; cls = k; }
+    }
+  }
   function drawCoverShields(x, y) {
     var f = coverFacing(x, y);
     SIDES.forEach(function (o) {
