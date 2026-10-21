@@ -678,7 +678,10 @@ XG.TacUI = (function () {
       var col = s === 'full' ? '79,209,255' : s === 'fading' ? '255,209,102' : '125,142,165';
       ctx.globalAlpha = s === 'idle' ? .4 : 1;
       ctx.beginPath(); ctx.moveTo(sx - 5, sy - 5); ctx.lineTo(sx + 5, sy - 5); ctx.lineTo(sx + 5, sy); ctx.lineTo(sx, sy + 6); ctx.lineTo(sx - 5, sy); ctx.closePath();
-      ctx.fillStyle = full && s !== 'idle' ? 'rgb(' + col + ')' : 'rgba(' + col + ',.15)'; ctx.strokeStyle = 'rgb(' + col + ')'; ctx.fill(); ctx.stroke();
+      ctx.fillStyle = 'rgba(' + col + ',.15)'; ctx.fill();
+      // full cover: a solid shield; half cover: the lower half filled
+      ctx.save(); ctx.clip(); ctx.fillStyle = 'rgb(' + col + ')'; ctx.fillRect(sx - 6, full ? sy - 6 : sy - 1, 12, full ? 13 : 8); ctx.restore();
+      ctx.strokeStyle = 'rgb(' + col + ')'; ctx.stroke();
       ctx.globalAlpha = 1;
     });
   }

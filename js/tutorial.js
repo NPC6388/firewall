@@ -11,7 +11,7 @@ XG.Tutorial = (function () {
     fw: [
       { t: '<b>Welcome to the field.</b> Your squad is on the left. Click an operative (or press Tab), then click a <span class="cy">blue</span> tile to move there for 1 AP. <span class="warn">Amber</span> tiles are a dash and cost both AP.',
         done: function (r, b) { return moved(r, b); } },
-      { t: '<b>Take cover.</b> Hover a tile: shield icons show cover on each side (filled = full, hollow = half). End your moves next to crates, racks or walls facing the enemy.',
+      { t: '<b>Take cover.</b> Hover a tile: shield icons show cover on each side (filled = full, half-filled = half). End your moves next to crates, racks or walls facing the enemy.',
         done: function (r, b) { return humans(b).some(function (u) { return u.alive && nextToCover(b, u); }); } },
       { t: '<b>Find the Lattice.</b> Hostiles hide in the fog until one of your units sees them. A <b>?</b> above one means it has not noticed you yet. Advance carefully, cover to cover.',
         done: function (r, b) { return b.units.some(function (u) { return u.alive && u.side !== b.human && !u.isStatic && b.visible[u.y * XG.Tac.W + u.x]; }); } },
@@ -121,7 +121,7 @@ XG.Tutorial = (function () {
   }
   var TRAIN_STEPS = [
     { t: function () { return '<b>Welcome to the range.</b> One trooper, two training drones. The <b>Target Drone</b> stands behind a crate; the <b>Gunner Drone</b> (bottom right) shoots back but can\'t hurt you much. You\'ll learn how cover works and where your hit chance comes from.'; }, done: 'next' },
-    { t: function () { return '<b>Cover protects one side.</b> The crate is on the target\'s <b>west</b> side, so it only helps against shots from the west. Crates and barriers are <b>half cover (−20)</b>; walls and racks are <b>full cover (−40)</b>. Hover any floor tile to see its shield icons: filled = full, hollow = half. A shield turns <span class="warn">yellow</span> when it only covers you at an angle, and fades out when no enemy you can see is on that side.'; }, done: 'next', show: 'cover' },
+    { t: function () { return '<b>Cover protects one side.</b> The crate is on the target\'s <b>west</b> side, so it only helps against shots from the west. Crates and barriers are <b>half cover (−20)</b>; walls and racks are <b>full cover (−40)</b>. Hover any floor tile to see its shield icons: filled = full, half-filled = half. A shield turns <span class="warn">yellow</span> when it only covers you at an angle, and fades out when no enemy you can see is on that side.'; }, done: 'next', show: 'cover' },
     { t: function () { return '<b>Aim.</b> Press <b>1</b> to arm Shoot, or click the Target Drone. The yellow ring is the aimed target; <b>Tab</b> cycles targets.'; },
       done: function (r, b, u, mode, aim) { var k = T(b); return mode === 'shoot' && k.tg && aim === k.tg.id; }, arm: true },
     { t: function (r, b) { var k = T(b); return '<b>Where the number comes from.</b> ' + partsLine(k.hi) + '.<br>' + angleLine(k.hi) + ' The same list is on the right under the target. Every modifier simply adds up, then the total is kept between 5% and 95%.'; }, done: 'next', show: 'angle', arm: true },
