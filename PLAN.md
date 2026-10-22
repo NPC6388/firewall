@@ -134,6 +134,8 @@ Each sprint ends with something playable. **Sprints 0–4 = the MVP.**
 - Ammo/reload, elevation (rooftops = aim bonus), destructible walls, explosive barrels / overloaded servers.
 - New enemies: *Shepherd* (re-hacks your Sentinel), *Mirror* (spoofs your squad on the minimap), *Swarm Queen*.
 - New mission types: rescue a scientist, extract an air-gapped drive, defend a hospital's backup generator, timed evac.
+- **Bigger maps:** triple the battle map area (each side about 1.73× longer). Keep every mission timer at its current
+  value, then playtest and lengthen timers only if the larger map makes them too hard.
 
 **Sprint 7: Strategy depth**
 - **Cyber-Ops layer:** hackers dive into a fast node-graph "netrun" minigame between missions to slow regions or steal intel.
