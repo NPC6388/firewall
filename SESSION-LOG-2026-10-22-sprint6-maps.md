@@ -44,6 +44,7 @@ Unverified: there is no record of whether smoke or balance ran again after `e4e2
 - `PLAN.md` Sprint 6: **Bigger maps ✅**. Still open: ammo/reload, elevation, destructible walls/barrels, the Shepherd/Mirror/Swarm Queen enemies, and four new mission types.
 
 ## Next step / Pick up here
+0. **First (user request, 2026-10-22):** add an **About** tab right after Help → Patch notes, with copyright info credited to **npc6388** (GitHub username). Never use the user's real name unless they explicitly say so. Add a CHANGELOG entry.
 1. Re-run smoke and the balance sim on the current HEAD, because the last three commits have never been sim-checked (commands are in `README.md`).
 2. Check uplink d4. FIREWALL won 3 of 50, which may be too hard. Look again after the 3x3 deploy-block change.
 3. **USER-ONLY:** playtest the 38x28 maps and judge whether mission timers need lengthening (the PLAN says to leave them until playtested).
