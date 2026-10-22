@@ -1,5 +1,5 @@
 // Prints tactical map stats and an ASCII sample of each layout: node tools/map-sampler.js [maps]
-// Legend: # wall, H tall cover, c low cover, ~ pit (impassable, no cover), . floor, F deploy, E enemy candidate area
+// Legend: # wall, H tall cover, c low cover, ~ pit (impassable, no cover), . floor, F player, E enemy (deployment is random per edge, see Tac.deploy)
 var fs = require('fs'), path = require('path'), vm = require('vm');
 var ctx = vm.createContext({ console: console, Math: Math, Date: Date, JSON: JSON });
 ['data.js', 'state.js', 'strategy.js', 'tactical.js'].forEach(function (f) {

@@ -9,12 +9,16 @@ The in-game **Help → Patch notes** tab shows everything from the first `##` he
 ## Unreleased
 
 ### 2026-10-22
+- **Battle:** pressing Tab to switch operatives now centres the camera on the one you switched to.
+- **Battle:** fixed garbled dashes, arrows and degree signs in the battle log and hit-chance breakdown.
+- **Battle:** random spawn points. Both sides now start somewhere new on every mission: your squad lands on a random map edge (north, south, east or west) and the enemy starts well away from it. Restart mission keeps the same map, squads and HP but reshuffles where everyone spawns.
 - **Audio:** new soundtrack moods. Dark ambient and darksynth tracks join the score, and the music shifts with the state of
   the war and of each battle: quiet while you sneak, driving once you make contact, frantic when you are losing.
-- **Battle:** cover can be shot down. With Shoot armed, click a crate, tall cover, glass panel or fuel barrel you can see (aim, then
-  click again). Crates take two or three rifle hits, tall cover more, barrels and glass one; a destroyed barrel explodes. Barriers,
-  pillars, walls and fences cannot be shot. The hover panel shows the object's durability and your odds, and the AI will shoot a
-  barrel that catches two of your units.
+- **Battle:** cover wears down. Half the shots that miss someone in breakable cover tear into the cover instead: crates fall
+  after about two such misses, tall cover after three or four, glass shatters on the first. Grenades and other blasts still
+  flatten it. Breakable cover carries a faint hairline crack so you can tell it from blast-proof barriers and pillars.
+- **Battle:** fuel barrels can be shot. With Shoot armed, Tab cycles to any barrel in reach after the enemy units (or click
+  one: aim, then click again). One hit sets it off. The AI will shoot a barrel that catches two of your units.
 - **Battle:** fixed a line-of-sight bug: a unit standing mid-wall (not at the end of it) could lean round the corner and see or be
   shot from far past the wall. Leaning only works from the last tile of a wall or tall cover.
 - **Battle:** corner standoffs. When two units hug the same wall or tall cover and can only see each other by leaning round the

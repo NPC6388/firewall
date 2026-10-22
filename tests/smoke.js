@@ -122,12 +122,58 @@ function autoBattle(g, m, squad) {
   check(Tac.tile(b2, gx, gy) === Tac.FLOOR, 'frag grenade destroys cover');
   check(t2.ap === 0 && t2.charges.grenade === 0, 'grenade spends AP and charge');
   // cover depends on the viewing angle: target at (10,10) behind high cover to the east
-  // deployment: the squad starts packed in a 3x3 block on the west edge
+  // deployment: the squad starts packed in a 3x3 block on a map edge (checked below)
   [11, 12, 13].forEach(function (sd) {
     var bd = Tac.create(g, Object.assign({}, m, { kind: 'purge', diff: 2, seed: sd }), g.soldiers.slice(0, 5)), mid = bd.H >> 1;
     var sq = bd.units.filter(function (u) { return u.side === 'player' && !u.isStatic; });
-    check(sq.every(function (u) { return u.x <= 2 && Math.abs(u.y - mid) <= 1 && Tac.tile(bd, u.x, u.y) === Tac.FLOOR; }), 'squad deploys inside the 3x3 block (seed ' + sd + ')');
+    var xs = sq.map(function (u) { return u.x; }), ys = sq.map(function (u) { return u.y; });
+    check(Math.max.apply(null, xs) - Math.min.apply(null, xs) <= 2 && Math.max.apply(null, ys) - Math.min.apply(null, ys) <= 2 && Tac.tile(bd, sq[0].x, sq[0].y) === Tac.FLOOR, 'squad deploys inside a 3x3 block (seed ' + sd + ')');
   });
+  // Random spawn points: the map is fixed per mission seed, deployment is not (and re-rolls on Restart)
+  (function () {
+    var edgesSeen = {}, tilesSame = true, propsSame = true, moved = 0, tot = 0, edgeOk = true, reachOk = true, floorOk = true, distOk = true, minSeen = 1e9, gen = function (kd, sd) {
+      return Tac.create(g, Object.assign({}, m, { kind: kd, diff: 3, seed: sd }), g.soldiers.slice(0, 5));
+    };
+    var L = Math.max(Tac.MAP_W, Tac.MAP_H);
+    for (var sd = 1; sd <= 100; sd++) {
+      var kd = ['purge', 'relay', 'uplink'][sd % 3], b0 = gen(kd, 700 + sd * 31), snap = JSON.parse(JSON.stringify(b0)), b1 = JSON.parse(JSON.stringify(b0)), b2 = JSON.parse(JSON.stringify(b0));
+      b1.rng = Object.assign(new XG.RNG(1), b1.rng); b2.rng = Object.assign(new XG.RNG(1), b2.rng);
+      Tac.redeploy(b1, sd * 2 + 1); Tac.redeploy(b2, sd * 2 + 2);
+      [b0, b1, b2].forEach(function (bb) {
+        var sq = bb.units.filter(function (u) { return u.side === 'player'; }), A = bb.anchor, W = bb.W, H = bb.H;
+        edgesSeen[A.edge] = (edgesSeen[A.edge] || 0) + 1;
+        if (!sq.every(function (u) { return u.x === 0 || u.y === 0 || u.x === W - 1 || u.y === H - 1 || (u.x <= 2 || u.y <= 2 || u.x >= W - 3 || u.y >= H - 3); })) edgeOk = false;
+        bb.units.forEach(function (u) { if (Tac.tile(bb, u.x, u.y) !== Tac.FLOOR) floorOk = false; if (!bb.reachable[u.y * W + u.x]) reachOk = false; });
+        bb.units.forEach(function (u) { if (u.side === 'enemy') { var d = Tac.dist(u.x, u.y, A.x, A.y); minSeen = Math.min(minSeen, d); if (d < L * 0.4) distOk = false; } });
+      });
+      // map identical across restarts (before the few starting-cover tiles beside the block, so compare the pristine base)
+      if (JSON.stringify(b1.base.tiles) !== JSON.stringify(b0.base.tiles) || JSON.stringify(b2.base.tiles) !== JSON.stringify(b0.base.tiles)) tilesSame = false;
+      if (JSON.stringify(b1.base.props) !== JSON.stringify(b0.base.props)) propsSame = false;
+      tot++; if (JSON.stringify(b1.units.map(function (u) { return [u.x, u.y]; })) !== JSON.stringify(b0.units.map(function (u) { return [u.x, u.y]; })) && JSON.stringify(b1.units.map(function (u) { return [u.x, u.y]; })) !== JSON.stringify(b2.units.map(function (u) { return [u.x, u.y]; }))) moved++;
+      var h0 = b0.units.map(function (u) { return u.id + ':' + u.hp; }).join(), h1 = b1.units.map(function (u) { return u.id + ':' + u.hp; }).join();
+      check(h0 === h1 && b1.turn === 1 && b1.explored.length === b1.W * b1.H, 'restart keeps the same units and HP (seed ' + sd + ')');
+    }
+    check(tilesSame && propsSame, 'map tiles and props are identical across restarts');
+    check(moved >= tot * 0.9, 'deployment differs between two deploy seeds on the same map (' + moved + '/' + tot + ')');
+    check(edgeOk, 'squad A deploys in a block on a map edge');
+    check(floorOk && reachOk, 'nothing spawns on a non-FLOOR or unreachable tile');
+    check(distOk, 'the two sides start far apart (closest enemy ' + minSeen.toFixed(1) + ' tiles, map ' + L + ')');
+    check(['W', 'E', 'N', 'S'].every(function (e) { return edgesSeen[e] > 0; }), 'every map edge gets used for deployment (' + JSON.stringify(edgesSeen) + ')');
+    // Lattice battles too, both directions (raid/uplink: FIREWALL lands; strike: you land)
+    var latOk = true, latFar = true;
+    ['raid', 'strike', 'breach', 'uplink'].forEach(function (kd2) {
+      for (var ls = 0; ls < 8; ls++) {
+        var lg2 = XG.Lat.newGame(300 + ls); lg2.day = 12 + ls * 6;
+        var lm2 = XG.Lat.spawnMission(lg2, S.rng(lg2), kd2), lb = Tac.createLattice(lm2, ['warden', 'drone', 'drone', 'harmonic'], XG.Lat.earthSquad(lg2, lm2), {}), A2 = lb.anchor;
+        var aSide = lb.deployInfo.aSide;
+        var lb2 = JSON.parse(JSON.stringify(lb)); lb2.rng = Object.assign(new XG.RNG(1), lb2.rng); Tac.redeploy(lb2, 5 + ls);
+        [lb, lb2].forEach(function (bb) {
+          bb.units.forEach(function (u) { if (Tac.tile(bb, u.x, u.y) !== Tac.FLOOR || !bb.reachable[u.y * bb.W + u.x]) latOk = false; if (u.side !== aSide && Tac.dist(u.x, u.y, bb.anchor.x, bb.anchor.y) < L * 0.4) latFar = false; });
+        });
+      }
+    });
+    check(latOk && latFar, 'Lattice battles: every unit on reachable floor, the sides start far apart (' + latOk + '/' + latFar + ')');
+  })();
   // Lattice campaign: your machines deploy packed in one 3x3 block in every mission kind
   ['raid', 'strike', 'breach', 'uplink'].forEach(function (kd) {
     for (var sd = 0; sd < 5; sd++) {
@@ -225,16 +271,14 @@ function autoBattle(g, m, squad) {
   check(rr.d[10 * Tac.MAP_W + 11] < 0 && rr.d[10 * Tac.MAP_W + 13] > 0, 'a pit cannot be entered, only walked around');
   bc.tiles[10 * Tac.MAP_W + 11] = Tac.FLOOR; bc.tiles[10 * Tac.MAP_W + 12] = Tac.FLOOR;
   // map layouts: all five turn up, the deployment zone stays clear, and some maps carry pits
-  var lay = {}, pitMaps = 0, deployOk = true;
+  var lay = {}, pitMaps = 0;
   for (var ms = 0; ms < 60; ms++) {
     var bm = Tac.create(g, Object.assign({}, m, { kind: 'purge', diff: 2, seed: 900 + ms * 7919 }), g.soldiers.slice(0, 4));
     lay[bm.layout] = 1;
     if (bm.tiles.some(function (tv, ti) { return tv === Tac.PIT && !bm.props[ti]; })) pitMaps++;
-    for (var dy = (Tac.MAP_H >> 1) - 3; dy <= (Tac.MAP_H >> 1) + 3; dy++) for (var dx = 0; dx < 3; dx++) if (bm.tiles[dy * Tac.MAP_W + dx] !== Tac.FLOOR) deployOk = false;
   }
   check(['compound', 'street', 'yard', 'plaza', 'blocks'].every(function (k) { return lay[k]; }), 'all five map layouts appear (' + Object.keys(lay).join(',') + ')');
   check(pitMaps > 15 && pitMaps < 60, 'some but not all maps have impassable ground (' + pitMaps + '/60)');
-  check(deployOk, 'deployment zone is always open floor');
   // mission maps are 38x28, combat training stays 22x16, timers are unchanged, and the floor is reachable
   var sizeOk = true, reachOk = true, worst = 1, lim = {};
   var reachCheck = function (bb) {
@@ -337,7 +381,7 @@ function autoBattle(g, m, squad) {
   for (var i = 0; i < 6; i++) {
     var g = XG.Lat.newGame(500 + i); g.day = 30; g.trace = 50;
     var m = XG.Lat.spawnMission(g, S.rng(g), 'raid'), b = Tac.createLattice(m, ['warden', 'drone', 'drone', 'harmonic'], XG.Lat.earthSquad(g, m), {});
-    b.units.forEach(function (u) { if (u.side === 'enemy') { units++; if (Tac.coverValue(b, u.x, u.y, 1, Tac.MAP_H >> 1) > 0) covered++; } });
+    b.units.forEach(function (u) { if (u.side === 'enemy') { units++; if (Tac.coverValue(b, u.x, u.y, b.anchor.x, b.anchor.y) > 0) covered++; } });
     for (var k = 0; k < 50 && b.side !== b.human && !b.outcome; k++)
       Tac.aiStep(b).forEach(function (e) { if (e.t === 'shot' && Tac.unitById(b, e.from).side === 'player') shots++; });
   }
@@ -524,21 +568,26 @@ function autoBattle(g, m, squad) {
   check(!!ev1 && Tac.tile(b, 10, 10) === Tac.FLOOR && Tac.tile(b, 11, 10) === Tac.FLOOR, 'shooting a barrel destroys it and chains into the next one');
   check(en[0].hp === 8 && sh.ap === 0, 'the chained blast hurts the hostile beside it for 2, and the shot spent the AP (hp ' + en[0].hp + ')');
   check(ev1.some(function (e) { return e.t === 'shot' && e.to === null && e.tx === 10; }) && ev1.filter(function (e) { return e.t === 'boom'; }).length === 2, 'the shot event has no target unit and both barrels boom');
-  // crate: survives the first hit, falls once its HP (6) is gone, with damage = weapon damage
-  reset(); put(10, 10, Tac.LOW, 0);
-  b.rng.chance = function () { return true; };
-  Tac.act.shootTile(b, sh, 10, 10);
-  check(Tac.tile(b, 10, 10) === Tac.LOW && Tac.objectAt(b, 10, 10).hp === 3, 'a crate survives one rifle hit (hp 3/6)');
-  sh.ap = 2; Tac.act.shootTile(b, sh, 10, 10);
+  // plain crates are not aimed at: a miss at the unit behind one can land in it (STRAY 50%) for weapon damage, 6 HP
+  reset(); put(10, 10, Tac.LOW, 0); put(14, 10, Tac.HIGH, 0);
+  check(Tac.objectTargets(b, sh).length === 0 && !Tac.act.shootTile(b, sh, 10, 10) && !Tac.act.shootTile(b, sh, 14, 10), 'crates and tall cover are not Shoot targets (only explosives are)');
+  en[0].x = 11; en[0].y = 10;
+  var seq = function (list) { var k = 0; b.rng.chance = function () { return k < list.length ? list[k++] : false; }; };
+  seq([false, true]); Tac.act.shoot(b, sh, en[0]);
+  check(Tac.tile(b, 10, 10) === Tac.LOW && Tac.objectAt(b, 10, 10).hp === 3, 'a stray miss chips the crate the target hides behind (hp 3/6)');
+  sh.ap = 2; seq([false, false]); Tac.act.shoot(b, sh, en[0]);
+  check(Tac.objectAt(b, 10, 10).hp === 3, 'a miss that does not stray leaves the crate alone');
+  sh.ap = 2; seq([false, true]); Tac.act.shoot(b, sh, en[0]);
   b.rng.chance = realChance;
-  check(Tac.tile(b, 10, 10) === Tac.FLOOR && b.tileHp[10 * W + 10] === undefined, 'the crate falls on the second hit and its HP entry is gone');
+  check(Tac.tile(b, 10, 10) === Tac.FLOOR && b.tileHp[10 * W + 10] === undefined, 'the second stray miss breaks the crate and its HP entry is gone');
   reset(); put(10, 10, Tac.HIGH, 0); check(Tac.objectAt(b, 10, 10).maxHp === 10, 'tall cover has 10 HP');
+  reset(); put(10, 10, Tac.LOW, 'barrel');
   var oi = Tac.hitInfo(b, sh, Tac.objectAt(b, 10, 10));
   check(oi.ok && oi.object && oi.parts[0][0] === 'Aim' && !oi.parts.some(function (p) { return /cover|defense/i.test(p[0]); }), 'an object hit chance has no cover or defense lines');
   // not targetable: blast-proof barrier and pillar, walls and fences
   reset(); put(10, 10, Tac.LOW, 'barrier'); put(10, 12, Tac.HIGH, 'pillar'); put(10, 8, Tac.WALL, 0); put(10, 14, Tac.PIT, 'fence');
   check(Tac.objectTargets(b, sh).length === 0 && !Tac.act.shootTile(b, sh, 10, 10) && !Tac.act.shootTile(b, sh, 10, 12) && !Tac.act.shootTile(b, sh, 10, 8) && !Tac.act.shootTile(b, sh, 10, 14), 'barriers, pillars, walls and fences cannot be shot');
-  reset(); put(10, 10, Tac.LOW, 0); sh.x = 30; check(Tac.objectTargets(b, sh).length === 0, 'objects out of weapon range are not targets');
+  reset(); put(10, 10, Tac.LOW, 'barrel'); sh.x = 30; check(Tac.objectTargets(b, sh).length === 0, 'objects out of weapon range are not targets');
   check(Tac.objectTargets(Tac.createTraining(g, g.soldiers.slice(0, 1)), pl[0]).length === 0, 'combat training has no object targets');
   // the AI shoots a barrel with 2 hostiles beside it, and leaves it alone when one of its own side is in the blast
   reset(); put(20, 10, Tac.LOW, 'barrel'); en[0].x = 21; en[0].y = 10; en[1].x = 20; en[1].y = 11; en[2].x = 36; en[2].y = 2; sh.x = 12;

@@ -98,6 +98,7 @@ XG.Gfx = (function () {
       if (pv && t !== PIT) propTile(c, B, b, x, y, pv, s.leds);
       else if (t === LOW) lowCover(c, B, b, x, y);
       else if (t === HIGH) highCover(c, B, b, x, y, s.leds);
+      if (pv !== 'barrel' && XG.Tac.objectAt(b, x, y)) breakMark(c, x, y); // barrels already look dangerous
     }
     for (y = 0; y < H; y++) for (x = 0; x < W; x++) if (propAt(b, x, y) === 'fence' && tileAt(b, x, y) === PIT) fenceTile(c, B, b, x, y);
     for (y = 0; y < H; y++) for (x = 0; x < W; x++) if (tileAt(b, x, y) === WALL) wallTile(c, B, b, x, y, s.leds);
@@ -496,6 +497,16 @@ XG.Gfx = (function () {
     if (!jl) edge(8, x0, wy, T, wh, false, false);
     if (!jr) edge(2, x1 - T, wy, T, wh, false, true);
     c.strokeStyle = 'rgba(0,0,0,.5)'; c.lineWidth = 1; c.strokeRect(x0 + .5, y0 + .5, w - 1, h - 1);
+  }
+  // Destructible (shootable) cover: a faint hairline fracture near the top corner, so it reads as breakable
+  // without competing with the cover art. Blast-proof barriers/pillars, walls and fences get none.
+  function breakMark(c, x, y) {
+    var px = x * TS, py = y * TS, i = y * 1000 + x, ox = px + TS - 13 - hash(i, 1, 120) * 4, oy = py + 6 + hash(i, 1, 121) * 3;
+    var path = function () { c.beginPath(); c.moveTo(ox, oy); c.lineTo(ox + 3, oy + 3); c.lineTo(ox + 2, oy + 6); c.lineTo(ox + 6, oy + 9); c.moveTo(ox + 3, oy + 3); c.lineTo(ox + 7, oy + 2); };
+    c.save(); c.lineCap = 'round';
+    c.strokeStyle = 'rgba(0,0,0,.45)'; c.lineWidth = 1.6; c.translate(.6, .6); path(); c.stroke();
+    c.strokeStyle = 'rgba(230,240,255,.42)'; c.lineWidth = .9; c.translate(-.6, -.6); path(); c.stroke();
+    c.restore();
   }
   // Damaged destructible objects (b.tileHp): cracks and a small HP bar over the baked terrain, drawn every frame (cheap: few tiles).
   function damaged(c, b) {

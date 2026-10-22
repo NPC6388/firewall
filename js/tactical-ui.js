@@ -23,6 +23,13 @@ XG.TacUI = (function () {
       reachCache: null, finished: false, lastLog: 0, dirty: true,
       cam: { x: 0, y: 0, z: 1 }, camGoal: null, camFit: true, keys: {}, mouse: null, drag: null
     };
+    // units start facing the other side (spawn points are random, so east/west defaults would look wrong)
+    if (!b.training) ['player', 'enemy'].forEach(function (sd) {
+      var mine = b.units.filter(function (u) { return u.alive && u.side === sd; }), foes = b.units.filter(function (u) { return u.alive && u.side !== sd; });
+      if (!mine.length || !foes.length) return;
+      var fx = foes.reduce(function (s, u) { return s + u.x; }, 0) / foes.length, fy = foes.reduce(function (s, u) { return s + u.y; }, 0) / foes.length;
+      mine.forEach(function (u) { st.face[u.id] = Math.atan2(fy - u.y, fx - u.x); });
+    });
     $('tac-log').innerHTML = '';
     syncLog();
     st.sel = firstReady();
@@ -101,7 +108,7 @@ XG.TacUI = (function () {
     $('tac-abort').onclick = function () {
       if (!canInput()) return;
       // Restart: start over from turn 1, same map, squad and enemies; nothing from this attempt counts
-      var RS = st.snap ? '<button id="ab-restart" title="Start over from turn 1: same map, squad and enemies. Nothing from this attempt counts.">Restart mission</button>' : '';
+      var RS = st.snap ? '<button id="ab-restart" title="Start over from turn 1: same map, squad and enemies, but both sides land on new spawn points. Nothing from this attempt counts.">Restart mission</button>' : '';
       XG.UI.modal(st.b.training ? '<h1>Leave the range?</h1><p>Training ends; nothing is lost.</p><div class="modal-actions"><button id="ab-no">Stay</button><button class="danger" id="ab-yes">Leave</button></div>' : lat() ? '<h1>Withdraw?</h1><p>Your units pull back into the network. The mission counts as lost.</p>' +
         '<div class="modal-actions"><button id="ab-no">Keep fighting</button>' + RS + '<button class="danger" id="ab-yes">Withdraw</button></div>' :
         '<h1>Abort mission?</h1><p>The squad extracts. The mission counts as a failure: regional infection rises and Convergence +2%.' +
@@ -309,7 +316,9 @@ XG.TacUI = (function () {
     var list = readyUnits();
     if (!list.length) return;
     var i = list.map(function (u) { return u.id; }).indexOf(st.sel);
-    select(list[(i + 1) % list.length].id);
+    var nu = list[(i + 1) % list.length];
+    select(nu.id);
+    centerOn(nu.x, nu.y); // Tab always brings the new unit to the middle of the screen
   }
   // While an ability is armed, Tab / Shift+Tab steps through its valid targets instead of squadmates.
   // Enemies are ordered best odds first (same as the auto-aim), allies nearest first.
@@ -335,11 +344,11 @@ XG.TacUI = (function () {
     var A = D.abilities[st.mode];
     if (A.target !== 'enemy' && A.target !== 'ally') return; // tile abilities: aim with the mouse
     var ts = Tac.targets(st.b, u, st.mode);
-    if (!ts.length && !(st.mode === 'shoot' && objTargets(u).length)) return;
+    if (!ts.length && !(st.mode === 'shoot' && objTargets(u).some(function (o) { return o.prop === 'barrel'; }))) return;
     ts.sort(A.target === 'enemy'
       ? function (a, c) { return hackedLast(a, c) || Tac.hitInfo(st.b, u, c).chance - Tac.hitInfo(st.b, u, a).chance || a.id - c.id; }
       : function (a, c) { return Tac.dist(u.x, u.y, a.x, a.y) - Tac.dist(u.x, u.y, c.x, c.y) || a.id - c.id; });
-    if (st.mode === 'shoot') ts = ts.concat(objTargets(u).slice().sort(function (a, c) { return Tac.hitInfo(st.b, u, c).chance - Tac.hitInfo(st.b, u, a).chance || a.y - c.y || a.x - c.x; })); // objects only after every unit
+    if (st.mode === 'shoot') ts = ts.concat(objTargets(u).filter(function (o) { return o.prop === 'barrel'; }).sort(function (a, c) { return Tac.hitInfo(st.b, u, c).chance - Tac.hitInfo(st.b, u, a).chance || a.y - c.y || a.x - c.x; })); // objects only after every unit
     var i = ts.map(function (t) { return t.id; }).indexOf(st.aim);
     st.aim = ts[(i + dir + ts.length) % ts.length].id;
     hud(); hoverPanel();
@@ -508,11 +517,12 @@ XG.TacUI = (function () {
     }
   }
 
-  // Restart the mission from turn 1: same map, squad and enemies. Nothing from the abandoned attempt counts.
+  // Restart the mission from turn 1: same map, squad and enemies, new spawn points. Nothing from the abandoned attempt counts.
   function restart() {
     if (!st || !st.snap) return;
     var nb = JSON.parse(st.snap);
     nb.rng = Object.assign(new XG.RNG(1), nb.rng);
+    Tac.redeploy(nb); // same map, units and HP; both squads land on new spots (also resets fog and sight caches)
     XG.UI.closeModal();
     startWith(st.g, nb, st.onDone, st.snap);
   }
@@ -681,9 +691,10 @@ XG.TacUI = (function () {
       var pn = XG.Gfx.propName(b, h.x, h.y);
       html = '<b>' + (pn || (t === Tac.PIT ? XG.Gfx.pitName(b) : ['Floor', 'Wall', 'Low cover', 'High cover'][t])) + '</b>' + (b.visible[h.y * W + h.x] ? '' : ' <span class="dim">(not in sight)</span>');
       var ob = explored(h.x, h.y) && Tac.objectAt(b, h.x, h.y);
-      if (ob) { // a destructible object: durability and the odds of shooting it
+      if (ob) { // a destructible object: durability; odds only for explosives (the only ones you can aim at)
         html += '<div>Durability <b>' + ob.hp + '/' + ob.maxHp + '</b>' + (ob.prop === 'barrel' ? ' <span class="warn">· explodes when destroyed</span>' : '') + '</div>';
-        if (u && u.abilities.indexOf('shoot') >= 0 && canInput()) {
+        if (ob.prop !== 'barrel') html += '<div class="dim">Breakable: missed shots at someone behind it can chip it, and blasts destroy it.</div>';
+        else if (u && u.abilities.indexOf('shoot') >= 0 && canInput()) {
           var oh = Tac.hitInfo(b, u, ob);
           html += oh.ok ? '<div>' + (u.short || u.name) + ': <b>' + oh.chance + '%</b> to hit it · ' + oh.d.toFixed(1) + ' tiles</div>' + breakdown(oh) : '<div class="dim">No line of fire from ' + (u.short || u.name) + '.</div>';
         }
@@ -975,8 +986,9 @@ XG.TacUI = (function () {
       });
       return;
     }
-    if (st.mode === 'shoot') objTargets(u).forEach(function (o) { // destructible objects in reach: a faint frame, the odds on the aimed or hovered one
+    if (st.mode === 'shoot') objTargets(u).forEach(function (o) { // explosives in reach get a pulsing frame; other objects only when hovered or aimed
       var c = center(o.x, o.y), aimed = st.aim === o.id, hov = st.hover && st.hover.x === o.x && st.hover.y === o.y;
+      if (o.prop !== 'barrel' && !aimed && !hov) return;
       ctx.strokeStyle = aimed ? '#ffd166' : o.prop === 'barrel' ? 'rgba(255,107,133,' + (.4 + pulse * .4) + ')' : 'rgba(255,209,102,.28)'; ctx.lineWidth = aimed ? 2.5 : 1.2;
       ctx.setLineDash([4, 4]); ctx.strokeRect(c[0] - 18, c[1] - 18, 36, 36); ctx.setLineDash([]);
       if (aimed || hov) {
