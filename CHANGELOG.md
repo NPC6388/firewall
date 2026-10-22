@@ -9,6 +9,8 @@ Steam release.
 ## Unreleased
 
 ### 2026-10-21
+- **XP:** a hostile your hacker has overridden and still controls when the battle ends earns the hacker the same XP as a
+  killing blow (it isn't added to their kill count).
 - **Help:** the Field manual explains how operatives earn XP and what each rank gives.
 - **Battle:** a slimmer bottom bar. Squad cards are half the size, abilities stay on one row, and the map no longer
   shrinks when you select a unit with more abilities.

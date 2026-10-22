@@ -308,7 +308,8 @@ XG.Strat = (function () {
     },
 
     // --------------------------------------------------------- results
-    // result: { outcome:'win'|'loss'|'abort', units:[{sid, hp, alive, kills}], salvage }
+    // result: { outcome:'win'|'loss'|'abort', units:[{sid, hp, alive, kills, held}], salvage }
+    // held: hostiles the unit hacked that were still ours at the end; each earns XP like a kill (not counted as a kill).
     // Credits a mission pays on success: its reward, but never below the minimum (the final mission ends the war instead).
     missionCredits: function (m) { return m.kind === 'uplink' ? 0 : Math.max(D.tuning.minMissionCredits || 0, (m.reward && m.reward.credits) || 0); },
     resolveMission: function (g, missionId, result) {
@@ -326,7 +327,7 @@ XG.Strat = (function () {
         }
         var rk = S.rankIndex(s);
         s.hp = Math.max(1, u.hp); s.missions++; s.kills += u.kills; s.hacks = (s.hacks || 0) + (u.hacks || 0);
-        s.xp += (result.outcome === 'win' ? 1 : 0) + u.kills;
+        s.xp += (result.outcome === 'win' ? 1 : 0) + u.kills + (u.held || 0);
         g.stats.kills += u.kills;
         if (S.rankIndex(s) > rk) out.promotions.push(s);
       });

@@ -222,6 +222,12 @@ function autoBattle(g, m, squad) {
   var r3 = Strat.spawnMission(g, S.rng(g), 'purge');
   Strat.resolveMission(g, r3.id, { outcome: 'loss', units: [{ sid: h3.sid, hp: 5, alive: true, kills: 0, hacks: 2 }] });
   check(S.stats(g, hs).hackSkill === base + 2, 'hack bonus persists after the mission (even on a loss)');
+  // a hacked hostile still ours when the battle ends is a killing blow's worth of XP for the hacker (not a kill)
+  var hr = Tac.result(b3).units.filter(function (u) { return u.sid === h3.sid; })[0];
+  check(hr.held === 1 && Tac.result(b3).units.every(function (u) { return u.sid === h3.sid || !u.held; }), 'held hack credited to the hacker only');
+  var xp0 = hs.xp, k0 = hs.kills, r4 = Strat.spawnMission(g, S.rng(g), 'purge');
+  Strat.resolveMission(g, r4.id, { outcome: 'loss', units: [hr] });
+  check(hs.xp === xp0 + 1 + hr.kills && hs.kills === k0 + hr.kills, 'held hack gives +1 XP without adding a kill');
   Tac.endPlayerTurn(b3); while (Tac.enemyStep(b3) !== null) { /* */ }
   Tac.endPlayerTurn(b3);
   check(!d3.alive, 'overridden drone is purged after 2 turns');

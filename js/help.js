@@ -81,7 +81,7 @@ XG.Help = (function () {
         '<p><b>LATTICE:</b> push Convergence to 100%. If Trace reaches 100% first, FIREWALL comes for the Uplink Core and you must hold it. Breach systems early, then hold your cells against FIREWALL raids and strike their safehouses.</p>' +
         '<p><b>In battle:</b> move to cover first, then shoot. Flank (green odds) for big crits. Put units that can\'t see anything on overwatch. Read the hit breakdown when you hover a target.</p>' +
         '<p><b>Between battles:</b> keep research running, build power before labs, and keep wounded operatives out of the next fight.</p>' +
-        '<p><b>Experience (FIREWALL):</b> operatives who come home earn XP. They get <b>+1 XP</b> for a won mission and <b>+1 XP</b> for every hostile they finish off, so the killing blow is what counts. Operatives killed in action keep nothing. Ranks: ' +
+        '<p><b>Experience (FIREWALL):</b> operatives who come home earn XP. They get <b>+1 XP</b> for a won mission and <b>+1 XP</b> for every hostile they finish off, so the killing blow is what counts. A hostile a hacker has overridden and still controls when the battle ends counts as a killing blow for the hacker. Operatives killed in action keep nothing. Ranks: ' +
         XG.DATA.ranks.map(function (r) { return r.name + ' ' + r.xp; }).join(' · ') + ' XP. Each promotion adds <b>+' + XG.DATA.rankBonus.aim + ' aim</b> and <b>+' + XG.DATA.rankBonus.hp + ' HP</b>.</p>' +
         '<p><b>Experience (LATTICE):</b> your forces don\'t gain XP. The FIREWALL squads you face come in at higher ranks as the days pass and Trace climbs, and each strike you win sets them back a step.</p>';
     }

@@ -1094,6 +1094,10 @@ XG.Tac = (function () {
     return ev;
   }
 
+  // Hostiles a unit hacked that are still under our control when the battle ends: each is worth a killing blow in XP.
+  function held(b, u) {
+    return b.units.filter(function (t) { return t.alive && t.override > 0 && t.side === u.side && t.origSide && t.origSide !== u.side && t.creditTo === u.id; }).length;
+  }
   function result(b) {
     return {
       outcome: b.outcome || 'abort',
@@ -1101,7 +1105,7 @@ XG.Tac = (function () {
       lattice: b.units.filter(function (u) { return u.deployed; }).map(function (u) { return { kind: u.kind, alive: u.alive }; }),
       humansKilled: b.units.filter(function (u) { return u.sid && !u.alive; }).length,
       units: b.units.filter(function (u) { return u.sid; }).map(function (u) {
-        return { sid: u.sid, hp: u.hp, alive: u.alive, kills: u.kills, hacks: u.hacks || 0, name: u.name };
+        return { sid: u.sid, hp: u.hp, alive: u.alive, kills: u.kills, hacks: u.hacks || 0, held: held(b, u), name: u.name };
       })
     };
   }
