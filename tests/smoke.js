@@ -233,6 +233,14 @@ function autoBattle(g, m, squad) {
   check(!d3.alive, 'overridden drone is purged after 2 turns');
 })();
 
+// in-game patch notes are generated from CHANGELOG.md; rerun tools/build-changelog.js after editing it
+(function () {
+  var cl = require(path.join(__dirname, '..', 'tools', 'build-changelog.js'));
+  check(fs.readFileSync(path.join(__dirname, '..', 'js', 'changelog.js'), 'utf8') === cl.build(), 'js/changelog.js matches CHANGELOG.md (run: node tools/build-changelog.js)');
+  var p = cl.parse(fs.readFileSync(path.join(__dirname, '..', 'CHANGELOG.md'), 'utf8'));
+  check(p.length && p[0].groups.length && p[0].groups[0].items.length, 'changelog parses into releases, dated groups and entries');
+})();
+
 // ---------------------------------------------------------------- battles
 var nb = +process.argv[2] || 60, tally = {};
 for (var i = 0; i < nb; i++) {

@@ -233,6 +233,10 @@ body.lattice { background: radial-gradient(ellipse at 80% -10%, rgba(255, 61, 24
 .title-util { display: flex; gap: 10px; justify-content: center; margin-top: 14px; }
 .title-util button { font-size: 12px; padding: 6px 12px; color: var(--dim); }
 .help-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+.notes { max-height: 55vh; overflow-y: auto; padding-right: 6px; scrollbar-color: var(--line-2) transparent; font-size: 12.5px; line-height: 1.5; }
+.notes h3 { margin: 4px 0 6px; color: #fff; }
+.notes-date { color: var(--cyan); font-size: 11px; letter-spacing: .15em; margin: 12px 0 4px; text-transform: uppercase; }
+.notes ul { margin: 0; padding-left: 18px; } .notes li { margin: 3px 0; } .notes li b { color: #fff; }
 .help-tabs button.on { border-color: var(--cyan); color: var(--cyan); }
 .gl-q { width: 100%; font-family: var(--mono); font-size: 14px; background: #070d16; color: var(--text); border: 1px solid var(--line-2); padding: 8px 10px; margin-bottom: 10px; }
 .gl-q:focus { outline: none; border-color: var(--cyan); }

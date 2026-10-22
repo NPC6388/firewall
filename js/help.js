@@ -74,8 +74,8 @@ XG.Help = (function () {
       body = '<input id="gl-q" class="gl-q" placeholder="Search terms…" autocomplete="off"><div id="gl-list" class="gl-list"></div>';
     } else if (tab === 'controls') {
       body = '<table>' + CONTROLS.map(function (c) { return '<tr><td><b>' + c[0] + '</b></td><td>' + c[1] + '</td></tr>'; }).join('') + '</table>';
-    } else if (tab === 'notes') { // placeholder: filled from CHANGELOG.md once the game nears its Steam release
-      body = '<p class="dim">Patch notes will appear here as FIREWALL gets closer to release.</p>';
+    } else if (tab === 'notes') { // from CHANGELOG.md via tools/build-changelog.js (js/changelog.js)
+      body = '<div class="notes">' + notes() + '</div>';
     } else {
       body = '<p><b>FIREWALL:</b> research your way to the Lattice uplink and sever it before Convergence hits 100%. Take missions as they appear; skipped ones and infected regions speed the clock up.</p>' +
         '<p><b>LATTICE:</b> push Convergence to 100%. If Trace reaches 100% first, FIREWALL comes for the Uplink Core and you must hold it. Breach systems early, then hold your cells against FIREWALL raids and strike their safehouses.</p>' +
@@ -97,6 +97,19 @@ XG.Help = (function () {
       };
       $('gl-q').oninput = draw; draw(); $('gl-q').focus();
     }
+  }
+
+  // Patch notes: each release (Unreleased shows as the latest build), its dated groups, then the entries.
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function niceDate(s) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s); return m ? +m[3] + ' ' + MONTHS[+m[2] - 1] + ' ' + m[1] : s; }
+  function notes() {
+    var log = XG.CHANGELOG || [];
+    if (!log.length) return '<p class="dim">No patch notes yet.</p>';
+    return log.map(function (r) {
+      return '<h3>' + (r.name === 'Unreleased' ? 'Latest build' : r.name) + '</h3>' + r.groups.map(function (gr) {
+        return (gr.name ? '<div class="notes-date">' + niceDate(gr.name) + '</div>' : '') + '<ul>' + gr.items.map(function (i) { return '<li>' + i + '</li>'; }).join('') + '</ul>';
+      }).join('');
+    }).join('');
   }
 
   function settings() {

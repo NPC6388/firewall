@@ -3,12 +3,13 @@
 All notable changes to FIREWALL, newest first. Add a line under **Unreleased** with every change you push; when a
 version is cut, rename that heading to the version and date. Write for players: what changed in the game, not how.
 
-The in-game **Help → Patch notes** tab is a placeholder for now. It gets filled from this file once the game nears its
-Steam release.
+The in-game **Help → Patch notes** tab shows everything from the first `##` heading down. After editing this file, run
+`node tools/build-changelog.js` to regenerate `js/changelog.js` (the smoke test fails if you forget).
 
 ## Unreleased
 
 ### 2026-10-21
+- **Help:** Patch notes are live. The Help menu now lists every change, newest first.
 - **XP:** a hostile your hacker has overridden and still controls when the battle ends earns the hacker the same XP as a
   killing blow (it isn't added to their kill count).
 - **Help:** the Field manual explains how operatives earn XP and what each rank gives.
@@ -16,7 +17,6 @@ Steam release.
   shrinks when you select a unit with more abilities.
 - **Comms:** HALCYON grows more afraid and the Lattice more smug as Convergence climbs toward 100%, and both swing
   back when it falls. In the Lattice campaign, a high Trace takes the edge off the Lattice's smugness.
-- **Help:** a Patch notes tab next to Field manual (a placeholder until the game nears release).
 - **Maps:** five battle map layouts (compound, street, container yard, plaza, dense blocks) instead of one.
 - **Maps:** 0–2 impassable features per map (sinkhole, Lattice chasm, coolant breach or null sector, by biome). Nothing
   crosses them, but they give no cover and don't block line of sight.

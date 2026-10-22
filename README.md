@@ -65,6 +65,7 @@ Hover a tile to see its cover (shield icons: filled = full, half-filled = half; 
 | `js/ui.js` | FIREWALL strategy screens, modals, story player |
 | `js/lattice-ui.js` | LATTICE strategy screens (magenta theme), squad picker, results |
 | `js/main.js` | Boot and click-action router |
+| `tools/build-changelog.js` | Regenerates `js/changelog.js` (in-game Help → Patch notes) from `CHANGELOG.md`; run after editing the changelog |
 | `tools/map-sampler.js` | `node tools/map-sampler.js [maps]`: ASCII sample of each map layout plus cover/pit/open-floor stats |
 | `tests/smoke.js` | Headless test: rule checks, AI-vs-AI battles, auto-played campaigns |
 | `tests/browser/` | Headless-Edge driver (`drive.mjs`) plus scripted UI runs; screenshots go to `tests/browser/shots/` |
