@@ -7,6 +7,7 @@ XG.CHANGELOG = [
    {
     "name": "2026-10-22",
     "items": [
+     "<b>Lattice campaign:</b> your machines now keep pace with FIREWALL's veterans. They deploy at a mark (Mk I to Mk VI) matching the rank of the squad they face, with +1 HP per mark, so late-game drones are no longer paper.",
      "<b>Lattice:</b> veteran squads draw more attention. Once the squad you deploy averages Sergeant or better, each mission has one extra Swarm Drone.",
      "<b>Battle:</b> Hunker all (H). Every unit with AP left hunkers down and the turn ends, after a confirm, like Overwatch all.",
      "<b>Battle:</b> the combat log now shows how many hostiles are still alive out of all you have discovered (e.g. 2/5)."

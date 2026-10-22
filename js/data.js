@@ -38,6 +38,9 @@ XG.DATA = {
     { name: 'Sergeant', xp: 9 }, { name: 'Lieutenant', xp: 14 }, { name: 'Captain', xp: 20 }
   ],
   rankBonus: { aim: 4, hp: 1 },
+  // Lattice campaign: your machines deploy at the mark that matches the FIREWALL squad's level (Lat.earthLevel).
+  latticeMarks: ['Mk I', 'Mk II', 'Mk III', 'Mk IV', 'Mk V', 'Mk VI'],
+  markBonus: { aim: 0, hp: 1 }, // +aim per mark pushed bot Lattice campaigns to 85% wins; HP alone evens the late battles
 
   abilities: {
     shoot:     { name: 'Shoot',        key: '1', target: 'enemy', ends: true,  desc: 'Fire your weapon. Ends turn.' },

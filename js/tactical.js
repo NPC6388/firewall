@@ -270,10 +270,10 @@ XG.Tac = (function () {
 
   // -------------------------------------------------------------- units
   function makeEnemy(b, type, x, y) {
-    var E = D.enemies[type];
+    var E = D.enemies[type], mk = E.static ? 0 : b.mark || 0, hp = E.hp + mk * D.markBonus.hp;
     var u = {
-      id: b.nextId++, side: 'enemy', kind: type, name: E.name, glyph: E.glyph, color: E.color, x: x, y: y,
-      hp: E.hp, maxHp: E.hp, armor: E.armor, aim: E.aim + (b.mission.diff - 1) * 2, mobility: E.mobility,
+      id: b.nextId++, side: 'enemy', kind: type, name: E.name + (mk ? ' ' + D.latticeMarks[mk] : ''), glyph: E.glyph, color: E.color, x: x, y: y, mark: mk,
+      hp: hp, maxHp: hp, armor: E.armor, aim: E.aim + (b.mission.diff - 1) * 2 + mk * D.markBonus.aim, mobility: E.mobility,
       dmg: E.dmg.slice(), range: E.range, close: 10, crit: 5, defense: E.defense, machine: !!E.machine,
       hackDef: E.hackDef, special: E.special || null, isStatic: !!E.static, spawn: E.spawn || null, spawned: 0,
       abilities: E.static ? [] : (E.abilities || ['shoot']).slice(), charges: {}, cooldowns: {}, ap: 0, overwatch: false, hunker: false,
@@ -435,7 +435,7 @@ XG.Tac = (function () {
       W: W, H: H, tiles: null, units: [], nextId: 1, turn: 1, side: 'player', human: 'enemy', rng: rng,
       mission: { kind: mission.kind === 'uplink' ? 'uplink' : 'purge', lkind: mission.kind, diff: 1, name: mission.name, city: mission.city, site: mission.site },
       grammar: false, emp: !!earth.g.flags.emp, overclock: 0, visible: null, scans: [], sever: 0, outcome: null, salvage: 0, log: [],
-      enemyQueue: [], aiQueue: [], turnLimit: mission.kind === 'raid' ? 10 : mission.kind === 'uplink' ? 0 : 25, spikeBonus: mods.spikeBonus || 0
+      enemyQueue: [], aiQueue: [], mark: Math.min(D.latticeMarks.length - 1, earth.level || 0), turnLimit: mission.kind === 'raid' ? 10 : mission.kind === 'uplink' ? 0 : 25, spikeBonus: mods.spikeBonus || 0
     };
     genMap(b, rng);
     var mid = H >> 1, left = [[1, mid], [1, mid - 1], [1, mid + 1], [0, mid - 2], [0, mid + 2], [2, mid], [0, mid], [2, mid - 2]];
@@ -446,7 +446,7 @@ XG.Tac = (function () {
     var addLat = function (type, p) {
       var e = makeEnemy(b, type, p[0], p[1]);
       count[type] = (count[type] || 0) + 1;
-      e.alerted = true; e.deployed = true; e.short = e.name.split(' ').pop() + ' ' + count[type];
+      e.alerted = true; e.deployed = true; e.short = D.enemies[type].name.split(' ').pop() + ' ' + count[type];
       if (!strike) e.overwatch = true; // defenders are dug in when FIREWALL arrives
       if (mods.swarm && type === 'drone') { e.hp++; e.maxHp++; e.aim += 5; }
       if (mods.detonate && type === 'drone') e.abilities.push('detonate');

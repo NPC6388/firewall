@@ -9,6 +9,8 @@ The in-game **Help → Patch notes** tab shows everything from the first `##` he
 ## Unreleased
 
 ### 2026-10-22
+- **Lattice campaign:** your machines now keep pace with FIREWALL's veterans. They deploy at a mark (Mk I to Mk VI)
+  matching the rank of the squad they face, with +1 HP per mark, so late-game drones are no longer paper.
 - **Lattice:** veteran squads draw more attention. Once the squad you deploy averages Sergeant or better, each mission
   has one extra Swarm Drone.
 - **Battle:** Hunker all (H). Every unit with AP left hunkers down and the turn ends, after a confirm, like Overwatch all.

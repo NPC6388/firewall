@@ -457,7 +457,7 @@ XG.TacUI = (function () {
     if (u.override) st2.push('<span class="good">Override: ' + u.override + ' turn(s) left</span>');
     var cds = Object.keys(u.cooldowns).filter(function (k) { return u.cooldowns[k] > 0; }).map(function (k) { return D.abilities[k] ? D.abilities[k].name + ' ' + u.cooldowns[k] : ''; });
     $('tac-info').innerHTML = '<h3 style="color:' + u.color + '">' + (u.deployed ? u.short : u.name) + '</h3>' +
-      ((D.classes[u.kind] || u.origSide || u.short) ? '<div class="dim">' + (u.rank ? u.rank + ' ' : '') + (D.classes[u.kind] ? D.classes[u.kind].name : D.enemies[u.kind].name + (u.origSide ? ' (hijacked)' : '')) + '</div>' : '') +
+      ((D.classes[u.kind] || u.origSide || u.short) ? '<div class="dim">' + (u.rank ? u.rank + ' ' : '') + (D.classes[u.kind] ? D.classes[u.kind].name : D.enemies[u.kind].name + (u.mark ? ' ' + D.latticeMarks[u.mark] : '') + (u.origSide ? ' (hijacked)' : '')) + '</div>' : '') +
       '<div>HP ' + u.hp + '/' + u.maxHp + (u.armor ? ' · armor ' + u.armor : '') + ' · AP ' + u.ap + '</div>' +
       '<div>Aim ' + u.aim + ' · move ' + u.mobility + ' · dmg ' + u.dmg[0] + '–' + u.dmg[1] + (u.hackSkill ? ' · hack ' + u.hackSkill : '') + '</div>' +
       (u.abilities.indexOf('grenade') >= 0 || u.abilities.indexOf('medkit') >= 0 ? '<div class="dim">' + (u.abilities.indexOf('grenade') >= 0 ? 'Grenades ' + u.charges.grenade + ' ' : '') + (u.abilities.indexOf('medkit') >= 0 ? 'Medkits ' + u.charges.medkit : '') + '</div>' : '') +

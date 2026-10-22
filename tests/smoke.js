@@ -252,6 +252,19 @@ function autoBattle(g, m, squad) {
   sq.forEach(function (s) { s.xp = 0; });
 })();
 
+// Lattice campaign: your machines deploy at the mark matching the FIREWALL squad's level; structures never upgrade.
+(function () {
+  var D = XG.DATA, g = XG.Lat.newGame(31); g.day = 60; g.trace = 80;
+  var m = XG.Lat.spawnMission(g, S.rng(g), 'uplink'), es = XG.Lat.earthSquad(g, m);
+  var b = Tac.createLattice(m, ['drone'], es, {});
+  var dr = b.units.filter(function (u) { return u.kind === 'drone'; })[0], core = b.units.filter(function (u) { return u.kind === 'core'; })[0];
+  check(es.level > 0 && dr.mark === es.level && dr.maxHp === D.enemies.drone.hp + es.level * D.markBonus.hp && dr.name.indexOf(D.latticeMarks[es.level]) > 0,
+    'Lattice drone is upgraded to the FIREWALL squad level (' + es.level + ')');
+  check(core && core.maxHp === D.enemies.core.hp, 'Uplink Core does not upgrade');
+  var b2 = Tac.create(S.newGame(31), { kind: 'purge', diff: 1, name: 't', city: 't', site: 'city', seed: 3 }, S.newGame(31).soldiers.slice(0, 4));
+  check(b2.units.every(function (u) { return u.side !== 'enemy' || !u.mark; }), 'FIREWALL campaign enemies have no marks');
+})();
+
 // ---------------------------------------------------------------- battles
 var nb = +process.argv[2] || 60, tally = {};
 for (var i = 0; i < nb; i++) {
