@@ -478,11 +478,12 @@ XG.Tac = (function () {
       groupSpots(b, cand, earth.squad.length).forEach(function (p, i) { makeDefender(b, earth.g, earth.squad[i], p[0], p[1]); });
     } else {
       earth.squad.forEach(function (s, i) { makeDefender(b, earth.g, s, left[i][0], left[i][1]); });
-      if (mission.kind === 'uplink') placeStatic(b, 'core', cand, W - Math.round(5 * kx));
-      // dug in: pod centers and members on tiles with cover toward the FIREWALL deployment edge, well back from it
+      var core = mission.kind === 'uplink' ? placeStatic(b, 'core', cand, W - Math.round(5 * kx)) : null;
+      // dug in: one tight 3x3 block on tiles with cover toward the FIREWALL deployment edge, well back from it
       var dug = function (x, y) { return x >= Math.round(12 * kx) && coverValue(b, x, y, 1, mid) > 0; };
       var dcand = cand.filter(function (p) { return dug(p[0], p[1]); }).concat(cand.filter(function (p) { return !dug(p[0], p[1]); }));
-      groupSpots(b, dcand, types.length, dug).forEach(function (p, i) { addLat(types[i], p); });
+      var spots = blockSpots(b, dcand.filter(function (p) { return p[0] >= Math.round(12 * kx); }), types.length, dug, core) || groupSpots(b, dcand, types.length, dug);
+      spots.forEach(function (p, i) { addLat(types[i], p); });
       b.approach = true; // FIREWALL's first turn is the approach: it moves in but holds fire
     }
     if (strike) {
@@ -504,6 +505,24 @@ XG.Tac = (function () {
     var mid = H >> 1, out = [[1, mid], [1, mid - 1], [1, mid + 1], [2, mid], [0, mid], [2, mid - 1], [2, mid + 1], [0, mid - 1], [0, mid + 1]];
     [0, 1, 2].forEach(function (x) { out.push([x, mid - 2], [x, mid + 2]); });
     return out;
+  }
+  // Your units deploy together: the 3x3 block (centred on a candidate) with room for all n and the most `pref` tiles,
+  // closest to `near` (the core) on ties. Spots come back pref first. Null if no block fits n (then use groupSpots).
+  function blockSpots(b, cand, n, pref, near) {
+    if (n > 9) return null;
+    var best = null, bestScore = -1e9;
+    cand.forEach(function (c) {
+      var cells = [];
+      for (var dy = -1; dy <= 1; dy++) for (var dx = -1; dx <= 1; dx++) {
+        var x = c[0] + dx, y = c[1] + dy;
+        if (free(b, x, y) && b.reachable[y * b.W + x]) cells.push([x, y, pref && pref(x, y) ? 1 : 0]);
+      }
+      if (cells.length < n) return;
+      cells.sort(function (p, q) { return q[2] - p[2] || cheb(p[0], p[1], c[0], c[1]) - cheb(q[0], q[1], c[0], c[1]); });
+      var got = cells.slice(0, n), score = got.reduce(function (s, p) { return s + p[2]; }, 0) * 10 - (near ? dist(c[0], c[1], near.x, near.y) : 0);
+      if (score > bestScore) { bestScore = score; best = got; }
+    });
+    return best && best.map(function (p) { return [p[0], p[1]]; });
   }
   // Positions for n units in pods of up to 3, pod centers spread apart, all on reachable floor.
   function groupSpots(b, cand, n, pref) {

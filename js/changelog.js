@@ -12,6 +12,7 @@ XG.CHANGELOG = [
      "<b>Battle:</b> new mouse controls. Right-click a tile to move there; drag with the left button to pan the map. A left click still selects units and aims, and right-click cancels an armed ability.",
      "<b>Battle:</b> fog of war hides the map until you discover it. Ground nobody has seen is blank; ground you have seen but can no longer see stays dimmed.",
      "<b>Battle:</b> your squad deploys together again, packed into a 3x3 block on the west edge.",
+     "<b>Lattice campaign:</b> in raids and uplink defences your machines also start together in one 3x3 block, dug in behind cover facing FIREWALL (next to the core when defending it), instead of in scattered pods.",
      "<b>Battle:</b> range now matters on every shot. There is no penalty next to the target, and it grows evenly to -30% at the weapon's max range (it used to start only past 10 tiles). Shots still cap at 95%, and flanked targets still add +25% crit chance, rolled only when the shot hits.",
      "<b>Battle:</b> maps are three times bigger (38x28 tiles) with more buildings, cover and terrain to fight through. The view scrolls: arrow keys, the map edge or a left-drag pan, the wheel zooms, C centres on your unit, and the camera follows the action. Mission timers are unchanged; combat training keeps its small range.",
      "<b>Lattice campaign:</b> when FIREWALL raids your cell, your units start dug in behind cover facing the attackers, and FIREWALL spends its first turn moving in without firing, so the first shots are yours or your overwatch's.",

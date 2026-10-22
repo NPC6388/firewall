@@ -128,6 +128,15 @@ function autoBattle(g, m, squad) {
     var sq = bd.units.filter(function (u) { return u.side === 'player' && !u.isStatic; });
     check(sq.every(function (u) { return u.x <= 2 && Math.abs(u.y - mid) <= 1 && Tac.tile(bd, u.x, u.y) === Tac.FLOOR; }), 'squad deploys inside the 3x3 block (seed ' + sd + ')');
   });
+  // Lattice campaign: your machines deploy packed in one 3x3 block in every mission kind
+  ['raid', 'strike', 'breach', 'uplink'].forEach(function (kd) {
+    for (var sd = 0; sd < 5; sd++) {
+      var lg = XG.Lat.newGame(90 + sd); lg.day = 10 + sd * 9;
+      var lm = XG.Lat.spawnMission(lg, S.rng(lg), kd), bl = Tac.createLattice(lm, ['warden', 'drone', 'drone', 'harmonic'], XG.Lat.earthSquad(lg, lm), {});
+      var mine = bl.units.filter(function (u) { return u.side === 'enemy' && !u.isStatic; }), xs = mine.map(function (u) { return u.x; }), ys = mine.map(function (u) { return u.y; });
+      check(Math.max.apply(null, xs) - Math.min.apply(null, xs) <= 2 && Math.max.apply(null, ys) - Math.min.apply(null, ys) <= 2, 'Lattice ' + kd + ' deploys in a 3x3 block (seed ' + sd + ')');
+    }
+  });
   // fog memory: unexplored tiles stay blank; anything once seen stays explored after the squad moves on
   var bf = Tac.create(g, Object.assign({}, m, { kind: 'purge', diff: 1, seed: 7 }), g.soldiers.slice(0, 4));
   var seen0 = bf.visible.slice(), sq = bf.units.filter(function (u) { return u.side === 'player'; });

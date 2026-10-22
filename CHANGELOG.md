@@ -17,6 +17,8 @@ The in-game **Help → Patch notes** tab shows everything from the first `##` he
 - **Battle:** fog of war hides the map until you discover it. Ground nobody has seen is blank; ground you have seen
   but can no longer see stays dimmed.
 - **Battle:** your squad deploys together again, packed into a 3x3 block on the west edge.
+- **Lattice campaign:** in raids and uplink defences your machines also start together in one 3x3 block, dug in behind
+  cover facing FIREWALL (next to the core when defending it), instead of in scattered pods.
 - **Battle:** range now matters on every shot. There is no penalty next to the target, and it grows evenly to -30% at
   the weapon's max range (it used to start only past 10 tiles). Shots still cap at 95%, and flanked targets still add
   +25% crit chance, rolled only when the shot hits.
