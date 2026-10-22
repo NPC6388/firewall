@@ -9,6 +9,8 @@ Steam release.
 ## Unreleased
 
 ### 2026-10-21
+- **Battle:** a slimmer bottom bar. Squad cards are half the size, abilities stay on one row, and the map no longer
+  shrinks when you select a unit with more abilities.
 - **Comms:** HALCYON grows more afraid and the Lattice more smug as Convergence climbs toward 100%, and both swing
   back when it falls. In the Lattice campaign, a high Trace takes the edge off the Lattice's smugness.
 - **Help:** a Patch notes tab next to Field manual (a placeholder until the game nears release).

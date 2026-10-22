@@ -47,6 +47,7 @@ XG.TacUI = (function () {
     cv.addEventListener('click', function (e) { click(tileFromEvent(e)); });
     cv.addEventListener('contextmenu', function (e) { e.preventDefault(); cancel(); });
     window.addEventListener('resize', function () { if (st) resize(); });
+    if (typeof ResizeObserver === 'function') new ResizeObserver(function () { if (st) resize(); }).observe(document.querySelector('.tac-bar')); // e.g. the squad wraps
     document.addEventListener('keydown', function (e) {
       if (!st || $('screen-tactical').classList.contains('hidden') || XG.UI.isModal()) return;
       if (e.key === 'Escape') cancel();
@@ -83,7 +84,9 @@ XG.TacUI = (function () {
     dpr = window.devicePixelRatio || 1;
     cv.width = W * TS * dpr; cv.height = H * TS * dpr;
     var wrap = cv.parentElement, aw = wrap.clientWidth - 16;
-    var ah = window.innerWidth <= 980 ? 1e9 : window.innerHeight - $('tac-top').offsetHeight - document.querySelector('.tac-bar').offsetHeight - 20;
+    var barH = document.querySelector('.tac-bar').offsetHeight;
+    document.documentElement.style.setProperty('--bar-h', barH + 'px'); // the comms card sits just above the bar
+    var ah = window.innerWidth <= 980 ? 1e9 : window.innerHeight - $('tac-top').offsetHeight - barH - 20;
     var sc = Math.min(aw / (W * TS), ah / (H * TS));
     cv.style.width = Math.floor(W * TS * sc) + 'px'; cv.style.height = Math.floor(H * TS * sc) + 'px';
   }
@@ -401,7 +404,7 @@ XG.TacUI = (function () {
       var name = id === 'grenade' && b.emp ? 'EMP Grenade' : A.short || A.name; // short label keeps the bar on one row
       ab += '<button data-ab="' + id + '" class="' + (st.mode === id ? 'on' : '') + '"' + (why || !canInput() ? ' disabled' : '') + ' title="' + A.name + ': ' + A.desc + (why ? ' — ' + why : '') + '"><span class="key">' + (i + 1) + '</span>' + name + extra + '</button>';
     });
-    if (st.mode) ab += '<span class="dim">' + modeHint() + '</span>';
+    if (st.mode) ab += '<span class="dim ab-hint">' + modeHint() + '</span>';
     $('tac-abilities').innerHTML = ab;
     $('tac-abilities').querySelectorAll('[data-ab]').forEach(function (el) { el.onclick = function () { pickAbility(el.getAttribute('data-ab')); }; });
 
