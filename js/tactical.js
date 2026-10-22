@@ -459,7 +459,11 @@ XG.Tac = (function () {
     } else {
       earth.squad.forEach(function (s, i) { makeDefender(b, earth.g, s, left[i][0], left[i][1]); });
       if (mission.kind === 'uplink') placeStatic(b, 'core', cand, W - 5);
-      groupSpots(b, cand, types.length).forEach(function (p, i) { addLat(types[i], p); });
+      // dug in: pod centers and members on tiles with cover toward the FIREWALL deployment edge, well back from it
+      var dug = function (x, y) { return x >= 12 && coverValue(b, x, y, 1, mid) > 0; };
+      var dcand = cand.filter(function (p) { return dug(p[0], p[1]); }).concat(cand.filter(function (p) { return !dug(p[0], p[1]); }));
+      groupSpots(b, dcand, types.length, dug).forEach(function (p, i) { addLat(types[i], p); });
+      b.approach = true; // FIREWALL's first turn is the approach: it moves in but holds fire
     }
     if (strike) {
       b.side = 'enemy';
@@ -475,7 +479,7 @@ XG.Tac = (function () {
     return b;
   }
   // Positions for n units in pods of up to 3, pod centers spread apart, all on reachable floor.
-  function groupSpots(b, cand, n) {
+  function groupSpots(b, cand, n, pref) {
     var out = [], centers = [];
     while (out.length < n) {
       var size = Math.min(3, n - out.length), c = null;
@@ -488,7 +492,7 @@ XG.Tac = (function () {
       centers.push(c);
       var taken = [];
       for (var k = 0; k < size; k++) {
-        var spot = nearestFreeExcept(b, c[0], c[1], 3, out.concat(taken));
+        var spot = nearestFreeExcept(b, c[0], c[1], 3, out.concat(taken), pref);
         if (!spot) break;
         taken.push(spot);
       }
@@ -497,12 +501,12 @@ XG.Tac = (function () {
     }
     return out;
   }
-  function nearestFreeExcept(b, x, y, r, used) {
+  function nearestFreeExcept(b, x, y, r, used, pref) {
     var best = null, bd = 1e9;
     for (var yy = y - r; yy <= y + r; yy++) for (var xx = x - r; xx <= x + r; xx++) {
       if (!free(b, xx, yy) || !b.reachable[yy * W + xx]) continue;
       if (used.some(function (p) { return p[0] === xx && p[1] === yy; })) continue;
-      var d = dist(x, y, xx, yy) + b.rng.next() * 0.3;
+      var d = dist(x, y, xx, yy) + b.rng.next() * 0.3 + (pref && !pref(xx, yy) ? 5 : 0); // pref: tiles failing it count as 5 further
       if (d < bd) { bd = d; best = [xx, yy]; }
     }
     return best;
@@ -999,6 +1003,11 @@ XG.Tac = (function () {
     }
     if (u.side === 'enemy' && !u.alerted) return patrol(b, u);
     var guard = 0;
+    if (b.approach && b.turn === 1 && u.side !== b.human) { // arriving at a dug-in Lattice cell: move up, hold fire
+      var to = foesOf(b, u).length && bestTile(b, u, foesOf(b, u));
+      if (to) Array.prototype.push.apply(ev, doMove(b, u, to[0], to[1]) || []);
+      u.ap = 0; return ev;
+    }
     while (u.ap > 0 && u.alive && !b.outcome && guard++ < 4) {
       var foes = foesOf(b, u);
       if (!foes.length) break;

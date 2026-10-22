@@ -265,6 +265,20 @@ function autoBattle(g, m, squad) {
   check(b2.units.every(function (u) { return u.side !== 'enemy' || !u.mark; }), 'FIREWALL campaign enemies have no marks');
 })();
 
+// Raids: your Lattice units start dug in behind cover facing FIREWALL, and FIREWALL's first turn holds fire.
+(function () {
+  var shots = 0, units = 0, covered = 0;
+  for (var i = 0; i < 6; i++) {
+    var g = XG.Lat.newGame(500 + i); g.day = 30; g.trace = 50;
+    var m = XG.Lat.spawnMission(g, S.rng(g), 'raid'), b = Tac.createLattice(m, ['warden', 'drone', 'drone', 'harmonic'], XG.Lat.earthSquad(g, m), {});
+    b.units.forEach(function (u) { if (u.side === 'enemy') { units++; if (Tac.coverValue(b, u.x, u.y, 1, Tac.H >> 1) > 0) covered++; } });
+    for (var k = 0; k < 50 && b.side !== b.human && !b.outcome; k++)
+      Tac.aiStep(b).forEach(function (e) { if (e.t === 'shot' && Tac.unitById(b, e.from).side === 'player') shots++; });
+  }
+  check(shots === 0, 'FIREWALL holds fire on the approach turn of a raid (' + shots + ' shots)');
+  check(covered >= units * 0.8, 'raid defenders start in cover facing FIREWALL (' + covered + '/' + units + ')');
+})();
+
 // ---------------------------------------------------------------- battles
 var nb = +process.argv[2] || 60, tally = {};
 for (var i = 0; i < nb; i++) {

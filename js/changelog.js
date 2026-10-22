@@ -7,6 +7,8 @@ XG.CHANGELOG = [
    {
     "name": "2026-10-22",
     "items": [
+     "<b>Lattice campaign:</b> when FIREWALL raids your cell, your units start dug in behind cover facing the attackers, and FIREWALL spends its first turn moving in without firing, so the first shots are yours or your overwatch's.",
+     "<b>Lattice:</b> longer weapon range. Swarm Drones reach 12 tiles (was 10), Warden Mechs and Harmonics 13 (was 12), level with the FIREWALL assault rifle.",
      "<b>Lattice campaign:</b> your machines now keep pace with FIREWALL's veterans. They deploy at a mark (Mk I to Mk VI) matching the rank of the squad they face, with +1 HP per mark, so late-game drones are no longer paper.",
      "<b>Lattice:</b> veteran squads draw more attention. Once the squad you deploy averages Sergeant or better, each mission has one extra Swarm Drone.",
      "<b>Battle:</b> Hunker all (H). Every unit with AP left hunkers down and the turn ends, after a confirm, like Overwatch all.",

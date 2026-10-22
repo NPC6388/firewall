@@ -58,11 +58,11 @@ XG.DATA = {
 
   // -------------------------------------------------------------- enemies
   enemies: {
-    drone:    { name: 'Swarm Drone',   glyph: '◆', color: '#ff4d6d', hp: 4,  armor: 0, aim: 58, mobility: 7, dmg: [2, 3], range: 10, defense: 10, machine: true, hackDef: 0,  xp: 1, abilities: ['shoot', 'overwatch', 'hunker'],
+    drone:    { name: 'Swarm Drone',   glyph: '◆', color: '#ff4d6d', hp: 4,  armor: 0, aim: 58, mobility: 7, dmg: [2, 3], range: 12, defense: 10, machine: true, hackDef: 0,  xp: 1, abilities: ['shoot', 'overwatch', 'hunker'],
                 blurb: 'Consumer drones running Lattice code. Fast, fragile, everywhere.' },
-    warden:   { name: 'Warden Mech',   glyph: '▣', color: '#ff7b3a', hp: 10, armor: 1, aim: 60, mobility: 4, dmg: [3, 5], range: 12, defense: 0,  machine: true, hackDef: 25, xp: 2, abilities: ['shoot', 'overwatch', 'hunker'],
+    warden:   { name: 'Warden Mech',   glyph: '▣', color: '#ff7b3a', hp: 10, armor: 1, aim: 60, mobility: 4, dmg: [3, 5], range: 13, defense: 0,  machine: true, hackDef: 25, xp: 2, abilities: ['shoot', 'overwatch', 'hunker'],
                 blurb: 'Hijacked security robot. Slow, armored, hits hard.' },
-    harmonic: { name: 'Harmonic',      glyph: '✶', color: '#ff3df2', hp: 7,  armor: 0, aim: 70, mobility: 6, dmg: [3, 4], range: 12, defense: 10, machine: true, hackDef: null, xp: 3, special: 'spike', abilities: ['shoot', 'spike', 'overwatch', 'hunker'],
+    harmonic: { name: 'Harmonic',      glyph: '✶', color: '#ff3df2', hp: 7,  armor: 0, aim: 70, mobility: 6, dmg: [3, 4], range: 13, defense: 10, machine: true, hackDef: null, xp: 3, special: 'spike', abilities: ['shoot', 'spike', 'overwatch', 'hunker'],
                 blurb: 'Hard-light avatar of the Lattice. Its Data Spike ignores cover. Cannot be hacked.' },
     relay:    { name: 'Lattice Relay', glyph: '⌬', color: '#ff2a55', hp: 12, armor: 1, aim: 0,  mobility: 0, dmg: [0, 0], range: 0,  defense: 0,  machine: true, hackDef: null, xp: 3, static: true,
                 spawn: { type: 'drone', every: 2, max: 3 }, blurb: 'Signal relay. Spawns drones until destroyed.' },
