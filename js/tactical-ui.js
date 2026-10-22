@@ -269,6 +269,9 @@ XG.TacUI = (function () {
       if (A.target === 'enemy') {
         if (at && Tac.targets(b, u, st.mode).indexOf(at) >= 0) {
           if (st.aim === at.id) run(st.mode, at); else { st.aim = at.id; hoverPanel(); }
+        } else if (!at && st.mode === 'shoot' && objTarget(u, t.x, t.y)) { // a destructible tile: aim, then fire
+          var ot = Tac.objectAt(b, t.x, t.y);
+          if (st.aim === ot.id) runObject(ot); else { st.aim = ot.id; hud(); hoverPanel(); }
         } else cancel();
         return;
       }
@@ -311,16 +314,32 @@ XG.TacUI = (function () {
   // While an ability is armed, Tab / Shift+Tab steps through its valid targets instead of squadmates.
   // Enemies are ordered best odds first (same as the auto-aim), allies nearest first.
   // Your own hacked machines are valid Shoot targets but always sort after real hostiles.
+  // Destructible objects the selected unit can shoot (cached per tile, turn and log length; the list is a line-of-sight scan).
+  function objTargets(u) {
+    var b = st.b, key = [u.id, u.x, u.y, b.turn, b.log.length, u.ap].join(',');
+    if (!st.objCache || st.objCache.key !== key) st.objCache = { key: key, list: Tac.objectTargets(b, u) };
+    return st.objCache.list;
+  }
+  function objTarget(u, x, y) { return objTargets(u).filter(function (o) { return o.x === x && o.y === y; })[0] || null; }
+  function aimObject() { return st.aim && st.b ? Tac.objectById(st.b, st.aim) : null; }
+  function runObject(o) {
+    var u = selUnit(); if (!u || !canInput()) return;
+    var ev = Tac.act.shootTile(st.b, u, o.x, o.y);
+    st.mode = null; st.aim = null; st.objCache = null;
+    if (ev) enqueue(ev);
+    hud();
+  }
   function hackedLast(a, c) { return (a.side === HS() ? 1 : 0) - (c.side === HS() ? 1 : 0); }
   function cycleTarget(dir) {
     var u = selUnit(); if (!canInput() || !u || !st.mode) return;
     var A = D.abilities[st.mode];
     if (A.target !== 'enemy' && A.target !== 'ally') return; // tile abilities: aim with the mouse
     var ts = Tac.targets(st.b, u, st.mode);
-    if (!ts.length) return;
+    if (!ts.length && !(st.mode === 'shoot' && objTargets(u).length)) return;
     ts.sort(A.target === 'enemy'
       ? function (a, c) { return hackedLast(a, c) || Tac.hitInfo(st.b, u, c).chance - Tac.hitInfo(st.b, u, a).chance || a.id - c.id; }
       : function (a, c) { return Tac.dist(u.x, u.y, a.x, a.y) - Tac.dist(u.x, u.y, c.x, c.y) || a.id - c.id; });
+    if (st.mode === 'shoot') ts = ts.concat(objTargets(u).slice().sort(function (a, c) { return Tac.hitInfo(st.b, u, c).chance - Tac.hitInfo(st.b, u, a).chance || a.y - c.y || a.x - c.x; })); // objects only after every unit
     var i = ts.map(function (t) { return t.id; }).indexOf(st.aim);
     st.aim = ts[(i + dir + ts.length) % ts.length].id;
     hud(); hoverPanel();
@@ -348,6 +367,8 @@ XG.TacUI = (function () {
     if (A.target === 'enemy') {
       var t = st.aim && Tac.unitById(b, st.aim);
       if (t && Tac.targets(b, u, id).indexOf(t) >= 0) { run(id, t); return true; }
+      var ao = id === 'shoot' && aimObject();
+      if (ao && objTarget(u, ao.x, ao.y)) { runObject(ao); return true; }
     } else if (A.target === 'ally') {
       ts = Tac.targets(b, u, id);
       var ta = st.aim && Tac.unitById(b, st.aim);
@@ -534,6 +555,9 @@ XG.TacUI = (function () {
     countPanel();
     var mine = b.side === b.human;
     XG.Audio.intensity(left ? 1 : .15);
+    // critical: hostiles in sight and half or more of your side is down
+    var side = b.units.filter(function (x) { return x.side === b.human && !x.isStatic; }), up = side.filter(function (x) { return x.alive; }).length;
+    XG.Audio.mood(left && up * 2 <= side.length ? 'critical' : left ? 'contact' : 'stealth');
     if (XG.Tutorial) XG.Tutorial.battleUpdate(b, u, st.mode, st.aim);
     $('tac-top').innerHTML = '<b>' + b.mission.name + '</b><span class="dim">' + b.mission.city + '</span><span class="obj">◎ ' + obj + '</span>' +
       '<span class="dim">Turn ' + b.turn + (b.turnLimit ? '/' + b.turnLimit : '') + ' · ' + left + ' hostile(s) in sight</span>' +
@@ -625,12 +649,13 @@ XG.TacUI = (function () {
     return '<table class="odds">' + hi.parts.map(function (p, i) {
       return '<tr><td>' + p[0] + '</td><td class="' + (i === 0 ? '' : p[1] > 0 ? 'good' : 'bad') + '">' + (i === 0 ? '' : p[1] > 0 ? '+' : '') + p[1] + '</td></tr>';
     }).join('') + '<tr class="tot"><td>Hit chance</td><td>' + hi.chance + '%</td></tr>' +
-      (hi.flankCrit ? '<tr><td colspan="2" class="good">Flanked: +25 crit</td></tr>' : '') + '</table>';
+      (hi.flankCrit ? '<tr><td colspan="2" class="good">Flanked: +25 crit</td></tr>' : '') + (hi.object ? '<tr><td colspan="2" class="dim">Object: no cover or defense, no crits</td></tr>' : '') + '</table>';
   }
   function hoverPanel() {
     if (!st) return;
-    var b = st.b, h = st.hover, u = selUnit(), html = '';
-    var focus = st.aim ? Tac.unitById(b, st.aim) : h ? unitAtVisible(h.x, h.y) : null;
+    var b = st.b, h = st.hover, u = selUnit(), html = '', ao = aimObject();
+    if (ao) h = { x: ao.x, y: ao.y };
+    var focus = st.aim && !ao ? Tac.unitById(b, st.aim) : h ? unitAtVisible(h.x, h.y) : null;
     if (focus && focus.alive) {
       html = '<b style="color:' + focus.color + '">' + focus.name + '</b><div>HP ' + focus.hp + '/' + focus.maxHp + (focus.armor ? ' · armor ' + focus.armor : '') + (focus.shield ? ' · shield ' + focus.shield : '') +
         (focus.side === b.human && !focus.isStatic ? ' · <span class="' + (focus.ap ? 'good' : 'dim') + '">' + focus.ap + ' AP left</span>' : '') + '</div>';
@@ -655,11 +680,19 @@ XG.TacUI = (function () {
       var t = Tac.tile(b, h.x, h.y);
       var pn = XG.Gfx.propName(b, h.x, h.y);
       html = '<b>' + (pn || (t === Tac.PIT ? XG.Gfx.pitName(b) : ['Floor', 'Wall', 'Low cover', 'High cover'][t])) + '</b>' + (b.visible[h.y * W + h.x] ? '' : ' <span class="dim">(not in sight)</span>');
-      if (pn) html += '<div class="' + (Tac.propOf(b, h.x, h.y) === 'barrel' ? 'warn' : 'dim') + '">' + XG.Gfx.propRule(b, h.x, h.y) + (t === Tac.PIT ? '. Impassable, gives no cover, does not block line of sight.' : t === Tac.LOW ? '. Half cover.' : '. Full cover.') + '</div>';
+      var ob = explored(h.x, h.y) && Tac.objectAt(b, h.x, h.y);
+      if (ob) { // a destructible object: durability and the odds of shooting it
+        html += '<div>Durability <b>' + ob.hp + '/' + ob.maxHp + '</b>' + (ob.prop === 'barrel' ? ' <span class="warn">· explodes when destroyed</span>' : '') + '</div>';
+        if (u && u.abilities.indexOf('shoot') >= 0 && canInput()) {
+          var oh = Tac.hitInfo(b, u, ob);
+          html += oh.ok ? '<div>' + (u.short || u.name) + ': <b>' + oh.chance + '%</b> to hit it · ' + oh.d.toFixed(1) + ' tiles</div>' + breakdown(oh) : '<div class="dim">No line of fire from ' + (u.short || u.name) + '.</div>';
+        }
+      }
+      if (pn) html += '<div class="' + (Tac.propOf(b, h.x, h.y) === 'barrel' ? 'warn' : 'dim') + '">' + XG.Gfx.propRule(b, h.x, h.y) + (XG.DATA.props[Tac.propOf(b, h.x, h.y)] && XG.DATA.props[Tac.propOf(b, h.x, h.y)].faces ? (t === Tac.HIGH ? '. Blocks sight; ' : '. See-through; ') + 'the face toward the attacker counts.' : t === Tac.PIT ? '. Impassable, gives no cover, does not block line of sight.' : t === Tac.LOW ? '. Half cover.' : '. Full cover.') + '</div>';
       else if (t === Tac.PIT) html += '<div class="dim">Impassable. Gives no cover and does not block line of sight.</div>';
       if (t === 0) {
         var cf = coverFacing(h.x, h.y), sides = SIDES.map(function (o) {
-          var c = Tac.coverTile(b, h.x + o[0], h.y + o[1]), s = sideState(cf, o);
+          var c = Tac.coverTile(b, h.x + o[0], h.y + o[1], o[0], o[1]), s = sideState(cf, o);
           var tag = s === 'idle' ? ' <span class="bad">(no use: faces no visible enemy)</span>' : s === 'fading' ? ' <span class="warn">(angled)</span>' : '';
           var what = c === 1 ? 'wall' : c === 3 ? 'high cover' : Tac.tile(b, h.x + o[0], h.y + o[1]) === 0 ? 'Sentinel' : 'crate', pnm = XG.Gfx.propName(b, h.x + o[0], h.y + o[1]);
           if (pnm) what = pnm.toLowerCase() + (Tac.propOf(b, h.x + o[0], h.y + o[1]) === 'barrel' ? ' <span class="warn">(explodes)</span>' : '');
@@ -741,6 +774,7 @@ XG.TacUI = (function () {
     var tw = Math.min(W * TS - tx0, Math.ceil(VW / z) + 2), th = Math.min(H * TS - ty0, Math.ceil(VH / z) + 2);
     ctx.drawImage(G.terrain(b, dpr).canvas, tx0 * dpr, ty0 * dpr, tw * dpr, th * dpr, tx0, ty0, tw, th);
     G.ambient(ctx, b, now);
+    G.damaged(ctx, b);
     // light pools under visible units
     var pools = [];
     b.units.forEach(function (x) {
@@ -890,7 +924,7 @@ XG.TacUI = (function () {
     var dx = Math.cos(a), dy = Math.sin(a), best = 'open';
     for (var i = 0; i < SIDES.length; i++) {
       var o = SIDES[i], along = o[0] ? dx * o[0] : dy * o[1], across = o[0] ? dy : dx;
-      if (along <= 0 || along < Math.abs(across) / 2 - 1e-9 || Tac.coverTile(st.b, x + o[0], y + o[1]) === Tac.FLOOR) continue;
+      if (along <= 0 || along < Math.abs(across) / 2 - 1e-9 || Tac.coverTile(st.b, x + o[0], y + o[1], o[0], o[1]) === Tac.FLOOR) continue;
       if (Math.atan2(Math.abs(across), along) <= Math.PI / 6 + 1e-9) return 'full';
       best = 'fading';
     }
@@ -912,7 +946,7 @@ XG.TacUI = (function () {
   function drawCoverShields(x, y) {
     var f = coverFacing(x, y);
     SIDES.forEach(function (o) {
-      var t = Tac.coverTile(st.b, x + o[0], y + o[1]);
+      var t = Tac.coverTile(st.b, x + o[0], y + o[1], o[0], o[1]);
       if (t === 0) return;
       var full = t === Tac.WALL || t === Tac.HIGH, c = center(x, y), sx = c[0] + o[0] * 14, sy = c[1] + o[1] * 14, s = sideState(f, o);
       if (s === 'idle') return; // cover facing away from every enemy you can see is no cover at all
@@ -941,6 +975,17 @@ XG.TacUI = (function () {
       });
       return;
     }
+    if (st.mode === 'shoot') objTargets(u).forEach(function (o) { // destructible objects in reach: a faint frame, the odds on the aimed or hovered one
+      var c = center(o.x, o.y), aimed = st.aim === o.id, hov = st.hover && st.hover.x === o.x && st.hover.y === o.y;
+      ctx.strokeStyle = aimed ? '#ffd166' : o.prop === 'barrel' ? 'rgba(255,107,133,' + (.4 + pulse * .4) + ')' : 'rgba(255,209,102,.28)'; ctx.lineWidth = aimed ? 2.5 : 1.2;
+      ctx.setLineDash([4, 4]); ctx.strokeRect(c[0] - 18, c[1] - 18, 36, 36); ctx.setLineDash([]);
+      if (aimed || hov) {
+        var oc = Tac.hitInfo(b, u, o).chance; ctx.font = 'bold ' + (aimed ? 15 : 12) + 'px "Share Tech Mono", monospace'; ctx.textAlign = 'center';
+        ctx.fillStyle = '#000'; ctx.fillRect(c[0] - 18, c[1] - 36, 36, 15); ctx.fillStyle = '#ffd166'; ctx.fillText(oc + '%', c[0], c[1] - 24);
+      }
+      if (aimed) { var s0 = center(u.x, u.y); ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.moveTo(s0[0], s0[1]); ctx.lineTo(c[0], c[1]); ctx.stroke(); ctx.setLineDash([]); }
+      ctx.lineWidth = 1;
+    });
     if (A.target === 'enemy' || A.target === 'ally') {
       Tac.targets(b, u, st.mode).forEach(function (t) {
         var c = center(t.x, t.y), aimed = st.aim === t.id;
@@ -1097,6 +1142,7 @@ XG.TacUI = (function () {
       var bc = center(e.x, e.y);
       if (e.kind === 'emp') { G.FX.emp(L, bc[0], bc[1], e.r || 1, now); shake(4, now); A.play('emp'); }
       else { G.FX.explosion(L, bc[0], bc[1], e.r || 1, now); shake(8, now); A.play('boom'); if (G.biomeOf(b) !== 'cyber') G.decal(b, 'scorch', e.x, e.y, 1.8); }
+    } else if (e.t === 'debris') { if (seen(e.x, e.y)) { var dc2 = center(e.x, e.y); G.FX.wreck(L, dc2[0], dc2[1], '150,150,160', now); G.FX.shatter(L, dc2[0], dc2[1], now); A.play('death-machine'); shake(2, now); }
     } else if (e.t === 'shatter') { if (seen(e.x, e.y)) { var gc = center(e.x, e.y); G.FX.shatter(L, gc[0], gc[1], now); A.play('shatter'); } }
     else if (e.t === 'spawn') { var sc = center(e.x, e.y); G.FX.warp(L, sc[0], sc[1], now); A.play('spawn'); }
     else if (e.t === 'scan') A.play('scan');
@@ -1118,7 +1164,7 @@ XG.TacUI = (function () {
     var b = st.b, vis = function (x, y) { return b.visible[y * W + x]; }, mine = function (id) { var u = Tac.unitById(b, id); return u && u.side === HS(); };
     if (e.t === 'move') return e.path.length > 1 ? e.path.filter(function (p, i) { return (mine(e.id) || vis(p[0], p[1])) && (i === 0 || i === e.path.length - 1 || !mine(e.id)); }) : [];
     if (e.t === 'shot' || e.t === 'hack') return mine(e.from) || mine(e.to) || vis(e.fx, e.fy) || vis(e.tx, e.ty) ? [[e.fx, e.fy], [e.tx, e.ty]] : [];
-    if (e.t === 'boom' || e.t === 'shatter') return [[e.x, e.y]];
+    if (e.t === 'boom' || e.t === 'shatter' || e.t === 'debris') return [[e.x, e.y]];
     if (e.t === 'text' || e.t === 'dmg' || e.t === 'heal' || e.t === 'death' || e.t === 'spawn' || e.t === 'scan') return (e.id && mine(e.id)) || vis(e.x, e.y) ? [[e.x, e.y]] : [];
     return [];
   }

@@ -48,6 +48,12 @@ XG.DATA = {
     barrier: { base: 2, rule: 'Blast-proof', names: { city: 'Concrete barrier', relay: 'Armored bulkhead', uplink: 'Armored bulkhead', cyber: 'Hardened block' } },
     pillar:  { base: 3, rule: 'Blast-proof', names: { city: 'Concrete pillar', relay: 'Support pillar', uplink: 'Support pillar', cyber: 'Anchored node' } },
     glass:   { base: 3, rule: 'Shatters on a miss', names: { city: 'Glass panel', relay: 'Crystal panel', uplink: 'Armored glass', cyber: 'Soft firewall' } },
+    // faces: true = carries a b.faces mask (full or half cover per side, see Tac.coverTile); the rule text is built from the mask
+    bunker:  { base: 3, faces: true, rule: 'Mixed cover by side', names: { city: 'Sandbag bunker', relay: 'Shielded emplacement', uplink: 'Shielded emplacement', cyber: 'Partial firewall' } },
+    stack:   { base: 2, faces: true, rule: 'Mixed cover by side', names: { city: 'Crate stack', relay: 'Cargo stack', uplink: 'Cargo stack', cyber: 'Data stack' } },
+    vehicle: { base: 2, faces: true, rule: 'Mixed cover by side', names: { city: 'Wrecked vehicle', relay: 'Hauler wreck', uplink: 'Hauler wreck', cyber: 'Dead process' } },
+    planter: { base: 2, faces: true, rule: 'Mixed cover by side', names: { city: 'Planter', relay: 'Spore planter', uplink: 'Coolant planter', cyber: 'Cache node' } },
+    plate:   { base: 2, faces: true, rule: 'Mixed cover by side', names: { city: 'Plated barrier', relay: 'Plated barrier', uplink: 'Plated barrier', cyber: 'Shielded block' } },
     fence:   { base: 4, rule: 'Blocks movement only', names: { city: 'Chain-link fence', relay: 'Laser fence', uplink: 'Laser fence', cyber: 'Filter gate' } }
   },
 

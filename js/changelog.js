@@ -7,6 +7,11 @@ XG.CHANGELOG = [
    {
     "name": "2026-10-22",
     "items": [
+     "<b>Audio:</b> new soundtrack moods. Dark ambient and darksynth tracks join the score, and the music shifts with the state of the war and of each battle: quiet while you sneak, driving once you make contact, frantic when you are losing.",
+     "<b>Battle:</b> cover can be shot down. With Shoot armed, click a crate, tall cover, glass panel or fuel barrel you can see (aim, then click again). Crates take two or three rifle hits, tall cover more, barrels and glass one; a destroyed barrel explodes. Barriers, pillars, walls and fences cannot be shot. The hover panel shows the object's durability and your odds, and the AI will shoot a barrel that catches two of your units.",
+     "<b>Battle:</b> fixed a line-of-sight bug: a unit standing mid-wall (not at the end of it) could lean round the corner and see or be shot from far past the wall. Leaning only works from the last tile of a wall or tall cover.",
+     "<b>Battle:</b> corner standoffs. When two units hug the same wall or tall cover and can only see each other by leaning round the corner, both shoot from a flat 50% base instead of their aim (cover, range and the rest still apply). The odds panel shows it.",
+     "<b>Battle:</b> mixed-side cover. Sandbag bunkers, shielded emplacements and partial firewalls have tall faces and low faces: only the side toward the attacker counts. Hover one to see which sides are full and which are half.",
      "<b>Battle:</b> five new obstacles on the map. Fuel barrels (coolant tanks, unstable packets) explode when destroyed, hurting everyone next to them and setting off neighbouring barrels. Concrete barriers and pillars are blast-proof. Glass panels are full cover but shatter when a shot at someone behind them misses (or in a blast). Fences block movement but not sight.",
      "<b>Battle:</b> a double row of tall cover (two racks or barriers back to back) now blocks sight completely, even with someone pressed against each side. Lean around the end of the row to see past it.",
      "<b>Battle:</b> Swarm Drones watch you: the pupil in each drone's eye follows your cursor around the map.",

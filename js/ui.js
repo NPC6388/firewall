@@ -87,6 +87,7 @@ XG.UI = (function () {
     var g = UI.g; if (!g) return;
     document.body.classList.toggle('lattice', g.faction === 'lattice');
     XG.Audio.scene(g.faction === 'lattice' ? 'lat' : 'fw');
+    XG.Audio.mood(XG.Comms.mood(g)); // calm / uneasy / dire with Convergence
     if (g.faction === 'lattice') XG.LUI.render();
     else {
       renderTop(g); renderTabs(g);

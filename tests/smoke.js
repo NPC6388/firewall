@@ -414,6 +414,146 @@ function autoBattle(g, m, squad) {
   check(Tac.coverTile(b, 11, 10) === Tac.FLOOR, 'a fence gives no cover');
 })();
 
+// Peeking only counts at the END of a wall: a unit mid-wall cannot lean round it.
+(function () {
+  var g = S.newGame(23), r = S.rng(g), m = Strat.spawnMission(g, r, 'purge'); S.saveRng(g, r);
+  var b = Tac.create(g, Object.assign({}, m, { diff: 1 }), g.soldiers.slice(0, 4)), W = b.W;
+  b.tiles.fill(Tac.FLOOR); b.props.fill(0); b.faces.fill(0); b.outcome = null;
+  var pl = b.units.filter(function (u) { return u.side === 'player'; }), en = b.units.filter(function (u) { return u.side === 'enemy'; });
+  en.forEach(function (u, i) { if (i) u.alive = false; });
+  var U = pl[0], E = en[0];
+  for (var wx = 10; wx <= 18; wx++) b.tiles[10 * W + wx] = Tac.WALL; // a long horizontal wall, x 10..18 at y 10
+  U.x = 12; U.y = 11; E.x = 8; E.y = 8; // under the wall, 2 tiles in from the west end; shooter up and to the left, past the end
+  check(!Tac.los(b, U.x, U.y, E.x, E.y) && !Tac.los(b, E.x, E.y, U.x, U.y), 'a unit mid-wall cannot see round the end of the wall (either way)');
+  U.x = 10; U.y = 11; // under the last wall tile
+  check(Tac.los(b, U.x, U.y, E.x, E.y) && Tac.los(b, E.x, E.y, U.x, U.y), 'a unit at the last wall tile can still lean round the corner (both ways)');
+  b.tiles[10 * W + 9] = Tac.HIGH; U.x = 10; U.y = 9; E.x = 8; E.y = 12; // a unit above the wall's end, tall cover continues the line
+  check(Tac.los(b, U.x, U.y, E.x, E.y) === Tac.los(b, E.x, E.y, U.x, U.y), 'peeking is symmetric');
+})();
+// Corner standoff (50% base for both sides) and mixed-side bunkers (the face toward the attacker sets the cover).
+(function () {
+  var g = S.newGame(22), r = S.rng(g), m = Strat.spawnMission(g, r, 'purge'); S.saveRng(g, r);
+  var b = Tac.create(g, Object.assign({}, m, { diff: 1 }), g.soldiers.slice(0, 4)), W = b.W;
+  check(Array.isArray(b.faces) && b.faces.length === b.tiles.length, 'battle carries a faces array');
+  // about half of all cover objects are mixed-side (a face mask on a prop); masks sit only on cover tiles of face-capable props
+  var mixedN = 0, coverN = 0, kindsSeen = {};
+  for (var sd = 1; sd <= 30; sd++) {
+    var bm = Tac.create(g, Object.assign({}, m, { diff: 2, seed: sd * 97 }), g.soldiers.slice(0, 4)), seenC = {};
+    check(bm.props.every(function (p, i) { return !bm.faces[i] || (D.props[p] && D.props[p].faces && (bm.tiles[i] === Tac.LOW || bm.tiles[i] === Tac.HIGH)); }), 'face masks only sit on cover tiles of face-capable props');
+    for (var ci = 0; ci < bm.tiles.length; ci++) { // count objects: 4-connected runs of one cover type
+      var tv = bm.tiles[ci]; if ((tv !== Tac.LOW && tv !== Tac.HIGH) || seenC[ci]) continue;
+      var st = [ci], mixed = false; seenC[ci] = 1;
+      while (st.length) { var cc = st.pop(), cx = cc % bm.W, cy2 = (cc - cx) / bm.W; if (D.props[bm.props[cc]] && D.props[bm.props[cc]].faces) { mixed = true; kindsSeen[bm.props[cc]] = 1; }
+        [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (o) { var nx = cx + o[0], ny = cy2 + o[1], ni = ny * bm.W + nx; if (nx >= 0 && ny >= 0 && nx < bm.W && ny < bm.H && bm.tiles[ni] === tv && !seenC[ni] && bm.props[ni] === bm.props[cc]) { seenC[ni] = 1; st.push(ni); } }); }
+      coverN++; if (mixed) mixedN++;
+    }
+  }
+  check(mixedN / coverN > 0.35 && mixedN / coverN < 0.65, 'about half of the cover objects are mixed-side (' + mixedN + '/' + coverN + ')');
+  check(['bunker', 'stack', 'vehicle', 'planter', 'plate'].every(function (k) { return kindsSeen[k]; }), 'all five mixed-side kinds are generated (' + Object.keys(kindsSeen).join(',') + ')');
+  b.tiles.fill(Tac.FLOOR); b.props.fill(0); b.faces.fill(0); b.outcome = null;
+  var pl = b.units.filter(function (u) { return u.side === 'player'; }), en = b.units.filter(function (u) { return u.side === 'enemy'; });
+  en.forEach(function (u, i) { if (i) u.alive = false; });
+  var A = pl[0], T = en[0];
+  [A, T].forEach(function (u) { u.range = 20; u.hunker = false; u.marked = 0; u.defense = 0; u.armor = 0; u.hp = u.maxHp = 10; u.isStatic = false; });
+  var at = function (u, x, y) { u.x = x; u.y = y; };
+  var odds = function (s, d) { return Tac.hitInfo(b, s, d); };
+  // standoff: a wall column between two units that each hug it
+  for (var wy = 8; wy <= 11; wy++) b.tiles[wy * W + 10] = Tac.WALL;
+  at(A, 9, 8); at(T, 11, 8); A.aim = 90; T.aim = 40;
+  var h1 = odds(A, T), h2 = odds(T, A);
+  check(h1.ok && h2.ok && h1.standoff && h2.standoff, 'two units round the same corner both get the standoff');
+  check(h1.parts[0][0] === 'Corner standoff: base' && h1.parts[0][1] === 50, 'the standoff base is 50 and replaces aim');
+  var h1b = (A.aim = 30, odds(A, T)); check(h1b.chance === h1.chance, 'aim no longer matters in a standoff (' + h1.chance + '%)');
+  check(h1.chance === h2.chance, 'a standoff is symmetric when the other modifiers match (' + h1.chance + '% / ' + h2.chance + '%)');
+  check(h1.chance === Math.max(5, Math.min(95, h1.parts.reduce(function (s, p) { return s + p[1]; }, 0))), 'the other modifiers apply on top of the 50 base');
+  var sym = true; for (var ax = 7; ax <= 13; ax++) for (var ay = 5; ay <= 14; ay++) for (var tx = 7; tx <= 13; tx++) for (var ty = 5; ty <= 14; ty++) {
+    if (b.tiles[ay * W + ax] || b.tiles[ty * W + tx] || (ax === tx && ay === ty)) continue;
+    at(A, ax, ay); at(T, tx, ty);
+    if (Tac.cornerStandoff(b, A, T) !== Tac.cornerStandoff(b, T, A)) sym = false;
+  }
+  check(sym, 'the standoff test is symmetric for every pair around a wall');
+  // an ordinary shot is unchanged: open ground, aim is the base
+  b.tiles.fill(Tac.FLOOR); at(A, 5, 20); at(T, 12, 20); A.aim = 70;
+  var ho = odds(A, T);
+  check(!ho.standoff && ho.parts[0][0] === 'Aim' && ho.parts[0][1] === 70 && ho.chance === 70 - Tac.rangePenalty(A, T, Tac.dist(5, 20, 12, 20)) + (Tac.dist(5, 20, 12, 20) <= 3 ? A.close || 0 : 0) + 25 * 0, 'an open-ground shot keeps the aim base (' + ho.chance + '%)');
+  b.tiles[20 * W + 8] = Tac.WALL; // a wall in the way, but they are not both hugging it: no standoff
+  check(!Tac.cornerStandoff(b, A, T), 'no standoff when the units are not beside the same blocker');
+  b.tiles.fill(Tac.FLOOR);
+  // mixed-side bunker at (15,10): N and E faces full (mask 3), S and W half
+  b.tiles[10 * W + 15] = Tac.HIGH; b.props[10 * W + 15] = 'bunker'; b.faces[10 * W + 15] = 3;
+  check(Tac.coverTile(b, 15, 10, 4, 0) === Tac.HIGH && Tac.coverTile(b, 15, 10, -4, 0) === Tac.LOW && Tac.coverTile(b, 15, 10, 0, -4) === Tac.HIGH && Tac.coverTile(b, 15, 10, 0, 4) === Tac.LOW, 'the face toward the attacker picks full or half');
+  check(Tac.coverTile(b, 15, 10, 2, 2) === Tac.HIGH && Tac.coverTile(b, 15, 10, -2, 2) === Tac.LOW && Tac.coverTile(b, 15, 10, 2, -2) === Tac.HIGH, 'a diagonal tie takes the better face for the defender');
+  at(T, 14, 10); at(A, 20, 10); A.aim = 70;
+  check(Tac.coverDetail(b, 14, 10, 20, 10).value === 40 && odds(A, T).cover === 40, 'target west of the bunker, shooter east: full face, cover 40');
+  at(T, 15, 9); at(A, 15, 4); check(Tac.coverDetail(b, 15, 9, 15, 15).value === 20, 'target north of the bunker, shooter south: the half S face gives 20');
+  at(T, 16, 10); check(Tac.coverDetail(b, 16, 10, 10, 10).value === 20, 'target east of the bunker, shooter west: the half W face gives 20');
+  check(Tac.coverDetail(b, 14, 10, 17, 12).value > 0 && Tac.coverDetail(b, 14, 10, 17, 12).base === 40, 'angled shot keeps the angle scaling and uses the better diagonal face');
+  // a low-based vehicle (long sides N/S full, ends half) and a stack with one tall end
+  b.tiles[12 * W + 20] = Tac.LOW; b.props[12 * W + 20] = 'vehicle'; b.faces[12 * W + 20] = 5; b.tiles[12 * W + 21] = Tac.LOW; b.props[12 * W + 21] = 'vehicle'; b.faces[12 * W + 21] = 5;
+  check(Tac.coverTile(b, 20, 12, 0, 3) === Tac.HIGH && Tac.coverTile(b, 20, 12, 0, -3) === Tac.HIGH && Tac.coverTile(b, 20, 12, 3, 0) === Tac.LOW && Tac.coverTile(b, 20, 12, -3, 0) === Tac.LOW, 'a vehicle is full cover on its long sides and half at the ends');
+  check(Tac.tile(b, 20, 12) === Tac.LOW && Tac.coverTile(b, 20, 12) === Tac.HIGH, 'the base tile stays LOW (sight and pathing unchanged); no direction reads the best face');
+  at(T, 20, 13); check(Tac.coverDetail(b, 20, 13, 20, 8).value === 40 && Tac.coverDetail(b, 20, 13, 20, 18).value === 0, 'cover applies from the shooter side only (vehicle north of the target, open to the south)');
+  b.tiles[16 * W + 25] = Tac.LOW; b.props[16 * W + 25] = 'stack'; b.faces[16 * W + 25] = 0; at(T, 24, 16);
+  check(Tac.coverDetail(b, 24, 16, 30, 16).value === 20, 'a stack tile with no tall face gives half cover');
+  b.faces[16 * W + 25] = 2; check(Tac.coverDetail(b, 24, 16, 30, 16).value === 40, 'a stack with a tall end gives full cover on that side');
+  Tac.clearTile(b, 15, 10, [], 'blast');
+  check(b.faces[10 * W + 15] === 0 && Tac.tile(b, 15, 10) === Tac.FLOOR, 'a blast clears a bunker and its face mask');
+})();
+
+// Destructible objects are Shoot targets: barrels explode (and chain), crates take several hits, blast-proof things cannot be shot.
+(function () {
+  var g = S.newGame(24), r = S.rng(g), m = Strat.spawnMission(g, r, 'purge'); S.saveRng(g, r);
+  var b = Tac.create(g, Object.assign({}, m, { diff: 1 }), g.soldiers.slice(0, 4)), W = b.W;
+  var pl = b.units.filter(function (u) { return u.side === 'player'; }), en = b.units.filter(function (u) { return u.side === 'enemy' && !u.isStatic; });
+  var sh = pl[0];
+  var reset = function () {
+    b.tiles.fill(Tac.FLOOR); b.props.fill(0); b.faces.fill(0); b.tileHp = {}; b.outcome = null;
+    pl.forEach(function (u, i) { u.x = 0; u.y = 20 + i; u.hp = u.maxHp = 10; u.armor = 0; u.ap = 2; });
+    en.forEach(function (u, i) { u.x = 36; u.y = i; u.alive = true; u.hp = u.maxHp = 10; u.armor = 0; u.alerted = true; });
+    sh.x = 5; sh.y = 10; sh.range = 14; sh.aim = 100; sh.dmg = [3, 3]; sh.ap = 2; sh.abilities = ['shoot', 'overwatch', 'grenade', 'hunker'];
+    b.visible.fill(true); b.explored = b.visible.slice();
+  };
+  var put = function (x, y, t, p) { b.tiles[y * W + x] = t; b.props[y * W + x] = p || 0; };
+  var realChance = b.rng.chance;
+  // barrel: one hit explodes it and the next barrel; a hostile beside the second one takes 2
+  reset(); put(10, 10, Tac.LOW, 'barrel'); put(11, 10, Tac.LOW, 'barrel'); en[0].x = 12; en[0].y = 11;
+  check(Tac.objectTargets(b, sh).length === 2, 'both barrels are listed as Shoot targets');
+  b.rng.chance = function () { return true; };
+  var ev1 = Tac.act.shootTile(b, sh, 10, 10);
+  b.rng.chance = realChance;
+  check(!!ev1 && Tac.tile(b, 10, 10) === Tac.FLOOR && Tac.tile(b, 11, 10) === Tac.FLOOR, 'shooting a barrel destroys it and chains into the next one');
+  check(en[0].hp === 8 && sh.ap === 0, 'the chained blast hurts the hostile beside it for 2, and the shot spent the AP (hp ' + en[0].hp + ')');
+  check(ev1.some(function (e) { return e.t === 'shot' && e.to === null && e.tx === 10; }) && ev1.filter(function (e) { return e.t === 'boom'; }).length === 2, 'the shot event has no target unit and both barrels boom');
+  // crate: survives the first hit, falls once its HP (6) is gone, with damage = weapon damage
+  reset(); put(10, 10, Tac.LOW, 0);
+  b.rng.chance = function () { return true; };
+  Tac.act.shootTile(b, sh, 10, 10);
+  check(Tac.tile(b, 10, 10) === Tac.LOW && Tac.objectAt(b, 10, 10).hp === 3, 'a crate survives one rifle hit (hp 3/6)');
+  sh.ap = 2; Tac.act.shootTile(b, sh, 10, 10);
+  b.rng.chance = realChance;
+  check(Tac.tile(b, 10, 10) === Tac.FLOOR && b.tileHp[10 * W + 10] === undefined, 'the crate falls on the second hit and its HP entry is gone');
+  reset(); put(10, 10, Tac.HIGH, 0); check(Tac.objectAt(b, 10, 10).maxHp === 10, 'tall cover has 10 HP');
+  var oi = Tac.hitInfo(b, sh, Tac.objectAt(b, 10, 10));
+  check(oi.ok && oi.object && oi.parts[0][0] === 'Aim' && !oi.parts.some(function (p) { return /cover|defense/i.test(p[0]); }), 'an object hit chance has no cover or defense lines');
+  // not targetable: blast-proof barrier and pillar, walls and fences
+  reset(); put(10, 10, Tac.LOW, 'barrier'); put(10, 12, Tac.HIGH, 'pillar'); put(10, 8, Tac.WALL, 0); put(10, 14, Tac.PIT, 'fence');
+  check(Tac.objectTargets(b, sh).length === 0 && !Tac.act.shootTile(b, sh, 10, 10) && !Tac.act.shootTile(b, sh, 10, 12) && !Tac.act.shootTile(b, sh, 10, 8) && !Tac.act.shootTile(b, sh, 10, 14), 'barriers, pillars, walls and fences cannot be shot');
+  reset(); put(10, 10, Tac.LOW, 0); sh.x = 30; check(Tac.objectTargets(b, sh).length === 0, 'objects out of weapon range are not targets');
+  check(Tac.objectTargets(Tac.createTraining(g, g.soldiers.slice(0, 1)), pl[0]).length === 0, 'combat training has no object targets');
+  // the AI shoots a barrel with 2 hostiles beside it, and leaves it alone when one of its own side is in the blast
+  reset(); put(20, 10, Tac.LOW, 'barrel'); en[0].x = 21; en[0].y = 10; en[1].x = 20; en[1].y = 11; en[2].x = 36; en[2].y = 2; sh.x = 12;
+  b.rng.chance = function () { return true; };
+  Tac.ai(b, sh);
+  check(Tac.tile(b, 20, 10) === Tac.FLOOR && en[0].hp === 8 && en[1].hp === 8, 'the AI shoots a barrel that catches two hostiles');
+  reset(); put(20, 10, Tac.LOW, 'barrel'); en[0].x = 21; en[0].y = 10; en[1].x = 20; en[1].y = 11; en[2].x = 36; en[2].y = 2; sh.x = 12; pl[1].x = 19; pl[1].y = 10;
+  Tac.ai(b, sh);
+  check(Tac.propOf(b, 20, 10) === 'barrel', 'the AI does not shoot a barrel with its own side in the blast');
+  reset(); put(20, 10, Tac.LOW, 'barrel'); en[0].x = 21; en[0].y = 10; en[1].x = 36; en[1].y = 1; en[2].x = 36; en[2].y = 2; sh.x = 12;
+  Tac.ai(b, sh);
+  check(Tac.propOf(b, 20, 10) === 'barrel', 'the AI ignores a barrel that would catch only one healthy hostile');
+  b.rng.chance = realChance;
+})();
+
 // ---------------------------------------------------------------- battles
 var nb = +process.argv[2] || 60, tally = {};
 for (var i = 0; i < nb; i++) {

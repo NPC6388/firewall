@@ -441,12 +441,89 @@ XG.Gfx = (function () {
     c.fillStyle = beam ? '#26364a' : '#8c97a6'; c.fillRect(cx - 2, base - Hh - 2, 4, Hh + 3);
     c.fillStyle = beam ? rgba(bc, 1) : '#e1e8f0'; c.fillRect(cx - 2, base - Hh - 3, 4, 2);
   }
+  // Mixed-side cover objects (b.faces mask: bit 1 N, 2 E, 4 S, 8 W; set = full/tall face, clear = half/low face). Same visual language
+  // everywhere: a thick bright raised wall = full cover from that side, a thin dotted rim = half cover. The pad inside says what it is:
+  // bunker (dark pad), stack (crate top), vehicle (roof, windshield, lights), planter (soil and plants), plate (hazard-striped concrete).
+  var FACE_WALL = { bunker: [150, 160, 172], stack: [166, 128, 78], vehicle: [138, 150, 164], planter: [108, 134, 98], plate: [160, 164, 170] };
+  function faceObject(c, B, b, x, y, p) {
+    var px = x * TS, py = y * TS, m = b.faces && b.faces[y * W_(b) + x] || 0, cy = B.cyber, acc = cy || B.veins ? B.accent : '255,209,102';
+    var jl = propAt(b, x - 1, y) === p, jr = propAt(b, x + 1, y) === p, ju = propAt(b, x, y - 1) === p, jd = propAt(b, x, y + 1) === p, T = 10;
+    var x0 = px + (jl ? 0 : 3), x1 = px + TS - (jr ? 0 : 3), y0 = py + (ju ? 0 : 4), y1 = py + TS - (jd ? 0 : 4), w = x1 - x0, h = y1 - y0, i, k;
+    var wall = cy ? [24, 80, 110] : B.veins ? [100, 88, 142] : FACE_WALL[p];
+    c.fillStyle = 'rgba(0,0,0,.35)'; if (!jd) c.fillRect(x0 + 2, y1, w, 3);
+    // the pad
+    if (p === 'stack') {
+      c.fillStyle = cy ? '#0b3550' : shade(B.low, 24); c.fillRect(x0, y0, w, h);
+      c.strokeStyle = cy ? rgba(B.accent, .35) : 'rgba(0,0,0,.4)'; c.lineWidth = 1; c.beginPath(); c.moveTo(x0 + 3, y0 + 3); c.lineTo(x1 - 3, y1 - 3); c.moveTo(x1 - 3, y0 + 3); c.lineTo(x0 + 3, y1 - 3); c.stroke();
+    } else if (p === 'vehicle') {
+      c.fillStyle = cy ? '#0d3a55' : shade(B.high, 36); c.fillRect(x0, y0, w, h);
+      var horiz = jl || jr || !(ju || jd);
+      c.fillStyle = 'rgba(0,0,0,.25)'; if (horiz) c.fillRect(x0 + (jl ? 0 : 6), y0 + h / 2 - 1, w - (jl ? 0 : 6) - (jr ? 0 : 6), 2); else c.fillRect(x0 + w / 2 - 1, y0 + (ju ? 0 : 6), 2, h - (ju ? 0 : 6) - (jd ? 0 : 6));
+      if (horiz && !jl) { c.fillStyle = 'rgba(150,215,255,.75)'; c.fillRect(x0 + 5, y0 + 7, 5, h - 14); c.fillStyle = '#ffe9a0'; c.fillRect(x0 + 1, y0 + 6, 2, 3); c.fillRect(x0 + 1, y1 - 9, 2, 3); }
+      if (horiz && !jr) { c.fillStyle = '#ff4d6d'; c.fillRect(x1 - 3, y0 + 6, 2, 3); c.fillRect(x1 - 3, y1 - 9, 2, 3); }
+      if (!horiz && !ju) { c.fillStyle = 'rgba(150,215,255,.75)'; c.fillRect(x0 + 7, y0 + 5, w - 14, 5); c.fillStyle = '#ffe9a0'; c.fillRect(x0 + 6, y0 + 1, 3, 2); c.fillRect(x1 - 9, y0 + 1, 3, 2); }
+      if (!horiz && !jd) { c.fillStyle = '#ff4d6d'; c.fillRect(x0 + 6, y1 - 3, 3, 2); c.fillRect(x1 - 9, y1 - 3, 3, 2); }
+    } else if (p === 'planter') {
+      c.fillStyle = cy ? '#06283a' : '#3a2c20'; c.fillRect(x0, y0, w, h);
+      for (i = 0; i < 7; i++) {
+        var gx = x0 + 5 + hash(x * 9 + i, y, 100) * (w - 10), gy = y0 + 5 + hash(x, y * 9 + i, 101) * (h - 10);
+        c.fillStyle = cy ? rgba(B.accent, .8) : B.veins ? '#b36cff' : i % 2 ? '#4fa05a' : '#6fcf7a';
+        if (cy) c.fillRect(gx, gy, 3, 3); else { c.beginPath(); c.arc(gx, gy, 3 + hash(x + i, y, 102) * 2, 0, 6.3); c.fill(); }
+      }
+    } else if (p === 'plate') {
+      c.fillStyle = cy ? '#0a2a40' : '#64686e'; c.fillRect(x0, y0, w, h);
+      hazard(c, x0 + 3, y0 + h / 2 - 3, w - 6, 6);
+    } else { c.fillStyle = cy ? '#0a2a40' : shade(B.floor, 16); c.fillRect(x0, y0, w, h); } // bunker
+    var edge = function (bit, ex, ey, ew, eh, hz, front) {
+      if (ew <= 0 || eh <= 0) return;
+      if (m & bit) { // raised wall: thick, lit top, dark lower lip
+        c.fillStyle = 'rgba(0,0,0,.45)'; if (hz) c.fillRect(ex + 2, ey + eh, ew, 3); else c.fillRect(ex + ew, ey + 2, 3, eh);
+        c.fillStyle = shade(wall, 0); c.fillRect(ex, ey, ew, eh);
+        c.fillStyle = shade(wall, 40); if (hz) c.fillRect(ex, ey, ew, eh - 4); else c.fillRect(ex, ey, ew - 3, eh);
+        c.fillStyle = shade(wall, -60); if (hz) c.fillRect(ex, ey + eh - 3, ew, 3); else c.fillRect(ex + ew - 3, ey, 3, eh);
+        c.fillStyle = rgba(acc, .9); if (hz) c.fillRect(ex, ey, ew, 1.5); else c.fillRect(ex, ey, 1.5, eh);
+      } else { // low rim: thin, darker, with seams
+        var bx = ex, by = ey, bw = ew, bh = eh;
+        if (hz) { bh = 3; by = front ? ey + eh - 3 : ey; } else { bw = 3; bx = front ? ex + ew - 3 : ex; }
+        c.fillStyle = shade(wall, -48); c.fillRect(bx, by, bw, bh);
+        c.fillStyle = 'rgba(0,0,0,.5)';
+        if (hz) for (k = bx + 3; k < bx + bw; k += 5) c.fillRect(k, by, 1, bh); else for (k = by + 3; k < by + bh; k += 5) c.fillRect(bx, k, bw, 1);
+      }
+    };
+    if (!ju) edge(1, x0, y0, w, T, true, false);
+    if (!jd) edge(4, x0, y1 - T, w, T, true, true);
+    var wy = y0 + (ju ? 0 : T), wh = y1 - (jd ? 0 : T) - wy;
+    if (!jl) edge(8, x0, wy, T, wh, false, false);
+    if (!jr) edge(2, x1 - T, wy, T, wh, false, true);
+    c.strokeStyle = 'rgba(0,0,0,.5)'; c.lineWidth = 1; c.strokeRect(x0 + .5, y0 + .5, w - 1, h - 1);
+  }
+  // Damaged destructible objects (b.tileHp): cracks and a small HP bar over the baked terrain, drawn every frame (cheap: few tiles).
+  function damaged(c, b) {
+    if (!b.tileHp) return;
+    var W = W_(b), Dm = XG.Tac;
+    Object.keys(b.tileHp).forEach(function (k) {
+      var i = +k, x = i % W, y = Math.floor(i / W), o = Dm.objectAt(b, x, y);
+      if (!o || o.hp >= o.maxHp) return;
+      var px = x * TS, py = y * TS, f = o.hp / o.maxHp;
+      c.save();
+      c.strokeStyle = 'rgba(0,0,0,.75)'; c.lineWidth = 1.3; c.beginPath();
+      for (var n = 0; n < 2 + Math.round((1 - f) * 3); n++) {
+        var cx = px + 8 + hash(i, n, 110) * 24, cy = py + 10 + hash(i, n, 111) * 22;
+        c.moveTo(cx, cy); c.lineTo(cx + (hash(i, n, 112) - .5) * 14, cy + 4 + hash(i, n, 113) * 7); c.lineTo(cx + (hash(i, n, 114) - .5) * 14, cy + 9 + hash(i, n, 115) * 6);
+      }
+      c.stroke();
+      c.fillStyle = 'rgba(0,0,0,.7)'; c.fillRect(px + 6, py + 2, TS - 12, 4);
+      c.fillStyle = f > .5 ? '#7dff9b' : f > .25 ? '#ffd166' : '#ff4d6d'; c.fillRect(px + 7, py + 3, (TS - 14) * f, 2);
+      c.restore();
+    });
+  }
   function propTile(c, B, b, x, y, p, leds) {
     if (p === 'barrel') barrelTile(c, B, b, x, y, leds);
     else if (p === 'barrier') barrierTile(c, B, b, x, y);
     else if (p === 'pillar') pillarTile(c, B, b, x, y);
     else if (p === 'glass') glassTile(c, B, b, x, y);
     else if (p === 'fence') fenceTile(c, B, b, x, y);
+    else if (XG.DATA.props[p] && XG.DATA.props[p].faces) faceObject(c, B, b, x, y, p);
   }
   function doorTile(c, B, b, x, y) {
     var Wm = W_(b), Hm = H_(b), wall = function (a, c2) { return a >= 0 && c2 >= 0 && a < Wm && c2 < Hm && b.tiles[c2 * Wm + a] === WALL; };
@@ -1043,8 +1120,16 @@ XG.Gfx = (function () {
   return {
     TS: TS, REDUCED: REDUCED, hash: hash, rgbOf: rgbOf, biomeOf: biomeOf, BIOMES: BIOMES, pitName: function (b) { return BIOMES[biomeOf(b)].pit.name; },
     propName: function (b, x, y) { var p = propAt(b, x, y), P = p && XG.DATA.props[p]; return P ? P.names[biomeOf(b)] : null; },
-    propRule: function (b, x, y) { var p = propAt(b, x, y), P = p && XG.DATA.props[p]; return P ? P.rule : null; },
-    terrain: terrain, decal: decal, ambient: ambient, motes: motes, fog: fog, lights: lights, vignette: vignette,
+    propRule: function (b, x, y) {
+      var p = propAt(b, x, y), P = p && XG.DATA.props[p];
+      if (P && P.faces) { // e.g. 'Full cover from N/E, half from S/W'
+        var m = b.faces[y * W_(b) + x], full = [], half = [];
+        [['N', 1], ['E', 2], ['S', 4], ['W', 8]].forEach(function (f) { (m & f[1] ? full : half).push(f[0]); });
+        return full.length === 4 ? 'Full cover all round' : !full.length ? 'Half cover all round' : 'Full cover from ' + full.join('/') + ', half from ' + half.join('/');
+      }
+      return P ? P.rule : null;
+    },
+    terrain: terrain, damaged: damaged, decal: decal, ambient: ambient, motes: motes, fog: fog, lights: lights, vignette: vignette,
     unit: unit, icon: icon, portrait: portrait, pal: pal, emit: emit, particles: particles, FX: FX, bolt: bolt, tracer: tracer, banner: banner, sweep: sweep
   };
 })();

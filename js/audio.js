@@ -156,64 +156,154 @@ XG.Audio = (function () {
   }
 
   // ------------------------------------------------------------ music
-  // An arranger, not a loop: songs are built from sections (intro, groove, lead, break, drop) picked by weighted chance,
-  // chord progressions rotate, melodies are generated motifs that mutate every couple of bars, and nothing repeats exactly.
-  // Battles play phonk (808s with glide, half-time claps, trap hats with rolls, pitched cowbell riffs, vowel chops).
-  // Enemies in view (intensity) open a filter over the beat, bring the cowbell up, thicken the hats and favour drops;
-  // out of contact the groove sinks under a low-pass and the lead falls back. It eases over a few seconds.
-  var SCALES = { aeolian: [0, 2, 3, 5, 7, 8, 10], dorian: [0, 2, 3, 5, 7, 9, 10], phrygian: [0, 1, 3, 5, 7, 8, 10], phrygDom: [0, 1, 4, 5, 7, 8, 10] };
+  // An arranger, not a loop: songs are built from sections picked by weighted chance, chord progressions rotate,
+  // melodies are generated motifs that mutate every couple of bars, and nothing repeats exactly.
+  // Four styles: 'ambient' (soft pads and a drifting melody), 'darkambient' (detuned drones, sub pulses, a sparse echoed
+  // arpeggio, hiss and crackle, data blips), 'darksynth' (pumping saw bass, gated snare on 2 and 4, an arpeggiated
+  // lead) and 'phonk' (808s with glide, half-time claps, trap hats with rolls, pitched cowbell riffs, vowel chops).
+  // Each scene has a pool of variants per mood (Audio.mood). A seeded pick keeps the same screen from always playing
+  // the same song, and mood changes crossfade on a bar line after at least HOLD bars, so the score never flips back and forth.
+  // Enemies in view (intensity) open a filter over the beat, bring the lead up and favour drops; out of contact the
+  // groove sinks under a low-pass. It eases over a few seconds.
+  var SCALES = { aeolian: [0, 2, 3, 5, 7, 8, 10], dorian: [0, 2, 3, 5, 7, 9, 10], phrygian: [0, 1, 3, 5, 7, 8, 10], phrygDom: [0, 1, 4, 5, 7, 8, 10], locrian: [0, 1, 3, 5, 6, 8, 10] };
   var PROGS = [[0, 0, 5, 6], [0, 5, 3, 4], [0, 3, 5, 4], [0, 6, 5, 6], [0, 1, 0, 6], [0, 3, 0, 1], [5, 3, 0, 6]];
+  // kind: which moods apply ('strategy': calm/uneasy/dire, 'battle': stealth/contact/critical). Variants override the base.
+  // calm: true holds intensity low; minI: an intensity floor (critical opens the beat right up).
   var SCENES = {
-    title:  { style: 'ambient', root: 45, scale: 'aeolian', bpm: 64, wave: 'sawtooth', cut: 520 },
-    fw:     { style: 'ambient', root: 45, scale: 'dorian', bpm: 72, wave: 'sawtooth', cut: 700 },
-    lat:    { style: 'phonk', root: 39, scale: 'phrygian', bpm: 128, wave: 'square', cut: 420, calm: true },
-    battle: { style: 'phonk', root: 40, scale: 'phrygian', bpm: 136, wave: 'sawtooth', cut: 600 },
-    'battle-lat': { style: 'phonk', root: 37, scale: 'phrygDom', bpm: 130, wave: 'square', cut: 480 }
+    title: { kind: 'title', root: 45, scale: 'aeolian', wave: 'sawtooth', cut: 520, pools: {
+      calm: [{ id: 'title-ambient', style: 'ambient', bpm: 64 }, { id: 'title-dark', style: 'darkambient', bpm: 62, scale: 'phrygian', cut: 440 }] } },
+    fw: { kind: 'strategy', root: 45, scale: 'dorian', wave: 'sawtooth', cut: 700, pools: {
+      calm: [{ id: 'fw-ambient', style: 'ambient', bpm: 72 }, { id: 'fw-dark', style: 'darkambient', bpm: 68, scale: 'aeolian', cut: 560 }],
+      uneasy: [{ id: 'fw-dark-phryg', style: 'darkambient', bpm: 74, scale: 'phrygian', cut: 620, blips: 1 }, { id: 'fw-synth-low', style: 'darksynth', bpm: 90, scale: 'aeolian', calm: true }],
+      dire: [{ id: 'fw-synth', style: 'darksynth', bpm: 100, scale: 'phrygian' }, { id: 'fw-synth-loc', style: 'darksynth', bpm: 104, scale: 'locrian', root: 43 }] } },
+    lat: { kind: 'strategy', root: 39, scale: 'phrygian', wave: 'square', cut: 420, pools: {
+      calm: [{ id: 'lat-phonk', style: 'phonk', bpm: 128, calm: true }, { id: 'lat-dark', style: 'darkambient', bpm: 70, scale: 'locrian', blips: 1 }],
+      uneasy: [{ id: 'lat-synth-low', style: 'darksynth', bpm: 96, calm: true }, { id: 'lat-phonk-b', style: 'phonk', bpm: 124, calm: true, scale: 'phrygDom' }],
+      dire: [{ id: 'lat-synth', style: 'darksynth', bpm: 108, scale: 'locrian' }, { id: 'lat-phonk-hot', style: 'phonk', bpm: 132 }] } },
+    battle: { kind: 'battle', root: 40, scale: 'phrygian', wave: 'sawtooth', cut: 600, pools: {
+      stealth: [{ id: 'battle-dark', style: 'darkambient', bpm: 70, cut: 520, blips: 1 }, { id: 'battle-synth-low', style: 'darksynth', bpm: 88, scale: 'aeolian', calm: true }],
+      contact: [{ id: 'battle-synth', style: 'darksynth', bpm: 104 }, { id: 'battle-phonk', style: 'phonk', bpm: 136 }],
+      critical: [{ id: 'battle-phonk-crit', style: 'phonk', bpm: 140, minI: .85 }, { id: 'battle-synth-crit', style: 'darksynth', bpm: 110, scale: 'locrian', minI: .9 }] } },
+    'battle-lat': { kind: 'battle', root: 37, scale: 'phrygDom', wave: 'square', cut: 480, pools: {
+      stealth: [{ id: 'blat-dark', style: 'darkambient', bpm: 66, scale: 'locrian', cut: 460, blips: 1 }, { id: 'blat-synth-low', style: 'darksynth', bpm: 86, calm: true }],
+      contact: [{ id: 'blat-phonk', style: 'phonk', bpm: 130 }, { id: 'blat-synth', style: 'darksynth', bpm: 102, scale: 'phrygian' }],
+      critical: [{ id: 'blat-phonk-crit', style: 'phonk', bpm: 138, minI: .85 }, { id: 'blat-synth-crit', style: 'darksynth', bpm: 108, minI: .9 }] } }
   };
+  var MOOD_KIND = { calm: 'strategy', uneasy: 'strategy', dire: 'strategy', stealth: 'battle', contact: 'battle', critical: 'battle' };
+  var DEFAULT_MOOD = { title: 'calm', strategy: 'calm', battle: 'stealth' };
+  var HOLD = 8; // bars a mood must play before the next mood change is allowed
   var KICKS = ['x.........x.....', 'x......x..x.....', 'x..x......x.....', 'x.........x..x..'];
   function rint(n) { return Math.floor(Math.random() * n); }
   function chance(p) { return Math.random() < p; }
   function weighted(w) { var t = 0, k; for (k in w) t += w[k]; var r = Math.random() * t; for (k in w) { r -= w[k]; if (r <= 0) return k; } return k; }
+  // Seeded per session (mulberry32), so variant picks differ between sessions but a seed can be replayed.
+  function seeded(s) { return function () { s = (s + 0x6D2B79F5) | 0; var x = Math.imul(s ^ (s >>> 15), 1 | s); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; }; }
+  music.seed = (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0; music.rng = seeded(music.seed);
+  music.moods = { title: 'calm', strategy: 'calm', battle: 'stealth' }; music.auto = { battle: true }; music.last = {}; music.pending = null;
+
+  // Pick a variant for a scene and mood: never the same one twice in a row from a pool that has a choice.
+  function pick(name, mood) {
+    var sc = SCENES[name]; if (!sc) return null;
+    var pool = sc.pools[mood] || sc.pools[DEFAULT_MOOD[sc.kind]], key = name + ':' + mood, i = Math.floor(music.rng() * pool.length);
+    if (pool.length > 1 && i === music.last[key]) i = (i + 1) % pool.length;
+    music.last[key] = i;
+    var cfg = { scene: name, mood: pool === sc.pools[mood] ? mood : DEFAULT_MOOD[sc.kind], kind: sc.kind }, k;
+    for (k in sc) if (k !== 'pools') cfg[k] = sc[k];
+    for (k in pool[i]) cfg[k] = pool[i][k];
+    return cfg;
+  }
+  function moodFor(name) { var sc = SCENES[name]; return sc ? music.moods[sc.kind] || DEFAULT_MOOD[sc.kind] : null; }
 
   function scene(name) {
     music.want = name;
     if (ready() && name !== music.scene) startScene(name);
   }
+  // Fade a song's nodes out from t over `secs` and release them; notes already scheduled ring out under the fade.
+  function fadeOut(nodes, t, secs) {
+    nodes.forEach(function (n) {
+      try {
+        var p = n.g.gain; if (p.cancelAndHoldAtTime) p.cancelAndHoldAtTime(t); else p.cancelScheduledValues(t);
+        p.setTargetAtTime(0.0001, t, secs / 4);
+        (n.o || []).forEach(function (o) { o.stop(t + secs * 2); });
+        if (n.d) setTimeout(function () { n.d.forEach(function (x) { try { x.disconnect(); } catch (e) { } }); }, (secs * 2 + 1) * 1000);
+      } catch (e) { }
+    });
+  }
   function stopScene() {
-    var t = ac.currentTime;
-    music.nodes.forEach(function (n) { try { n.g.gain.setTargetAtTime(0.0001, t, .5); (n.o || []).forEach(function (o) { o.stop(t + 3); }); } catch (e) { } });
-    music.nodes = [];
+    if (ac) fadeOut(music.nodes, ac.currentTime, 2);
+    music.nodes = []; music.song = null; music.pending = null;
     if (music.timer) clearInterval(music.timer);
     music.timer = null;
   }
   function startScene(name) {
-    stopScene();
-    music.scene = name;
-    var sc = SCENES[name]; if (!sc) return;
-    var t = ac.currentTime;
-    // routing: beat (drums, 808, lead) -> stealth low-pass -> out; pad -> duck (sidechain) -> out
-    var out = ac.createGain(); out.gain.setValueAtTime(0.0001, t); out.gain.exponentialRampToValueAtTime(1, t + 2.5); out.connect(musicBus);
+    var cfg = pick(name, moodFor(name));
+    music.scene = name; music.pending = null;
+    if (!cfg) { stopScene(); return; }
+    begin(cfg, ac.currentTime + .05, 2, 2.5, HOLD);
+    if (!music.timer) music.timer = setInterval(tick, 50);
+  }
+  // Start a song at time t: fade the old one out over `out` seconds and the new one in over `inn`. hold = bars before
+  // a mood change may replace it (a fresh scene can still settle its mood on its very first bar line).
+  function begin(sc, t, outSecs, inSecs, hold) {
+    fadeOut(music.nodes, t, outSecs);
+    music.nodes = [];
+    var style = sc.style;
+    // routing: beat (drums, bass, lead) -> stealth low-pass -> out; pad -> duck (sidechain) -> out; arp -> echo -> out
+    var out = ac.createGain(); out.gain.setValueAtTime(0.0001, t); out.gain.exponentialRampToValueAtTime(1, t + inSecs); out.connect(musicBus);
     var stealth = ac.createBiquadFilter(); stealth.type = 'lowpass'; stealth.Q.value = 1.2; stealth.frequency.value = 900; stealth.connect(out);
     var beat = ac.createGain(); beat.gain.value = .42; beat.connect(stealth); // keeps the beat under the battle sound effects
     var duck = ac.createGain(); duck.connect(out);
     var dist = ac.createWaveShaper(); dist.curve = driveCurve(2.6); dist.oversample = '2x';
     var bassG = ac.createGain(); bassG.gain.value = .55; dist.connect(bassG); bassG.connect(beat);
     var lead = ac.createGain(); lead.gain.value = .3; lead.connect(beat);
-    music.g = { out: out, stealth: stealth, beat: beat, duck: duck, dist: dist, lead: lead };
-    music.nodes.push({ g: out });
-    // drone: root and fifth under everything, breathing low-pass
-    var dg = ac.createGain(), fl = ac.createBiquadFilter(), lfo = ac.createOscillator(), lg = ac.createGain();
+    var G = { out: out, stealth: stealth, beat: beat, duck: duck, dist: dist, bass: bassG, lead: lead }, nd = { g: out, d: [] };
+    if (style === 'darkambient' || style === 'darksynth') {
+      // dotted-eighth feedback echo for the arpeggios, darkened on every repeat
+      var echo = ac.createDelay(2), fb = ac.createGain(), efl = ac.createBiquadFilter(), eIn = ac.createGain(), arp = ac.createGain();
+      echo.delayTime.value = 60 / sc.bpm * .75; fb.gain.value = style === 'darkambient' ? .5 : .35;
+      efl.type = 'lowpass'; efl.frequency.value = style === 'darkambient' ? 1800 : 2600;
+      eIn.connect(echo); echo.connect(efl); efl.connect(fb); fb.connect(echo); efl.connect(out);
+      arp.connect(out); arp.connect(eIn); lead.connect(eIn);
+      G.echo = eIn; G.arp = arp; nd.d.push(eIn, echo, efl, fb);
+    }
+    music.g = G;
+    music.nodes.push(nd);
+    // drone: root and fifth under everything, breathing low-pass (wider detune and a slower sweep for dark ambient)
+    var dark = style === 'darkambient', dg = ac.createGain(), fl = ac.createBiquadFilter(), lfo = ac.createOscillator(), lg = ac.createGain();
     fl.type = 'lowpass'; fl.frequency.value = sc.cut; fl.Q.value = 3;
-    lfo.frequency.value = .05 + Math.random() * .04; lg.gain.value = sc.cut * .45; lfo.connect(lg); lg.connect(fl.frequency);
-    var os = [0, 7, -12].map(function (n, i) { var o = ac.createOscillator(); o.type = i === 2 ? 'sine' : sc.wave; o.frequency.value = hz(sc.root + n); o.detune.value = (i - 1) * 7; o.connect(fl); o.start(); return o; });
-    lfo.start(); os.push(lfo);
-    fl.connect(dg); dg.gain.value = sc.style === 'phonk' ? .05 : .09; dg.connect(duck);
+    lfo.frequency.value = dark ? .02 + Math.random() * .03 : .05 + Math.random() * .04; lg.gain.value = sc.cut * (dark ? .6 : .45); lfo.connect(lg); lg.connect(fl.frequency);
+    var fifth = SCALES[sc.scale][4];
+    var os = [0, fifth, -12].map(function (n, i) { var o = ac.createOscillator(); o.type = i === 2 ? 'sine' : sc.wave; o.frequency.value = hz(sc.root + n); o.detune.value = (i - 1) * (dark ? 13 : 7); o.connect(fl); o.start(t); return o; });
+    if (dark) { var o2 = ac.createOscillator(); o2.type = 'sawtooth'; o2.frequency.value = hz(sc.root); o2.detune.value = -11; o2.connect(fl); o2.start(t); os.push(o2); }
+    lfo.start(t); os.push(lfo);
+    fl.connect(dg); dg.gain.value = { phonk: .05, darksynth: .045, darkambient: .07 }[style] || .09; dg.connect(duck);
     var vs = ac.createGain(); vs.gain.value = .35; dg.connect(vs); vs.connect(verbIn);
     music.nodes.push({ g: dg, o: os });
-    if (sc.style === 'phonk') music.nodes.push(crackle(out, .5));
-    music.song = newSong(sc);
-    music.next = ac.currentTime + .15; music.step = 0;
-    music.timer = setInterval(tick, 50);
+    var crk = { phonk: .5, darkambient: .4, darksynth: .22 }[style];
+    if (crk) music.nodes.push(crackle(out, crk, t));
+    music.song = newSong(sc); music.song.hold = hold;
+    music.next = t; music.step = 0;
+  }
+  // Mood change on a bar line: crossfade over about two bars.
+  function crossfade(mood, t) {
+    var cfg = pick(music.scene, mood); if (!cfg) return;
+    var bar = 60 / cfg.bpm * 4, secs = Math.max(3, Math.min(6, bar * 1.5));
+    begin(cfg, t, secs, secs * .8, HOLD);
+  }
+  function setMood(name) {
+    var kind = MOOD_KIND[name];
+    if (!kind || music.moods[kind] === name) return; // same mood again: nothing to do
+    music.moods[kind] = name;
+    var sc = SCENES[music.scene];
+    if (!music.song || !sc || sc.kind !== kind) return; // remembered for the next scene of that kind
+    music.pending = music.song.sc.mood === name ? null : name; // flipping back before the switch cancels it
+  }
+  // Public: 'calm' | 'uneasy' | 'dire' for strategy screens, 'stealth' | 'contact' | 'critical' for battles.
+  // Calling it hands that kind of mood to the UI for good (battles otherwise follow intensity: contact above .5).
+  function mood(name) {
+    var kind = MOOD_KIND[name]; if (!kind) return;
+    music.auto[kind] = false;
+    setMood(name);
   }
   function driveCurve(k) { var n = 1024, c = new Float32Array(n); for (var i = 0; i < n; i++) { var x = i / (n - 1) * 2 - 1; c[i] = Math.tanh(k * x) / Math.tanh(k); } return c; }
 
@@ -222,9 +312,10 @@ XG.Audio = (function () {
   // constantly changing notes. So the riff stays put for a few sections and only the last bar of a phrase turns around.
   function newSong(sc) {
     var so = { sc: sc, scale: SCALES[sc.scale], prog: PROGS[rint(PROGS.length)], progBars: 0, section: 'intro', secBars: 4, bar: 0,
-      riff: null, riffAge: 0, kick: KICKS[0], lastBass: null, phrase: null, wasHot: false };
+      riff: null, riffAge: 0, kick: KICKS[0], lastBass: null, phrase: null, arp: null, wasHot: false, hold: HOLD };
     so.riff = makeRiff();
     so.phrase = makePhrase();
+    so.arp = makeArp(sc.style);
     return so;
   }
   function deg(so, d, oct) { var sc = so.scale, n = sc.length, o = Math.floor(d / n); return so.sc.root + sc[((d % n) + n) % n] + 12 * (o + (oct || 0)); }
@@ -242,8 +333,21 @@ XG.Audio = (function () {
   }
   function turnaround(r) { var c = r.slice(); [26, 28, 30].forEach(function (i) { c[i] = chance(.6) ? [7, 5, 4, 1][rint(4)] : null; }); return c; }
   function makePhrase() { var m = []; for (var i = 0; i < 16; i++) m.push(i % 4 === 0 && chance(.7) ? [0, 2, 4, 1][rint(4)] : null); return m; }
+  // Arpeggio shapes in scale degrees over the chord (0 root, 2 third, 4 fifth, 7 octave). Dark ambient leaves gaps.
+  var ARPS = [[0, 2, 4, 7, 4, 2, 0, 2], [0, 4, 7, 4, 9, 7, 4, 2], [0, 2, 4, 2, 7, 4, 2, 4], [7, 4, 2, 0, 2, 4, 6, 4], [0, 7, 4, 7, 2, 7, 4, 1]];
+  function makeArp(style) {
+    var a = ARPS[rint(ARPS.length)].slice();
+    if (style === 'darkambient') a = a.map(function (d, i) { return i === 0 || chance(.55) ? d : null; });
+    return a;
+  }
   function nextSection(so, hot) {
-    if (so.sc.style !== 'phonk') return weighted({ swell: 2, drift: 3, sparse: 3, melody: 2 });
+    var style = so.sc.style;
+    if (style === 'darkambient') return weighted({ void: 2, pulse: 3, arp: 3, glitch: 1.5 });
+    if (style === 'darksynth') {
+      if (so.sc.calm) return weighted({ intro: 3, break: 2, lead: 1.5 });
+      return hot ? weighted({ drive: 4, lead: 3, break: 1 }) : weighted({ intro: 1.5, drive: 2, lead: 3, break: 2 });
+    }
+    if (style !== 'phonk') return weighted({ swell: 2, drift: 3, sparse: 3, melody: 2 });
     if (so.sc.calm) return weighted({ groove: 4, break: 2, lead: 2, intro: 1 });
     return hot ? weighted({ lead: 4, drop: 3, groove: 1.5, break: 1 }) : weighted({ groove: 4, break: 2, intro: 1.5, lead: .8 });
   }
@@ -253,35 +357,45 @@ XG.Audio = (function () {
     if (!ready() || !music.song) return;
     var so = music.song, sc = so.sc, g = music.g;
     music.intensity += (music.target - music.intensity) * .012;
-    var I = sc.calm ? .12 : music.intensity, now = ac.currentTime;
+    var I = sc.calm ? .12 : Math.max(music.intensity, sc.minI || 0), now = ac.currentTime;
     // the subtle part: the beat's filter and the lead's level follow intensity smoothly
-    g.stealth.frequency.setTargetAtTime(sc.style === 'phonk' ? 600 + Math.pow(I, 1.6) * 12000 : 18000, now, .5);
+    var cut = sc.style === 'phonk' ? 600 + Math.pow(I, 1.6) * 12000 : sc.style === 'darksynth' ? 800 + Math.pow(I, 1.4) * 9000 : 18000;
+    g.stealth.frequency.setTargetAtTime(cut, now, .5);
     g.lead.gain.setTargetAtTime(.08 + I * .3, now, .6);
     var sixteenth = 60 / sc.bpm / 4;
     if (music.next < now - .1) music.next = now + .05; // tab was hidden: skip ahead, don't burst
     while (music.next < now + .3) {
       var st = music.step % 16, t = music.next;
+      // a mood change waits for a bar line, and for the current song to have played its hold
+      if (st === 0 && music.pending && (so.bar === 0 || so.bar >= so.hold)) { var m = music.pending; music.pending = null; crossfade(m, t); return tick(); }
       if (st === 0) newBar(so, t, I);
-      if (sc.style === 'phonk') phonkStep(so, st, t, sixteenth, I); else ambientStep(so, st, t, sixteenth);
+      if (sc.style === 'phonk') phonkStep(so, st, t, sixteenth, I);
+      else if (sc.style === 'darkambient') darkAmbientStep(so, st, t, sixteenth);
+      else if (sc.style === 'darksynth') darkSynthStep(so, st, t, sixteenth, I);
+      else ambientStep(so, st, t, sixteenth);
       music.next += sixteenth; music.step++;
     }
   }
   function newBar(so, t, I) {
-    var hot = I > .55, phonk = so.sc.style === 'phonk';
-    if (hot && !so.wasHot && phonk && !so.sc.calm) braam(so, t); // contact: one heavy low hit, XCOM-style
+    var hot = I > .55, style = so.sc.style, phonk = style === 'phonk';
+    if (hot && !so.wasHot && (phonk || style === 'darksynth') && !so.sc.calm) braam(so, t); // contact: one heavy low hit, XCOM-style
     so.wasHot = hot;
     so.bar++; so.progBars++;
     if (so.progBars >= 16 && chance(.5)) { so.prog = PROGS[rint(PROGS.length)]; so.progBars = 0; }
     if (--so.secBars <= 0) {
       so.section = nextSection(so, hot);
-      so.secBars = so.section === 'intro' || so.section === 'break' ? 4 : 8;
+      so.secBars = so.section === 'intro' || so.section === 'break' || so.section === 'void' ? 4 : 8;
       so.kick = KICKS[rint(KICKS.length)];
       if (++so.riffAge >= 3) { so.riff = makeRiff(); so.riffAge = 0; }
-      if (!phonk && so.bar % 8 === 1) so.phrase = makePhrase();
-      if (so.section === 'break') chop(so, t, 0);
+      if (style === 'ambient' && so.bar % 8 === 1) so.phrase = makePhrase();
+      if ((style === 'darkambient' || style === 'darksynth') && chance(.4)) so.arp = makeArp(style);
+      if (phonk && so.section === 'break') chop(so, t, 0);
     }
-    if (phonk) { if ((so.section === 'intro' || so.section === 'break') && so.bar % 4 === 1) pad(so, t, 60 / so.sc.bpm * 16); }
-    else if (so.bar % 2 === 1) pad(so, t, 60 / so.sc.bpm * 8);
+    var beatLen = 60 / so.sc.bpm;
+    if (phonk) { if ((so.section === 'intro' || so.section === 'break') && so.bar % 4 === 1) pad(so, t, beatLen * 16); }
+    else if (style === 'darkambient') { if (so.bar % 4 === 1) darkPad(so, t, beatLen * 16 * 1.1, so.sc.cut, .022); }
+    else if (style === 'darksynth') { if (so.bar % 2 === 1) darkPad(so, t, beatLen * 8 * 1.05, 1100, .016); }
+    else if (so.bar % 2 === 1) pad(so, t, beatLen * 8);
   }
   function phonkStep(so, st, t, sx, I) {
     var sec = so.section, drums = sec === 'groove' || sec === 'lead' || sec === 'drop', ch = chordDeg(so), swing = st % 2 ? sx * .1 : 0;
@@ -314,6 +428,34 @@ XG.Audio = (function () {
     }
     if (sec === 'swell' && st === 0 && so.bar % 4 === 0) shimmer(so, t);
     if (st === 0 && so.bar % 4 === 0) tone({ type: 'sine', f: [hz(deg(so, ch, -1))], dur: sx * 30, gain: .07, attack: sx * 8, at: at(t), dest: music.g.out });
+  }
+  // Dark ambient: drones and pads carry it; a sub pulse on the bar, a sparse echoed arpeggio, data blips. Barely any drums.
+  function darkAmbientStep(so, st, t, sx) {
+    var sec = so.section, ch = chordDeg(so);
+    if (st === 0 || (sec === 'pulse' && st === 8)) sub(t, deg(so, ch, -1), sx * (st === 0 ? 7 : 5), st === 0 ? 1 : .7);
+    if (sec === 'pulse' && st === 0) kick(t, .3);
+    if (st % 2 === 0 && sec !== 'void' && sec !== 'intro' && chance(sec === 'arp' ? .55 : .25)) {
+      var a = so.arp[(st / 2 + so.bar * 8) % so.arp.length];
+      if (a !== null) pluck(t, deg(so, ch + a, 2), sx * 3);
+    }
+    if (chance((sec === 'glitch' ? .1 : .015) * (so.sc.blips ? 1.8 : 1))) blip(t + (chance(.5) ? sx / 2 : 0));
+    if (sec === 'void' && st === 0 && so.bar % 2 === 0) shimmer(so, t);
+  }
+  // Darksynth: pumping saw bass on 8ths (16ths when driving or in contact), kick on 1 and 3, gated snare on 2 and 4,
+  // an arpeggiated lead through the echo.
+  function darkSynthStep(so, st, t, sx, I) {
+    var sec = so.section, ch = chordDeg(so), drums = sec === 'drive' || sec === 'lead';
+    if (drums && (st === 0 || st === 8 || (sec === 'drive' && I > .5 && (st === 4 || st === 12)))) { kick(t, st === 0 ? .9 : .75); duckPad(t); }
+    if (drums && (st === 4 || st === 12)) gatedSnare(t, 1);
+    if (drums && st % 4 === 2) hat(t, .7, false);
+    if (drums && I > .6 && st % 2 === 1) hat(t, .35, false);
+    var rate = sec === 'drive' || I > .6 ? 1 : 2;
+    if (sec !== 'break' && st % rate === 0) synthBass(t, deg(so, ch, -1) + (st === 14 && chance(.3) ? 12 : 0), sx * rate, I);
+    if (sec === 'break' && st === 0) sub(t, deg(so, ch, -1), sx * 14, 1);
+    if (sec === 'lead' || sec === 'break' || (sec === 'drive' && I > .4)) {
+      var every = sec === 'lead' ? 1 : 2;
+      if (st % every === 0) { var a = so.arp[(st / every) % so.arp.length]; if (a !== null) leadArp(t, deg(so, ch + a, 1), sx * every * .9, sec === 'break' ? .6 : 1); }
+    }
   }
 
   // ------------------------------------------- instruments (t = absolute AudioContext time)
@@ -376,12 +518,12 @@ XG.Audio = (function () {
     tone({ type: 'sine', f: [hz(n), hz(n) * .9], dur: 1.6, gain: .18, at: at(t), dest: music.g.out });
   }
   // Lo-fi bed: vinyl crackle and tape hiss, looped. Phonk lives on this.
-  function crackle(dest, level) {
+  function crackle(dest, level, t) {
     var n = ac.sampleRate * 3, b = ac.createBuffer(1, n, ac.sampleRate), d = b.getChannelData(0);
     for (var i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * .015 + (Math.random() < .0004 ? (Math.random() * 2 - 1) * .8 : 0);
     var src = ac.createBufferSource(), hp = ac.createBiquadFilter(), g = ac.createGain();
     src.buffer = b; src.loop = true; hp.type = 'bandpass'; hp.frequency.value = 2500; hp.Q.value = .5;
-    g.gain.value = level; src.connect(hp); hp.connect(g); g.connect(dest); src.start();
+    g.gain.value = level; src.connect(hp); hp.connect(g); g.connect(dest); src.start(t);
     return { g: g, o: [src] };
   }
   function shimmer(so, t) {
@@ -394,13 +536,74 @@ XG.Audio = (function () {
       tone({ type: 'triangle', f: [hz(n)], dur: len * .95, gain: so.sc.style === 'phonk' ? .028 : .035, attack: len * .3, at: at(t), dest: music.g.duck, filter: ['lowpass', 900], verb: .8, detune: i * 4 - 4 });
     });
   }
+  // Dark pad: each chord tone is two saws detuned apart, through one low-pass that sweeps slowly open and shut.
+  function darkPad(so, t, len, cut, gain) {
+    var ch = chordDeg(so), g = ac.createGain(), lp = ac.createBiquadFilter();
+    lp.type = 'lowpass'; lp.Q.value = 2;
+    lp.frequency.setValueAtTime(cut * .5, t); lp.frequency.exponentialRampToValueAtTime(cut * 1.7, t + len * .5); lp.frequency.exponentialRampToValueAtTime(cut * .6, t + len);
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + len * .35); g.gain.setValueAtTime(gain, t + len * .65); g.gain.exponentialRampToValueAtTime(.0001, t + len);
+    [0, 2, 4].forEach(function (d) {
+      var f = hz(deg(so, ch + d, 0));
+      [-9, 9].forEach(function (dt) { var o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = dt + (Math.random() - .5) * 6; o.connect(lp); o.start(t); o.stop(t + len + .1); });
+    });
+    lp.connect(g); g.connect(music.g.duck);
+    var s = ac.createGain(); s.gain.value = .6; g.connect(s); s.connect(verbIn);
+  }
+  // Sub-bass pulse: a soft sine swell, felt more than heard.
+  function sub(t, midi, len, v) {
+    var o = ac.createOscillator(), g = ac.createGain();
+    o.type = 'sine'; o.frequency.value = hz(midi);
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.2 * v, t + .04); g.gain.setTargetAtTime(.0001, t + len * .4, len * .2);
+    o.connect(g); g.connect(music.g.out); o.start(t); o.stop(t + len + .3);
+  }
+  // Glassy pluck for the dark-ambient arpeggio, into the echo.
+  function pluck(t, midi, len) {
+    var f = hz(midi), g = ac.createGain(), lp = ac.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.setValueAtTime(2400, t); lp.frequency.exponentialRampToValueAtTime(500, t + len);
+    [['triangle', 0], ['sine', 1200]].forEach(function (w) { var o = ac.createOscillator(); o.type = w[0]; o.frequency.value = f; o.detune.value = w[1] + (Math.random() - .5) * 8; o.connect(lp); o.start(t); o.stop(t + len + .1); });
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.05, t + .006); g.gain.exponentialRampToValueAtTime(.0001, t + len);
+    lp.connect(g); g.connect(music.g.arp);
+    var s = ac.createGain(); s.gain.value = .5; g.connect(s); s.connect(verbIn);
+  }
+  // Data blip: two to four tiny square chirps, like a modem thinking aloud.
+  function blip(t) {
+    var f = hz(84 + rint(14)), n = 2 + rint(3), down = chance(.5);
+    for (var i = 0; i < n; i++) tone({ type: 'square', f: [f * (down ? 1 - i * .12 : 1 + i * .1)], dur: .022, gain: .016, attack: .002, at: at(t + i * .032), dest: music.g.out, filter: ['bandpass', f, 5], verb: .3 });
+  }
+  // Gated snare: a noise burst that holds flat and is then cut hard, with a body tone. The 80s darksynth snare.
+  function gatedSnare(t, v) {
+    var src = ac.createBufferSource(), bp = ac.createBiquadFilter(), g = ac.createGain();
+    src.buffer = noiseBuf; bp.type = 'bandpass'; bp.frequency.value = 1900; bp.Q.value = .8;
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.3 * v, t + .003); g.gain.setValueAtTime(.2 * v, t + .13); g.gain.linearRampToValueAtTime(.0001, t + .15);
+    src.connect(bp); bp.connect(g); g.connect(music.g.beat);
+    var s = ac.createGain(); s.gain.value = .2; g.connect(s); s.connect(verbIn);
+    src.start(t, Math.random() * .5); src.stop(t + .2);
+    tone({ type: 'triangle', f: [200, 150], dur: .09, gain: .16 * v, at: at(t), dest: music.g.beat });
+  }
+  // Pumping bass: saw plus square under a closing low-pass, its level swelling up after each hit (the sidechain feel).
+  function synthBass(t, midi, len, I) {
+    var f = hz(midi), g = ac.createGain(), lp = ac.createBiquadFilter(), cut = 220 + I * 900;
+    lp.type = 'lowpass'; lp.Q.value = 3; lp.frequency.setValueAtTime(cut * 2.5, t); lp.frequency.exponentialRampToValueAtTime(cut, t + len * .6);
+    [['sawtooth', 0], ['square', -8]].forEach(function (w) { var o = ac.createOscillator(); o.type = w[0]; o.frequency.value = f; o.detune.value = w[1]; o.connect(lp); o.start(t); o.stop(t + len + .05); });
+    g.gain.setValueAtTime(.04, t); g.gain.linearRampToValueAtTime(.42, t + len * .55); g.gain.exponentialRampToValueAtTime(.0001, t + len * .98);
+    lp.connect(g); g.connect(music.g.bass);
+  }
+  // Arpeggiated lead: square and saw a hair apart through a resonant low-pass, into the echo.
+  function leadArp(t, midi, len, v) {
+    var f = hz(midi), g = ac.createGain(), lp = ac.createBiquadFilter();
+    lp.type = 'lowpass'; lp.Q.value = 4; lp.frequency.setValueAtTime(3200, t); lp.frequency.exponentialRampToValueAtTime(900, t + len * 1.5);
+    [['square', -5], ['sawtooth', 5]].forEach(function (w) { var o = ac.createOscillator(); o.type = w[0]; o.frequency.value = f; o.detune.value = w[1]; o.connect(lp); o.start(t); o.stop(t + len * 1.6 + .05); });
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.12 * v, t + .005); g.gain.exponentialRampToValueAtTime(.0001, t + len * 1.6);
+    lp.connect(g); g.connect(music.g.lead);
+  }
   function duckPad(t) { var d = music.g.duck.gain; d.cancelScheduledValues(t); d.setValueAtTime(.35, t); d.linearRampToValueAtTime(1, t + .28); }
   // 0 = calm, 1 = contact. Battles set it from whether hostiles are in sight.
-  function intensity(v) { music.target = Math.max(0, Math.min(1, v)); }
+  function intensity(v) { music.target = Math.max(0, Math.min(1, v)); if (music.auto.battle) setMood(v > .5 ? 'contact' : 'stealth'); }
 
   // Test hook: an analyser on the master bus (tests/browser/audio-levels.mjs).
   function meter() { if (!ac) return null; var a = ac.createAnalyser(); a.fftSize = 2048; master.connect(a); return a; }
 
-  return { play: play, scene: scene, meter: meter, intensity: intensity, ready: ready, unlock: unlock, SFX: SFX, SCENES: SCENES,
-    _state: function () { var so = music.song; return { ac: ac && ac.state, scene: music.scene, want: music.want, unlocked: unlocked, section: so && so.section, bar: so && so.bar, intensity: +music.intensity.toFixed(2), cutoff: music.g && Math.round(music.g.stealth.frequency.value) }; } };
+  return { play: play, scene: scene, mood: mood, meter: meter, intensity: intensity, ready: ready, unlock: unlock, SFX: SFX, SCENES: SCENES,
+    _state: function () { var so = music.song; return { ac: ac && ac.state, scene: music.scene, want: music.want, unlocked: unlocked, section: so && so.section, bar: so && so.bar, intensity: +music.intensity.toFixed(2), cutoff: music.g && Math.round(music.g.stealth.frequency.value),
+      style: so && so.sc.style, variant: so && so.sc.id, mood: so && so.sc.mood, bpm: so && so.sc.bpm, pending: music.pending, moods: Object.assign({}, music.moods), seed: music.seed }; } };
 })();

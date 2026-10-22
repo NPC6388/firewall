@@ -24,6 +24,8 @@ XG.Help = (function () {
     ['Blast-proof cover', 'both', 'Concrete barriers (low) and pillars (tall) and their network equivalents. Grenades and blasts do not destroy them.'],
     ['Glass panel', 'both', 'Full cover, but when a shot at a unit using it as cover misses, the panel shatters and the cover is gone. Blasts shatter it too.'],
     ['Fence', 'both', 'Chain-link or laser fences. Nothing can walk through, but they give no cover, do not block line of sight and cannot be destroyed.'],
+    ['Corner standoff', 'both', 'Two units hugging the same wall or tall cover, who can only see each other by leaning round the corner, both shoot from a base of 50% instead of their aim. Cover, range and the other modifiers still apply, and the odds breakdown shows it as its own line.'],
+    ['Mixed-side cover', 'both', 'Sandbag bunkers, shielded emplacements and partial firewalls: tall objects whose four faces are each full or half cover. Only the face toward the attacker counts, so hover one to see which sides are which.'],
     ['Aegis Shield', 'fw', 'HALCYON Sentinel ability: gives any ally on the map 3 shield points that soak damage first. No range limit.'],
     ['Overclock', 'fw', 'HALCYON gives one operative +1 AP. Limited uses per mission (O key).'],
     ['Sever', 'fw', 'A hacker next to the Uplink Core can try to cut it. Three successes end the mission.'],
