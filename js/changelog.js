@@ -7,6 +7,7 @@ XG.CHANGELOG = [
    {
     "name": "2026-10-22",
     "items": [
+     "<b>Lattice:</b> veteran squads draw more attention. Once the squad you deploy averages Sergeant or better, each mission has one extra Swarm Drone.",
      "<b>Battle:</b> Hunker all (H). Every unit with AP left hunkers down and the turn ends, after a confirm, like Overwatch all.",
      "<b>Battle:</b> the combat log now shows how many hostiles are still alive out of all you have discovered (e.g. 2/5)."
     ]

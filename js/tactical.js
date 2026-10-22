@@ -320,6 +320,12 @@ XG.Tac = (function () {
     5: ['drone', 'warden', 'warden', 'harmonic', 'drone', 'drone']
   };
 
+  // Average rank of the operatives in a squad (machines don't rank up).
+  function squadRank(squad) {
+    var ops = squad.filter(function (s) { return s.cls && !D.classes[s.cls].machine; });
+    return ops.length ? ops.reduce(function (a, s) { return a + XG.State.rankIndex(s); }, 0) / ops.length : 0;
+  }
+
   // squad: array of soldier objects (already chosen). mission: strategy mission object.
   function create(g, mission, squad) {
     var rng = new XG.RNG(mission.seed || 12345);
@@ -346,6 +352,7 @@ XG.Tac = (function () {
       list = ['warden', 'harmonic', 'drone', 'drone'];
       placeStatic(b, 'core', cand, W - 5);
     }
+    if (squadRank(squad) >= D.tuning.veteranDrone) list.push('drone'); // the Lattice sends more against veterans
     // pods of 2-3, centers spread out
     var centers = [], pods = [];
     while (list.length) pods.push(list.splice(0, list.length === 4 ? 2 : Math.min(3, list.length)));
@@ -1113,7 +1120,7 @@ XG.Tac = (function () {
 
   return {
     W: W, H: H, FLOOR: FLOOR, WALL: WALL, LOW: LOW, HIGH: HIGH, PIT: PIT, SIGHT: SIGHT,
-    create: create, createLattice: createLattice, createTraining: createTraining, refillAP: refillAP, act: act, endPlayerTurn: endPlayerTurn, enemyStep: enemyStep, ai: ai,
+    create: create, squadRank: squadRank, createLattice: createLattice, createTraining: createTraining, refillAP: refillAP, act: act, endPlayerTurn: endPlayerTurn, enemyStep: enemyStep, ai: ai,
     endTurn: endTurn, aiStep: aiStep,
     reach: reach, pathTo: pathTo, moveRange: moveRange, hitInfo: hitInfo, targets: targets, tileOk: tileOk,
     abilityBlock: abilityBlock, coverValue: coverValue, coverDetail: coverDetail, los: los, isVisible: isVisible, unitAt: unitAt,

@@ -241,6 +241,17 @@ function autoBattle(g, m, squad) {
   check(p.length && p[0].groups.length && p[0].groups[0].items.length, 'changelog parses into releases, dated groups and entries');
 })();
 
+// Veteran squads (average rank >= tuning.veteranDrone) draw one extra drone.
+(function () {
+  var g = S.newGame(77), D = XG.DATA, r = S.rng(g), m = Strat.spawnMission(g, r, 'purge'); S.saveRng(g, r);
+  m.diff = 2;
+  var sq = g.soldiers.slice(0, 4), drones = function (b) { return b.units.filter(function (u) { return u.kind === 'drone'; }).length; };
+  var n0 = drones(Tac.create(g, m, sq));
+  sq.forEach(function (s) { s.xp = D.ranks[D.tuning.veteranDrone].xp; });
+  check(drones(Tac.create(g, m, sq)) === n0 + 1, 'veteran squad faces one extra drone');
+  sq.forEach(function (s) { s.xp = 0; });
+})();
+
 // ---------------------------------------------------------------- battles
 var nb = +process.argv[2] || 60, tally = {};
 for (var i = 0; i < nb; i++) {

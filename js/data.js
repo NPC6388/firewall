@@ -387,7 +387,8 @@ XG.DATA = {
     hireCost: 30,
     minMissionCredits: 15,     // every won mission pays at least this
     missionEvery: [3, 5],
-    missionLife: [4, 6]
+    missionLife: [4, 6],
+    veteranDrone: 3            // one extra drone once the squad's average rank reaches this (3 = Sergeant)
   },
 
   // ---------------------------------------------------- the Lattice campaign
