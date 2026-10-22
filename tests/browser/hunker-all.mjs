@@ -1,19 +1,16 @@
-// Every unit but the HALCYON Sentinel can hunker. The scientist's five abilities still fit the battle bar on one row.
-export default async function ({ ev, sleep, send }) {
-  await ev(`localStorage.clear(); localStorage.setItem('firewall-settings-v1', JSON.stringify({hints:false})); location.reload()`); await sleep(1200);
-  await ev(`document.querySelector('[data-action="new-game"]').click()`); await sleep(300);
-  await ev(`document.getElementById('story-next').click()`); await sleep(200);
-  await ev(`(function(){var g=XG.UI.g, r=XG.State.rng(g); XG.Strat.spawnMission(g,r,'purge'); XG.State.saveRng(g,r); XG.UI.render();})()`);
-  await ev(`document.querySelector('[data-action="deploy"]').click()`); await sleep(300);
-  await ev(`document.getElementById('sq-go').click()`); await sleep(700);
-  console.log('hunker by kind:', await ev(`JSON.stringify(XG.TacUI.debug().b.units.filter(u=>!u.isStatic).map(u=>u.kind+':'+(u.abilities.indexOf('hunker')>=0)))`));
-  for (const kind of ['scientist', 'hacker', 'trooper']) {
-    const ok = await ev(`(function(){var s=XG.TacUI.debug(), u=s.b.units.find(u=>u.kind==='${kind}'); if(!u) return 'none'; s.sel=u.id; s.dirty=true; XG.TacUI.render && XG.TacUI.render(); return 'ok';})()`);
-    await sleep(300);
-    const bar = await ev(`(function(){var bs=[].slice.call(document.querySelectorAll('#tac-abilities button')); var tops={}; bs.forEach(b=>tops[Math.round(b.getBoundingClientRect().top)]=1); return bs.map(b=>b.innerText.replace(/\s+/g,' ').trim()).join(' | ')+'  rows='+Object.keys(tops).length;})()`);
-    console.log(kind, ok, bar);
-  }
-  const r = await ev(`(function(){var r=document.getElementById('tac-bar')||document.getElementById('tac-abilities'); r=r.getBoundingClientRect(); return [r.left,r.top,r.width,r.height];})()`);
-  const res = await send('Page.captureScreenshot', { format: 'png', clip: { x: 0, y: Math.max(0, r[1] - 10), width: 1400, height: r[3] + 20, scale: 1 } });
-  const fs = await import('node:fs'); fs.writeFileSync('tests/browser/shots/hunker-all.png', Buffer.from(res.result.data, 'base64'));
+// Hunker all (H): asks first, then every unit with AP left hunkers down and the turn ends.
+export default async function ({ ev, shot, sleep, send }) {
+  const press = async (k, code, vk) => { await send('Input.dispatchKeyEvent', { type: 'keyDown', key: k, code, text: k.length === 1 ? k : undefined, windowsVirtualKeyCode: vk }); await send('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code, windowsVirtualKeyCode: vk }); };
+  await ev(`localStorage.clear(); XG.Settings.set('hints', false); location.reload()`); await sleep(1200);
+  await ev(`(function(){ var g=XG.State.newGame(7), sq=g.soldiers.slice(0,4); var b=XG.Tac.create(g, {kind:'purge', diff:1, name:'Hunker test', city:'Test', site:'city', seed: 7}, sq); XG.TacUI.startWith(g, b, function(){}); })()`); await sleep(1500);
+  const state = () => ev(`(function(){ var b=XG.TacUI.debug().b; return 'turn ' + b.turn + '/' + b.side + ' hunkered ' + b.units.filter(function(u){ return u.alive && u.side===b.human && u.hunker; }).length; })()`);
+  console.log('start', await state());
+  await press('h', 'KeyH', 72); await sleep(400);
+  console.log('modal:', await ev(`document.getElementById('modal-box').innerText.replace(/\\s+/g, ' ')`)); await shot('hunker-all-ask');
+  await press('Escape', 'Escape', 27); await sleep(300);
+  console.log('after Esc', await state(), '| modal open', await ev(`XG.UI.isModal()`));
+  await ev(`document.getElementById('tac-hkall').click()`); await sleep(300);
+  await ev(`document.getElementById('owa-yes').click()`); await sleep(1500);
+  console.log('after confirm', await state());
+  console.log('log:', await ev(`XG.TacUI.debug().b.log.map(function(l){ return l.msg; }).filter(function(m){ return /unker/.test(m); }).join(' | ')`)); await shot('hunker-all-done');
 }

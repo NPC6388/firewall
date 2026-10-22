@@ -56,6 +56,7 @@ XG.TacUI = (function () {
       else if (e.key === 'o' || e.key === 'O') overclock();
       else if (e.key === ' ') { e.preventDefault(); if (!(XG.Tutorial && XG.Tutorial.advance())) { if (st.mode) confirmArmed(); else if (allSpent()) endTurn(); } }
       else if (e.key === 'y' || e.key === 'Y') overwatchAll();
+      else if (e.key === 'h' || e.key === 'H') hunkerAll();
       else if (e.key === 'm' || e.key === 'M') XG.Settings.set('muted', !XG.Settings.get('muted'));
       else if (e.key === '?' || e.key === 'F1') { e.preventDefault(); XG.Help.open(); }
       else if (/^[1-9]$/.test(e.key)) { var u = selUnit(); if (u && u.abilities[+e.key - 1]) pickAbility(u.abilities[+e.key - 1]); }
@@ -63,7 +64,8 @@ XG.TacUI = (function () {
     $('tac-endturn').onclick = endTurn;
     $('tac-overclock').onclick = overclock;
     $('tac-owall').onclick = overwatchAll;
-    // Esc closes the overwatch-all question (the battle key handler is paused while a modal is open)
+    $('tac-hkall').onclick = hunkerAll;
+    // Esc closes the overwatch-all / hunker-all question (the battle key handler is paused while a modal is open)
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && $('owa-no') && XG.UI.isModal()) XG.UI.closeModal(); });
     $('tac-abort').onclick = function () {
       if (!canInput()) return;
@@ -227,20 +229,23 @@ XG.TacUI = (function () {
     var u = selUnit(); if (!canInput() || !u || !st.mode) return;
     confirmMode(u, st.mode, D.abilities[st.mode]);
   }
-  // Overwatch all: every unit of yours with AP left that can take overwatch, after an "are you sure?".
-  function overwatchAll() {
-    if (!canInput() || !allowed('overwatchAll')) return;
-    var b = st.b, list = b.units.filter(function (u) { return u.alive && u.side === HS() && !u.isStatic && u.ap > 0 && !Tac.abilityBlock(b, u, 'overwatch'); });
-    if (!list.length) { XG.UI.modal('<h1>Overwatch all</h1><p>No one can go on overwatch right now.</p><div class="modal-actions"><button class="primary" id="owa-no">OK</button></div>'); $('owa-no').onclick = XG.UI.closeModal; $('owa-no').focus(); return; }
+  // Overwatch all / Hunker all: every unit of yours with AP left that can take that order, after an "are you sure?",
+  // then the turn ends.
+  function overwatchAll() { groupOrder('overwatch', 'overwatchAll', 'Overwatch all', 'go on overwatch', 'goes on overwatch'); }
+  function hunkerAll() { groupOrder('hunker', 'hunkerAll', 'Hunker all', 'hunker down', 'hunkers down'); }
+  function groupOrder(id, kind, title, many, one) {
+    if (!canInput() || !allowed(kind)) return;
+    var b = st.b, list = b.units.filter(function (u) { return u.alive && u.side === HS() && !u.isStatic && u.ap > 0 && !Tac.abilityBlock(b, u, id); });
+    if (!list.length) { XG.UI.modal('<h1>' + title + '</h1><p>No one can ' + many + ' right now.</p><div class="modal-actions"><button class="primary" id="owa-no">OK</button></div>'); $('owa-no').onclick = XG.UI.closeModal; $('owa-no').focus(); return; }
     st.mode = null; st.aim = null; hud();
-    XG.UI.modal('<h1>Overwatch all?</h1><p>Are you sure? <b>' + list.length + '</b> unit' + (list.length > 1 ? 's go' : ' goes') + ' on overwatch, then your turn ends: ' +
+    XG.UI.modal('<h1>' + title + '?</h1><p>Are you sure? <b>' + list.length + '</b> unit' + (list.length > 1 ? 's ' + many : ' ' + one) + ', then your turn ends: ' +
       list.map(function (u) { return u.short || u.name; }).join(', ') + '.</p>' +
-      '<div class="modal-actions"><button id="owa-no">Cancel (Esc)</button><button class="primary" id="owa-yes">Overwatch all (Space)</button></div>');
+      '<div class="modal-actions"><button id="owa-no">Cancel (Esc)</button><button class="primary" id="owa-yes">' + title + ' (Space)</button></div>');
     $('owa-no').onclick = XG.UI.closeModal;
     $('owa-yes').onclick = function () {
       XG.UI.closeModal();
-      list.forEach(function (u) { if (u.alive && u.ap > 0) { var ev = Tac.act.overwatch(st.b, u); if (ev) enqueue(ev); } });
-      endTurn(true); // the overwatch events play first, then the other side moves
+      list.forEach(function (u) { if (u.alive && u.ap > 0) { var ev = Tac.act[id](st.b, u); if (ev) enqueue(ev); } });
+      endTurn(true); // the order's events play first, then the other side moves
     };
     $('owa-yes').focus(); // Space / Enter press the focused button
   }
@@ -418,6 +423,7 @@ XG.TacUI = (function () {
     $('tac-endturn').innerHTML = allSpent() ? 'End Turn ␣' : 'End Turn ⏎';
     $('tac-endturn').title = allSpent() ? 'Everyone is out of AP: Space or Enter ends the turn' : 'End turn (Enter)';
     $('tac-owall').disabled = !canInput();
+    $('tac-hkall').disabled = !canInput();
     $('tac-abort').disabled = !canInput();
     infoPanel(u);
   }

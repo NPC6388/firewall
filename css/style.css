@@ -204,9 +204,12 @@ td { padding: 7px 6px; border-bottom: 1px solid #121c2b; }
 .abilities .ab-hint { position: absolute; left: 0; bottom: calc(100% + 12px); max-width: 60vw; white-space: normal; width: max-content;
   background: rgba(6, 10, 16, .92); border: 1px solid var(--line-2); padding: 5px 9px; font-size: 12px; pointer-events: none; z-index: 5; }
 .abilities button.on { border-color: var(--amber); color: var(--amber); }
-.abilities button .key, #tac-owall .key, #tac-overclock .key { color: var(--dim); margin-right: 5px; }
+.abilities button .key, #tac-owall .key, #tac-hkall .key, #tac-overclock .key { color: var(--dim); margin-right: 5px; }
 .tac-end { display: flex; gap: 6px; align-items: center; flex: none; margin-left: auto; }
 .tac-end button { white-space: nowrap; }
+/* Overwatch all / Hunker all stacked in one column, so the pair costs the width of one button */
+.all-orders { display: flex; flex-direction: column; gap: 3px; }
+.all-orders button { font-size: 11px; padding: 2px 8px; text-align: left; }
 @media (max-width: 980px) {
   .tac-bar { flex-wrap: wrap; }
   .tac-body { flex-direction: column; }

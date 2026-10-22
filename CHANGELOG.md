@@ -9,6 +9,7 @@ The in-game **Help → Patch notes** tab shows everything from the first `##` he
 ## Unreleased
 
 ### 2026-10-22
+- **Battle:** Hunker all (H). Every unit with AP left hunkers down and the turn ends, after a confirm, like Overwatch all.
 - **Battle:** the combat log now shows how many hostiles are still alive out of all you have discovered (e.g. 2/5).
 
 ### 2026-10-21
