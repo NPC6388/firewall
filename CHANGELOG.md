@@ -9,6 +9,8 @@ The in-game **Help → Patch notes** tab shows everything from the first `##` he
 ## Unreleased
 
 ### 2026-10-22
+- **Battle:** a double row of tall cover (two racks or barriers back to back) now blocks sight completely, even
+  with someone pressed against each side. Lean around the end of the row to see past it.
 - **Battle:** Swarm Drones watch you: the pupil in each drone's eye follows your cursor around the map.
 - **Battle:** new mouse controls. Right-click a tile to move there; drag with the left button to pan the map. A left
   click still selects units and aims, and right-click cancels an armed ability.

@@ -31,9 +31,10 @@ XG.Tac = (function () {
   function free(b, x, y) { return inB(b, x, y) && tile(b, x, y) === FLOOR && !unitAt(b, x, y); }
 
   // Bresenham; walls always block, tall cover blocks unless it's next to either end (peeking).
+  // Two tall-cover tiles back to back on the line (a double row) always block: only a corner peek gets around them.
   function lineClear(b, x0, y0, x1, y1) {
     var dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
-    var err = dx + dy, x = x0, y = y0, sx0 = x0, sy0 = y0;
+    var err = dx + dy, x = x0, y = y0, sx0 = x0, sy0 = y0, prevHigh = false;
     while (!(x === x1 && y === y1)) {
       var e2 = 2 * err;
       if (e2 >= dy) { err += dy; x += sx; }
@@ -41,7 +42,8 @@ XG.Tac = (function () {
       if (x === x1 && y === y1) break;
       var t = tile(b, x, y);
       if (t === WALL) return false;
-      if (t === HIGH && cheb(x, y, sx0, sy0) > 1 && cheb(x, y, x1, y1) > 1) return false;
+      if (t === HIGH && (prevHigh || cheb(x, y, sx0, sy0) > 1 && cheb(x, y, x1, y1) > 1)) return false;
+      prevHigh = t === HIGH;
     }
     return true;
   }

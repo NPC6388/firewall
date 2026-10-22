@@ -7,6 +7,7 @@ XG.CHANGELOG = [
    {
     "name": "2026-10-22",
     "items": [
+     "<b>Battle:</b> a double row of tall cover (two racks or barriers back to back) now blocks sight completely, even with someone pressed against each side. Lean around the end of the row to see past it.",
      "<b>Battle:</b> Swarm Drones watch you: the pupil in each drone's eye follows your cursor around the map.",
      "<b>Battle:</b> new mouse controls. Right-click a tile to move there; drag with the left button to pan the map. A left click still selects units and aims, and right-click cancels an armed ability.",
      "<b>Battle:</b> fog of war hides the map until you discover it. Ground nobody has seen is blank; ground you have seen but can no longer see stays dimmed.",

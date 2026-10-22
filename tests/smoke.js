@@ -194,6 +194,17 @@ function autoBattle(g, m, squad) {
   sh.alive = false;
   check(Tac.coverValue(bc, 10, 10, 18, 10) === 0, 'a destroyed Sentinel gives no cover');
   sh.alive = true; sh.kind = sk;
+  // a double row of tall cover is opaque even with a unit hugging each side; a corner peek at its end still sees past
+  var bl = Tac.create(g, Object.assign({}, m, { kind: 'purge', diff: 1, seed: 3 }), g.soldiers.slice(0, 2));
+  bl.tiles = bl.tiles.map(function () { return Tac.FLOOR; });
+  for (var ry = 5; ry <= 15; ry++) { bl.tiles[ry * bl.W + 10] = Tac.HIGH; bl.tiles[ry * bl.W + 11] = Tac.HIGH; }
+  var la = bl.units[0], lb = bl.units[1]; bl.units = [la, lb];
+  la.x = 9; la.y = 10; lb.x = 12; lb.y = 10;
+  check(!Tac.los(bl, 9, 10, 12, 10), 'units hugging both sides of a double row of tall cover cannot see each other');
+  bl.tiles[10 * bl.W + 11] = Tac.FLOOR; lb.x = 11;
+  check(Tac.los(bl, 9, 10, 11, 10), 'a single row of tall cover between two hugging units is still see-through');
+  bl.tiles[10 * bl.W + 11] = Tac.HIGH; la.y = 15; lb.x = 12; lb.y = 15;
+  check(Tac.los(bl, 9, 15, 12, 15), 'a corner peek at the end of a double row sees past it');
   // a pit: impassable, no cover, and you can see and shoot across it
   sh.x = 15; sh.y = 15;
   bc.tiles[10 * Tac.MAP_W + 11] = Tac.PIT; bc.tiles[10 * Tac.MAP_W + 12] = Tac.PIT;
