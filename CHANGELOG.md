@@ -9,6 +9,7 @@ Steam release.
 ## Unreleased
 
 ### 2026-10-21
+- **Help:** the Field manual explains how operatives earn XP and what each rank gives.
 - **Battle:** a slimmer bottom bar. Squad cards are half the size, abilities stay on one row, and the map no longer
   shrinks when you select a unit with more abilities.
 - **Comms:** HALCYON grows more afraid and the Lattice more smug as Convergence climbs toward 100%, and both swing
