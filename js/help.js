@@ -15,7 +15,7 @@ XG.Help = (function () {
     ['Overwatch', 'both', 'Ends the turn; the unit shoots the first hostile that moves in view, at −15 aim.'],
     ['Hunker down', 'both', 'Every shot at you gets −25 to hit until your next turn, on top of cover (so 45% becomes 20%). Arm it to see each visible enemy\'s odds on you now and hunkered. Use it when you can\'t shoot and can\'t reach better cover.'],
     ['Fog of war', 'both', 'You only see what your units see (about 9 tiles, blocked by walls). Hostiles out of sight are not drawn.'],
-    ['Hit chance', 'both', 'Aim, minus cover and defense, plus close-range and scan bonuses, minus long-range and overwatch penalties, kept between 5% and 95%. Hover a target to see the breakdown.'],
+    ['Hit chance', 'both', 'Aim, minus cover and defense, plus close-range and scan bonuses, minus the range penalty (none next to the target, up to -30% at the max range of the weapon) and overwatch, kept between 5% and 95%. A flanked target also gives +25% crit chance, rolled only on a hit. Hover a target to see the breakdown.'],
     ['Hack', 'fw', 'Hackers can stun a Lattice machine for 2 turns. With Lattice Grammar researched, a successful hack takes control of it instead. Each success raises that hacker\'s skill by 1.'],
     ['Sensor Scan', 'fw', 'Scientist ability: reveals a 5-tile radius and marks hostiles there (+15 to hit them). 1 AP, cooldown 3.'],
     ['Medkit', 'fw', 'Heals an adjacent ally (or yourself) for 4. 1 AP, two per mission.'],

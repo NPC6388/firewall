@@ -9,6 +9,9 @@ The in-game **Help → Patch notes** tab shows everything from the first `##` he
 ## Unreleased
 
 ### 2026-10-22
+- **Battle:** range now matters on every shot. There is no penalty next to the target, and it grows evenly to -30% at
+  the weapon's max range (it used to start only past 10 tiles). Shots still cap at 95%, and flanked targets still add
+  +25% crit chance, rolled only when the shot hits.
 - **Battle:** maps are three times bigger (38x28 tiles) with more buildings, cover and terrain to fight through.
   The view scrolls: arrow keys, the map edge or a right-drag pan, the wheel zooms, C centres on your unit, and the
   camera follows the action. Mission timers are unchanged; combat training keeps its small range.

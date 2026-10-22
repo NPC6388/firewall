@@ -167,6 +167,9 @@ function autoBattle(g, m, squad) {
   var hi = Tac.hitInfo(bc, sh, tg);
   check(hi.ok && hi.parts.reduce(function (s, p) { return s + p[1]; }, 0) === hi.chance, 'hit breakdown sums to the chance (' + JSON.stringify(hi.parts) + ')');
   tg.hunker = false; tg.marked = 0;
+  // range: 0 when adjacent (diagonal too), -30 at the weapon's max range, even in between
+  var RP = function (dx, dy) { return Tac.rangePenalty({ x: 0, y: 0, range: 13 }, { x: dx, y: dy }, Math.sqrt(dx * dx + dy * dy)); };
+  check(RP(1, 0) === 0 && RP(1, 1) === 0 && RP(13, 0) === 30 && RP(7, 0) === 15, 'range penalty scales 0 adjacent to -30 at max range');
   bc.tiles[10 * Tac.MAP_W + 11] = Tac.LOW;
   check(Tac.coverValue(bc, 10, 10, 15, 15) < 20 && Tac.coverValue(bc, 10, 10, 15, 15) > 10, 'half cover also fades with angle');
   // a HALCYON Sentinel (mech chassis) is half cover for whoever stands beside it; other units are not

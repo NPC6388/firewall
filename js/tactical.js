@@ -609,6 +609,11 @@ XG.Tac = (function () {
   }
 
   // ------------------------------------------------------------ combat
+  // Range: no penalty on an adjacent tile (diagonals too), falling evenly to -30 at the weapon's max range.
+  function rangePenalty(a, t, d) {
+    if (cheb(a.x, a.y, t.x, t.y) <= 1 || !(a.range > 1)) return 0;
+    return Math.round(30 * Math.min(1, (d - 1) / (a.range - 1)));
+  }
   function hitInfo(b, a, t, opts) {
     opts = opts || {};
     var d = dist(a.x, a.y, t.x, t.y);
@@ -621,7 +626,7 @@ XG.Tac = (function () {
     add('Close range', d <= 3 ? a.close || 0 : 0);
     add('Marked by scan', t.marked > 0 ? 15 : 0);
     add('Overwatch shot', opts.overwatch ? -15 : 0);
-    add('Long range', d > 10 ? -Math.round((d - 10) * 3) : 0);
+    add('Range', -rangePenalty(a, t, d));
     var ch = parts.reduce(function (s, p) { return s + p[1]; }, 0), raw = ch;
     if (t.isStatic) ch = Math.max(ch, 85);
     ch = Math.max(5, Math.min(95, Math.round(ch)));
@@ -1190,7 +1195,7 @@ XG.Tac = (function () {
   function abort(b) { if (!b.outcome) b.outcome = 'abort'; }
 
   return {
-    MAP_W: MAP_W, MAP_H: MAP_H, BASE_W: BASE_W, BASE_H: BASE_H, FLOOR: FLOOR, WALL: WALL, LOW: LOW, HIGH: HIGH, PIT: PIT, SIGHT: SIGHT,
+    MAP_W: MAP_W, MAP_H: MAP_H, BASE_W: BASE_W, BASE_H: BASE_H, FLOOR: FLOOR, WALL: WALL, LOW: LOW, HIGH: HIGH, PIT: PIT, SIGHT: SIGHT, rangePenalty: rangePenalty,
     create: create, squadRank: squadRank, createLattice: createLattice, createTraining: createTraining, refillAP: refillAP, act: act, endPlayerTurn: endPlayerTurn, enemyStep: enemyStep, ai: ai,
     endTurn: endTurn, aiStep: aiStep,
     reach: reach, pathTo: pathTo, moveRange: moveRange, hitInfo: hitInfo, targets: targets, tileOk: tileOk,
