@@ -9,7 +9,7 @@ XG.Tutorial = (function () {
   // Each step: text (HTML) and done(run, b, unit, mode) -> true when the player has done it.
   var STEPS = {
     fw: [
-      { t: '<b>Welcome to the field.</b> Your squad is on the left. Click an operative (or press Tab), then click a <span class="cy">blue</span> tile to move there for 1 AP. <span class="warn">Amber</span> tiles are a dash and cost both AP.',
+      { t: '<b>Welcome to the field.</b> Your squad is on the left. Click an operative (or press Tab), then <b>right-click</b> a <span class="cy">blue</span> tile to move there for 1 AP. <span class="warn">Amber</span> tiles are a dash and cost both AP.',
         done: function (r, b) { return moved(r, b); } },
       { t: '<b>Take cover.</b> Hover a tile: shield icons show cover on each side (filled = full, half-filled = half). End your moves next to crates, racks or walls facing the enemy.',
         done: function (r, b) { return humans(b).some(function (u) { return u.alive && nextToCover(b, u); }); } },
@@ -25,7 +25,7 @@ XG.Tutorial = (function () {
         done: null }
     ],
     lat: [
-      { t: '<b>You are the Lattice.</b> Click one of your machines (or press Tab), then a <span class="cy">highlighted</span> tile to move. The objective is at the top: purge the defenders, or hold out until the turn limit.',
+      { t: '<b>You are the Lattice.</b> Click one of your machines (or press Tab), then <b>right-click</b> a <span class="cy">highlighted</span> tile to move. Drag with the left mouse button to look around. The objective is at the top: purge the defenders, or hold out until the turn limit.',
         done: function (r, b) { return moved(r, b); } },
       { t: '<b>Locate the enemy.</b> Earth\'s units hide in fog like anything else. Spread out and close in from more than one side: flanked targets are easier to hit.',
         done: function (r, b) { return b.units.some(function (u) { return u.alive && u.side !== b.human && b.visible[u.y * b.W + u.x]; }); } },
@@ -127,7 +127,7 @@ XG.Tutorial = (function () {
     { t: function () { return '<b>Aim.</b> Press <b>1</b> to arm Shoot, or click the Target Drone. The yellow ring is the aimed target; <b>Tab</b> cycles targets.'; },
       done: function (r, b, u, mode, aim) { var k = T(b); return mode === 'shoot' && k.tg && aim === k.tg.id; }, arm: true },
     { t: function (r, b) { var k = T(b); return '<b>Where the number comes from.</b> ' + partsLine(k.hi) + '.<br>' + angleLine(k.hi) + ' The same list is on the right under the target. Every modifier simply adds up, then the total is kept between 5% and 95%.'; }, done: 'next', show: 'angle', arm: true },
-    { t: function (r, b) { var k = T(b); return '<b>Change the angle.</b> Press <b>Esc</b>, then move your trooper to the <b class="good">marked tile</b> to the north, behind a crate so the Gunner can\'t catch you in the open. The cones on the target show the rule: inside <span class="good">30°</span> the crate counts in full, up to <span class="warn">63°</span> it fades toward half, past that you\'re flanking.<br>Now: ' + angleLine(k.hi) + ' ' + (k.hi && k.hi.ok ? 'Hit chance ' + k.hi.chance + '%.' : ''); },
+    { t: function (r, b) { var k = T(b); return '<b>Change the angle.</b> Press <b>Esc</b>, then <b>right-click</b> the <b class="good">marked tile</b> to the north to move there, behind a crate so the Gunner can\'t catch you in the open. The cones on the target show the rule: inside <span class="good">30°</span> the crate counts in full, up to <span class="warn">63°</span> it fades toward half, past that you\'re flanking.<br>Now: ' + angleLine(k.hi) + ' ' + (k.hi && k.hi.ok ? 'Hit chance ' + k.hi.chance + '%.' : ''); },
       done: function (r, b) { var k = T(b); return k.hi && k.hi.ok && k.hi.cover > 0 && k.hi.cover < k.hi.coverBase; }, show: 'angle',
       goal: { ok: function (k) { return k.tr.y < k.tg.y && k.hi && k.hi.ok && k.hi.cover > 0 && k.hi.cover <= k.hi.coverBase * .75 && covered(k); }, score: gunnerCover } }, // a fade you can see
     { t: function (r, b) { var k = T(b); return '<b>Flank it.</b> Keep circling north and east to the <b class="good">marked tile</b>: no cover sits between you and the target, and a crate still shields you from the Gunner. Never end a move in the open if you can help it. The move preview shows <span class="good">green</span> odds for flanked shots.<br>Now: ' + angleLine(k.hi) + ' ' + (k.hi && k.hi.ok ? partsLine(k.hi) : ''); },

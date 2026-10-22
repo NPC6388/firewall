@@ -29,7 +29,7 @@ they assault the Uplink: hold it or lose.
 | Input | Action |
 |---|---|
 | Click operative / squad card / `Tab` | Select. Each turn starts on the leader (most HP); `Tab` goes down the squad by HP. While an ability is armed, `Tab` / `Shift+Tab` cycles its targets instead |
-| Click blue tile / amber tile | Move (1 AP) / dash (2 AP) |
+| Right-click blue tile / amber tile | Move (1 AP) / dash (2 AP) |
 | Click enemy, click again | Aim, then fire |
 | `1`–`5` | Pick an ability (numbers shown on the buttons); press the same key again to fire it at the aimed enemy or hovered tile/ally |
 | `O` | HALCYON Overclock: +1 AP (after HALCYON Integration) |
@@ -37,11 +37,11 @@ they assault the Uplink: hold it or lose.
 | `Y` | Overwatch all, then end the turn (asks first) |
 | `H` | Hunker all, then end the turn (asks first) |
 | Arrow keys / mouse at the map edge | Scroll the battle map |
-| Right- or middle-drag | Pan the map (a right click without dragging still cancels) |
+| Left- or middle-drag | Pan the map (a left click without dragging still selects and aims) |
 | Mouse wheel | Zoom in and out |
 | `C` | Centre the view on the selected unit |
 | `Enter` | End turn |
-| `Esc` / right-click | Cancel |
+| `Esc` / right-click | Cancel an armed ability |
 | `M` | Mute or unmute |
 | `?` / `F1` | Help: glossary, controls, field manual |
 

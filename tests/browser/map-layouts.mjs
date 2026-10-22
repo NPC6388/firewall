@@ -21,6 +21,7 @@ export default async function ({ ev, shot, sleep, send }) {
           if ('${kind}' === 'cyber') b.mission.lkind = 'breach';
           XG.TacUI.startWith(g, b, function(){});
           b.visible = b.visible.map(function(){return true});
+          b.explored = b.explored.map(function(){return true});
           return JSON.stringify({ seed: seed, pit: [pit % b.W, Math.floor(pit / b.W)] });
         }
       }

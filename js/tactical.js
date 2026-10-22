@@ -353,7 +353,7 @@ XG.Tac = (function () {
       enemyQueue: []
     };
     genMap(b, rng);
-    var mid = H >> 1, spots = [[1, mid], [1, mid - 1], [1, mid + 1], [0, mid - 2], [0, mid + 2], [2, mid], [0, mid]];
+    var mid = H >> 1, spots = deploySpots(H);
     squad.forEach(function (s, i) { makeSquadUnit(b, g, s, spots[i][0], spots[i][1]); });
 
     var R = b.reachable;
@@ -456,7 +456,7 @@ XG.Tac = (function () {
       enemyQueue: [], aiQueue: [], mark: Math.min(D.latticeMarks.length - 1, earth.level || 0), turnLimit: mission.kind === 'raid' ? 10 : mission.kind === 'uplink' ? 0 : 25, spikeBonus: mods.spikeBonus || 0
     };
     genMap(b, rng);
-    var mid = H >> 1, left = [[1, mid], [1, mid - 1], [1, mid + 1], [0, mid - 2], [0, mid + 2], [2, mid], [0, mid], [2, mid - 2]];
+    var mid = H >> 1, left = deploySpots(H);
     var R = b.reachable, cand = [];
     for (var y = 0; y < H; y++) for (var x = Math.round(11 * kx); x < W; x++) if (R[y * W + x] && free(b, x, y)) cand.push([x, y]);
     rng.shuffle(cand);
@@ -495,6 +495,13 @@ XG.Tac = (function () {
       uplink: 'Protect the Uplink Core. Wipe the squad to break the assault.'
     })[mission.kind], 'sys');
     return b;
+  }
+  // The deployment zone on the west edge: a tight 3x3 block around (1, mid), centre first (a 5-man squad fits in it);
+  // the tiles just above and below it only if more than 9 units deploy.
+  function deploySpots(H) {
+    var mid = H >> 1, out = [[1, mid], [1, mid - 1], [1, mid + 1], [2, mid], [0, mid], [2, mid - 1], [2, mid + 1], [0, mid - 1], [0, mid + 1]];
+    [0, 1, 2].forEach(function (x) { out.push([x, mid - 2], [x, mid + 2]); });
+    return out;
   }
   // Positions for n units in pods of up to 3, pod centers spread apart, all on reachable floor.
   function groupSpots(b, cand, n, pref) {
@@ -582,6 +589,9 @@ XG.Tac = (function () {
     });
     if (b.training) v.fill(true);
     b.visible = v;
+    // explored: every tile the human side has ever seen; the rest of the map draws as blank fog
+    if (!b.explored || b.explored.length !== v.length) b.explored = v.slice();
+    else for (var i = 0; i < v.length; i++) if (v[i]) b.explored[i] = true;
   }
   // b.human is the side the person controls ('player' = FIREWALL, 'enemy' = Lattice); fog is drawn from its view.
   function isVisible(b, u) { return u.side === b.human || (b.visible && b.visible[u.y * b.W + u.x]); }
@@ -1195,7 +1205,7 @@ XG.Tac = (function () {
   function abort(b) { if (!b.outcome) b.outcome = 'abort'; }
 
   return {
-    MAP_W: MAP_W, MAP_H: MAP_H, BASE_W: BASE_W, BASE_H: BASE_H, FLOOR: FLOOR, WALL: WALL, LOW: LOW, HIGH: HIGH, PIT: PIT, SIGHT: SIGHT, rangePenalty: rangePenalty,
+    MAP_W: MAP_W, MAP_H: MAP_H, BASE_W: BASE_W, BASE_H: BASE_H, FLOOR: FLOOR, WALL: WALL, LOW: LOW, HIGH: HIGH, PIT: PIT, SIGHT: SIGHT, rangePenalty: rangePenalty, refreshVis: refreshVis,
     create: create, squadRank: squadRank, createLattice: createLattice, createTraining: createTraining, refillAP: refillAP, act: act, endPlayerTurn: endPlayerTurn, enemyStep: enemyStep, ai: ai,
     endTurn: endTurn, aiStep: aiStep,
     reach: reach, pathTo: pathTo, moveRange: moveRange, hitInfo: hitInfo, targets: targets, tileOk: tileOk,

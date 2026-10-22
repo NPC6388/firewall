@@ -52,7 +52,7 @@ XG.Help = (function () {
   ];
   var CONTROLS = [
     ['Click unit / Tab', 'Select an operative (Tab cycles units with AP left)'],
-    ['Click tile', 'Move there (blue = 1 AP, amber = dash, 2 AP)'],
+    ['Right-click tile', 'Move there (blue = 1 AP, amber = dash, 2 AP)'],
     ['Click hostile', 'Aim; click it again to fire'],
     ['1–5', 'Arm an ability; press the same key again (or Space) to use it'],
     ['Tab (ability armed)', 'Cycle that ability\'s targets'],
@@ -61,11 +61,11 @@ XG.Help = (function () {
     ['H', 'Hunker all, then end the turn (asks first)'],
     ['O', 'Overclock (HALCYON +1 AP)'],
     ['Arrow keys / map edge', 'Scroll the battle map'],
-    ['Right- or middle-drag', 'Pan the map (a right click without dragging still cancels)'],
+    ['Left- or middle-drag', 'Pan the map (a left click without dragging still selects and aims)'],
     ['Mouse wheel', 'Zoom in and out'],
     ['C', 'Centre the view on the selected unit'],
     ['Enter', 'End turn'],
-    ['Esc / right-click', 'Cancel'],
+    ['Esc / right-click', 'Cancel an armed ability'],
     ['M', 'Mute or unmute'],
     ['? / F1', 'This help']
   ];

@@ -48,10 +48,11 @@ XG.TacUI = (function () {
       updateHover();
     });
     cv.addEventListener('mouseleave', function () { if (st) { st.mouse = null; st.hover = null; hoverPanel(); } });
-    cv.addEventListener('click', function (e) { click(tileFromEvent(e)); });
-    // camera: right or middle drag pans (a right click without dragging still cancels), the wheel zooms at the cursor
+    // a left click that ended a drag only panned the view
+    cv.addEventListener('click', function (e) { if (st && st.dragMoved) { st.dragMoved = false; return; } click(tileFromEvent(e)); });
+    // camera: left or middle drag pans; the wheel zooms at the cursor. Right click moves (or cancels an armed ability).
     cv.addEventListener('mousedown', function (e) {
-      if (!st || (e.button !== 1 && e.button !== 2)) return;
+      if (!st || (e.button !== 0 && e.button !== 1)) return;
       if (e.button === 1) e.preventDefault(); // no autoscroll
       st.drag = { x: e.clientX, y: e.clientY, cx: st.cam.x, cy: st.cam.y, moved: false };
       st.dragMoved = false;
@@ -65,7 +66,7 @@ XG.TacUI = (function () {
       setCam(d.cx - (e.clientX - d.x) * k / st.cam.z, d.cy - (e.clientY - d.y) * k / st.cam.z);
     });
     window.addEventListener('mouseup', function () { if (st && st.drag) { st.dragMoved = st.drag.moved; st.drag = null; } });
-    cv.addEventListener('contextmenu', function (e) { e.preventDefault(); if (!st.dragMoved && !(st.drag && st.drag.moved)) cancel(); st.dragMoved = false; });
+    cv.addEventListener('contextmenu', function (e) { e.preventDefault(); if (st) rightClick(tileFromEvent(e)); });
     cv.addEventListener('wheel', function (e) {
       if (!st || st.camFit) return; // a map that fits whole doesn't zoom (and the page may scroll)
       e.preventDefault();
@@ -210,6 +211,12 @@ XG.TacUI = (function () {
     var sx = (e.clientX - r.left - cv.clientLeft) * s, sy = (e.clientY - r.top - cv.clientTop) * s;
     return { x: Math.floor((st.cam.x + sx / st.cam.z) / TS), y: Math.floor((st.cam.y + sy / st.cam.z) / TS) };
   }
+  // The cursor in map px (null when it is off the map), for sprites whose eyes follow it.
+  function cursorMap() {
+    if (!st.mouse) return null;
+    var r = cv.getBoundingClientRect(), s = viewScale();
+    return [st.cam.x + (st.mouse.x - r.left - cv.clientLeft) * s / st.cam.z, st.cam.y + (st.mouse.y - r.top - cv.clientTop) * s / st.cam.z];
+  }
   function updateHover() {
     if (!st || !st.mouse) return;
     var t = tileFromEvent({ clientX: st.mouse.x, clientY: st.mouse.y });
@@ -238,6 +245,8 @@ XG.TacUI = (function () {
       .sort(function (a, c) { return c.hp - a.hp || c.maxHp - a.maxHp || a.id - c.id; });
   }
   function firstReady() { var u = readyUnits()[0]; return u ? u.id : null; }
+  // A tile the person's side has ever seen (unexplored ground is blank: no terrain, cover or move-range shading).
+  function explored(x, y) { var e = st.b.explored || st.b.visible; return !!e[y * W + x]; }
   function canInput() { return st && !st.cur && !st.queue.length && st.b.side === st.b.human && !st.b.outcome; }
   function visibleUnit(u) { return u.side === HS() || st.b.visible[u.y * W + u.x]; }
   function unitAtVisible(x, y) {
@@ -274,12 +283,17 @@ XG.TacUI = (function () {
     }
     if (at && at.side === HS()) { select(at.id); return; }
     if (at && u && Tac.targets(b, u, 'shoot').indexOf(at) >= 0) { if (allowed('arm', 'shoot')) { st.mode = 'shoot'; st.aim = at.id; hud(); } return; }
-    if (u && !at) {
-      var r = getReach(u), d = r.d[t.y * W + t.x];
-      if (d > 0 && allowed('move', t.x, t.y)) {
-        var ev = Tac.act.move(b, u, t.x, t.y);
-        if (ev) { enqueue(ev); hud(); }
-      }
+  }
+  // Right click: cancel an armed ability, otherwise move the selected unit to that tile.
+  function rightClick(t) {
+    if (st.mode) { cancel(); return; }
+    if (!canInput() || t.x < 0 || t.y < 0 || t.x >= W || t.y >= H) return;
+    var b = st.b, u = selUnit();
+    if (!u || unitAtVisible(t.x, t.y)) return;
+    var r = getReach(u), d = r.d[t.y * W + t.x];
+    if (d > 0 && allowed('move', t.x, t.y)) {
+      var ev = Tac.act.move(b, u, t.x, t.y);
+      if (ev) { enqueue(ev); hud(); }
     }
   }
   function select(id) {
@@ -635,6 +649,8 @@ XG.TacUI = (function () {
           if (focus.kind === 'core' && u.hackSkill) html += '<div class="good">Sever chance ' + Math.min(90, u.hackSkill + 10) + '% when adjacent</div>';
         }
       }
+    } else if (h && h.x >= 0 && h.x < W && h.y >= 0 && h.y < H && !explored(h.x, h.y)) {
+      html = '<b>Unexplored</b><div class="dim">Nobody has seen this ground yet.</div>';
     } else if (h && h.x >= 0 && h.x < W && h.y >= 0 && h.y < H) {
       var t = Tac.tile(b, h.x, h.y);
       html = '<b>' + (t === Tac.PIT ? XG.Gfx.pitName(b) : ['Floor', 'Wall', 'Low cover', 'High cover'][t]) + '</b>' + (b.visible[h.y * W + h.x] ? '' : ' <span class="dim">(not in sight)</span>');
@@ -736,15 +752,15 @@ XG.TacUI = (function () {
       var c = center(s.x, s.y);
       ctx.strokeStyle = 'rgba(255,209,102,.35)'; ctx.setLineDash([4, 6]); ctx.lineDashOffset = -now / 60; ctx.beginPath(); ctx.arc(c[0], c[1], s.r * TS, 0, 7); ctx.stroke(); ctx.setLineDash([]);
     });
-    G.fog(ctx, b);
     G.motes(ctx, b, now);
+    G.fog(ctx, b);
 
     var u = selUnit(), idle = canInput();
     // movement range + path preview
     if (u && idle && !st.mode && u.ap > 0) {
       var r = getReach(u);
       for (var i = 0; i < r.d.length; i++) {
-        if (r.d[i] <= 0) continue;
+        if (r.d[i] <= 0 || !explored(i % W, Math.floor(i / W))) continue;
         ctx.fillStyle = r.d[i] <= u.mobility && u.ap >= 1 ? 'rgba(79,209,255,.14)' : 'rgba(255,209,102,.06)';
         ctx.fillRect((i % W) * TS + 1, Math.floor(i / W) * TS + 1, TS - 2, TS - 2);
       }
@@ -754,8 +770,7 @@ XG.TacUI = (function () {
         ctx.strokeStyle = dash ? '#ffd166' : '#4fd1ff'; ctx.lineWidth = 2; ctx.beginPath();
         var c0 = center(u.x, u.y); ctx.moveTo(c0[0], c0[1]);
         p.forEach(function (q) { var c = center(q[0], q[1]); ctx.lineTo(c[0], c[1]); }); ctx.stroke(); ctx.lineWidth = 1;
-        drawCoverCones(h.x, h.y);
-        drawCoverShields(h.x, h.y);
+        if (explored(h.x, h.y)) { drawCoverCones(h.x, h.y); drawCoverShields(h.x, h.y); }
         drawMoveOdds(u, h.x, h.y);
       }
     }
@@ -963,7 +978,7 @@ XG.TacUI = (function () {
     if (fl <= 0) delete st.flash[x.id];
     var kick = fl > 0 ? fl * 3 : 0, ang = facing(x, now);
     XG.Gfx.unit(ctx, x, c[0] - Math.cos(ang) * kick, c[1] - Math.sin(ang) * kick, {
-      facing: ang, now: now, alpha: alpha, flash: Math.max(0, fl), human: HS(), myTurn: st.b.side === HS(), top: st.cam.y,
+      facing: ang, now: now, alpha: alpha, flash: Math.max(0, fl), human: HS(), myTurn: st.b.side === HS(), top: st.cam.y, look: cursorMap(),
       hp: st.displayHp[x.id] !== undefined ? st.displayHp[x.id] : x.hp
     });
     var h = st.hover;

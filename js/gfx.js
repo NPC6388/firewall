@@ -406,16 +406,18 @@ XG.Gfx = (function () {
     c.restore();
   }
   // Soft fog: a tiny mask (3 px per tile) upscaled with smoothing, so sight edges feather.
+  // In sight: clear. Explored but out of sight: dimmed. Never seen: opaque, so the map is blank until discovered.
   function fog(c, b) {
     var s = gs(b), W = W_(b), H = H_(b), key = '';
-    for (var i = 0; i < W * H; i++) key += b.visible[i] ? '1' : '0';
+    var ex = b.explored || b.visible;
+    for (var i = 0; i < W * H; i++) key += b.visible[i] ? '1' : ex[i] ? '2' : '0';
     if (key !== s.fogKey) {
       s.fogKey = key;
       if (!s.fogC || s.fogC.width !== W * 3 || s.fogC.height !== H * 3) { s.fogC = document.createElement('canvas'); s.fogC.width = W * 3; s.fogC.height = H * 3; }
       var fc = s.fogC.getContext('2d'), img = fc.createImageData(W * 3, H * 3), d = img.data;
       for (var y = 0; y < H * 3; y++) for (var x = 0; x < W * 3; x++) {
-        var o = (y * W * 3 + x) * 4, vis = b.visible[Math.floor(y / 3) * W + Math.floor(x / 3)];
-        d[o] = 2; d[o + 1] = 4; d[o + 2] = 10; d[o + 3] = vis ? 0 : 182;
+        var o = (y * W * 3 + x) * 4, k = Math.floor(y / 3) * W + Math.floor(x / 3);
+        d[o] = 2; d[o + 1] = 4; d[o + 2] = 10; d[o + 3] = b.visible[k] ? 0 : ex[k] ? 182 : 255; // unexplored: blank
       }
       fc.putImageData(img, 0, 0);
     }
@@ -472,7 +474,9 @@ XG.Gfx = (function () {
     if (u.override) { c.strokeStyle = '#7dff9b'; c.setLineDash([3, 4]); c.lineDashOffset = now / 30; circle(c, cx, cy, 20); c.stroke(); c.setLineDash([]); }
     c.translate(cx, cy + bob - (hover ? 3 : 0));
     var draw = SPRITES[u.kind];
-    if (draw) draw(c, col, o.facing || 0, now, u);
+    // o.look: the cursor in map px; eyes that track it get its angle and distance from the unit
+    if (o.look) { o.lookAng = Math.atan2(o.look[1] - cy, o.look[0] - cx); o.lookDist = Math.hypot(o.look[0] - cx, o.look[1] - cy); }
+    if (draw) draw(c, col, o.facing || 0, now, u, o);
     else fallback(c, u, R);
     if (o.flash > 0) { c.globalCompositeOperation = 'lighter'; glowAt(c, 0, 0, 22, '255,255,255', o.flash); c.globalCompositeOperation = 'source-over'; }
     c.restore();
@@ -597,7 +601,7 @@ XG.Gfx = (function () {
       c.fillStyle = col; c.fillRect(9, -1.5, 9, 3);
       c.fillStyle = rgba(rgb, p); circle(c, 0, 0, 4.5); c.fill(); c.fillStyle = '#fff'; circle(c, 0, 0, 1.8); c.fill();
     },
-    drone: function (c, col, f, now) { // quadcopter: spinning rotors around a red eye
+    drone: function (c, col, f, now, u, o) { // quadcopter: spinning rotors around a red eye
       var rgb = rgbOf(col);
       c.rotate(f);
       c.strokeStyle = '#3a1a24'; c.lineWidth = 2.5; c.beginPath(); c.moveTo(-8, -8); c.lineTo(8, 8); c.moveTo(-8, 8); c.lineTo(8, -8); c.stroke();
@@ -608,7 +612,9 @@ XG.Gfx = (function () {
         c.moveTo(p[0] + Math.cos(a) * 5, p[1] + Math.sin(a) * 5); c.lineTo(p[0] - Math.cos(a) * 5, p[1] - Math.sin(a) * 5); c.stroke();
       });
       c.lineWidth = 1.5; c.fillStyle = '#1d0a12'; c.strokeStyle = col; circle(c, 0, 0, 5.5); c.fill(); c.stroke();
-      glow(c, rgb, 8, .5); c.fillStyle = '#ffd0da'; circle(c, 2.5, 0, 1.8); c.fill();
+      // the pupil looks at the cursor (relative to the body's facing); straight ahead with no cursor
+      var la = o && o.lookAng != null ? o.lookAng - f : 0, lr = o && o.lookAng != null ? 2.5 * Math.min(1, o.lookDist / 14) : 2.5;
+      glow(c, rgb, 8, .5); c.fillStyle = '#ffd0da'; circle(c, Math.cos(la) * lr, Math.sin(la) * lr, 1.8); c.fill();
     },
     warden: function (c, col, f, now, u) { // tracked security mech with a turret
       var rgb = rgbOf(col);

@@ -4,6 +4,11 @@ export default async function ({ ev, shot, sleep, send }) {
     await send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 });
     await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
   };
+  const rclick = async (x, y) => {
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
+    await send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'right', clickCount: 1 });
+    await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'right', clickCount: 1 });
+  };
   const tile = async (x, y) => {
     const p = await ev(`XG.TacUI.tileToClient(${x},${y})`); // scrolls the camera to the tile first
     return [p.x, p.y];
@@ -43,7 +48,7 @@ export default async function ({ ev, shot, sleep, send }) {
   console.log('coach:', await ev(`JSON.stringify(XG.Tutorial.state())`), await ev(`document.querySelector('.coach-h') && document.querySelector('.coach-h').textContent`));
   await shot('s6-coach');
   const u = await ev(`(function(){var s=XG.TacUI.debug(), u=XG.Tac.unitById(s.b,s.sel); var r=XG.Tac.reach(s.b,u,u.mobility); for(var i=0;i<r.d.length;i++){ if(r.d[i]>=2&&r.d[i]<=4) return [i%s.b.W, Math.floor(i/s.b.W)]; } return null;})()`);
-  const p = await tile(u[0], u[1]); await click(p[0], p[1]); await sleep(900);
+  const p = await tile(u[0], u[1]); await rclick(p[0], p[1]); await sleep(900);
   console.log('after a move:', await ev(`JSON.stringify(XG.Tutorial.state())`));
   // breakdown: put a drone in view and hover it
   const e = await ev(`(function(){var s=XG.TacUI.debug(), b=s.b, u=XG.Tac.unitById(s.b,s.sel)||b.units[0]; var d=b.units.filter(x=>x.side==='enemy'&&!x.isStatic)[0];

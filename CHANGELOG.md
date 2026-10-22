@@ -9,11 +9,17 @@ The in-game **Help → Patch notes** tab shows everything from the first `##` he
 ## Unreleased
 
 ### 2026-10-22
+- **Battle:** Swarm Drones watch you: the pupil in each drone's eye follows your cursor around the map.
+- **Battle:** new mouse controls. Right-click a tile to move there; drag with the left button to pan the map. A left
+  click still selects units and aims, and right-click cancels an armed ability.
+- **Battle:** fog of war hides the map until you discover it. Ground nobody has seen is blank; ground you have seen
+  but can no longer see stays dimmed.
+- **Battle:** your squad deploys together again, packed into a 3x3 block on the west edge.
 - **Battle:** range now matters on every shot. There is no penalty next to the target, and it grows evenly to -30% at
   the weapon's max range (it used to start only past 10 tiles). Shots still cap at 95%, and flanked targets still add
   +25% crit chance, rolled only when the shot hits.
 - **Battle:** maps are three times bigger (38x28 tiles) with more buildings, cover and terrain to fight through.
-  The view scrolls: arrow keys, the map edge or a right-drag pan, the wheel zooms, C centres on your unit, and the
+  The view scrolls: arrow keys, the map edge or a left-drag pan, the wheel zooms, C centres on your unit, and the
   camera follows the action. Mission timers are unchanged; combat training keeps its small range.
 - **Lattice campaign:** when FIREWALL raids your cell, your units start dug in behind cover facing the attackers, and
   FIREWALL spends its first turn moving in without firing, so the first shots are yours or your overwatch's.

@@ -15,7 +15,8 @@ export default async function ({ ev, sleep, send }) {
     await ev(`(function(){var s=XG.TacUI.debug(); XG.Tac.unitById(s.b, ${u.id}).ap=${ap};})()`);
     await hover(u.x + 3, u.y + 3); await hover(u.x, u.y);
     console.log('ap', ap, '->', await ev(`document.getElementById('tac-hover').innerText.split('\\n').slice(0,2).join(' | ')`));
-    const res = await send('Page.captureScreenshot', { format: 'png', clip: { x: r[0] + (u.x - 1) * r[2], y: r[1] + (u.y - 1) * r[2], width: r[2] * 3, height: r[2] * 3, scale: 3 } });
+    const c0 = await ev(`XG.TacUI.tileToClient(${u.x},${u.y})`), c1 = await ev(`XG.TacUI.tileToClient(${u.x + 1},${u.y})`), ts = Math.abs(c1.x - c0.x) || 40; // centre and tile size on screen
+    const res = await send('Page.captureScreenshot', { format: 'png', clip: { x: c0.x - ts * 1.5, y: c0.y - ts * 1.5, width: ts * 3, height: ts * 3, scale: 3 } });
     fs.writeFileSync('tests/browser/shots/ap-hover-' + ap + '.png', Buffer.from(res.result.data, 'base64'));
   }
 }

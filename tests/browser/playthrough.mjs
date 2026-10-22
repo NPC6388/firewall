@@ -15,13 +15,40 @@ export default async function ({ ev, shot, sleep, send }) {
     await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: cx, y: cy, button: 'left', clickCount: 1 });
     await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: cx, y: cy, button: 'left', clickCount: 1 });
   };
+  const rightClickTile = async (x, y) => { // a real right click: fires contextmenu, which moves the selected unit
+    const p = await ev(`XG.TacUI.tileToClient(${x},${y})`), cx = p.x, cy = p.y;
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: cx, y: cy });
+    await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: cx, y: cy, button: 'right', clickCount: 1 });
+    await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: cx, y: cy, button: 'right', clickCount: 1 });
+  };
+  // fog: the squad is packed at the west edge, unexplored ground is blank, explored-but-unseen is dimmed
+  await sleep(500); await shot('11-fog');
+  console.log('squad tiles:', await ev(`JSON.stringify(XG.TacUI.debug().b.units.filter(u=>u.side==='player').map(u=>[u.x,u.y]))`),
+    'explored share:', await ev(`(function(){var e=XG.TacUI.debug().b.explored; if(!e) return 'none'; var n=0; for(var i=0;i<e.length;i++) if(e[i]) n++; return (n/e.length).toFixed(2);})()`));
+  { // left-drag pans without moving the selected unit; right click on a blue tile moves it
+    const u0 = await ev(`(function(){var s=XG.TacUI.debug(), u=XG.Tac.unitById(s.b,s.sel); return [u.x,u.y,u.ap];})()`);
+    const cam0 = await ev(`JSON.stringify(XG.TacUI.debug().cam)`);
+    const r = await ev(`(function(){var r=document.getElementById('tac-canvas').getBoundingClientRect(); return [r.left+r.width/2, r.top+r.height/2];})()`);
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: r[0], y: r[1] });
+    await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: r[0], y: r[1], button: 'left', clickCount: 1 });
+    for (let k = 1; k <= 8; k++) await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: r[0] - k * 15, y: r[1], button: 'left', buttons: 1 });
+    await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: r[0] - 120, y: r[1], button: 'left', clickCount: 1 });
+    await sleep(200);
+    const cam1 = await ev(`JSON.stringify(XG.TacUI.debug().cam)`);
+    const u1 = await ev(`(function(){var s=XG.TacUI.debug(), u=XG.Tac.unitById(s.b,s.sel); return [u.x,u.y,u.ap,s.sel];})()`);
+    console.log('left drag pans, unit stays:', cam0 !== cam1 && u0[0] === u1[0] && u0[1] === u1[1] && u0[2] === u1[2], cam0, '->', cam1);
+    const to = await ev(`(function(){var s=XG.TacUI.debug(),b=s.b,u=XG.Tac.unitById(b,s.sel),r=XG.Tac.reach(b,u,u.mobility); for(var i=0;i<r.d.length;i++){ var x=i%b.W,y=(i-x)/b.W; if(r.d[i]>=2&&r.d[i]<=3&&b.explored[i]&&!XG.Tac.unitAt(b,x,y)) return [x,y]; } return null;})()`);
+    await rightClickTile(to[0], to[1]); await sleep(900);
+    const u2 = await ev(`(function(){var s=XG.TacUI.debug(), u=XG.Tac.unitById(s.b,s.sel); return [u.x,u.y];})()`);
+    console.log('right click moves:', u2[0] === to[0] && u2[1] === to[1], 'to', to);
+  }
   const idle = `(function(){var s=XG.TacUI.debug(); return !!s && !s.cur && !s.queue.length && s.b.side==='player';})()`;
   const waitIdle = async () => { for (let i = 0; i < 200; i++) { if (await ev(idle)) return true; if (await ev(`!XG.TacUI.debug()`)) return false; await sleep(100); } return false; };
 
   for (let turn = 0; turn < 25; turn++) {
     if (!(await waitIdle())) break;
     if (await ev(`XG.TacUI.debug().b.outcome || ''`)) break;
-    // each player unit: move with a real click toward the AI's chosen tile, then let AI finish its action
+    // each player unit: move with a real right click toward the AI's chosen tile, then let AI finish its action
     const ids = await ev(`XG.TacUI.debug().b.units.filter(u=>u.alive&&u.side==='player').map(u=>u.id)`);
     for (const id of ids) {
       if (!(await waitIdle())) break;
@@ -34,7 +61,7 @@ export default async function ({ ev, shot, sleep, send }) {
       if (!plan) continue;
       if (plan.to) {
         await ev(`(function(){var s=XG.TacUI.debug(); var el=document.querySelector('[data-unit="${id}"]'); if(el) el.click();})()`);
-        await clickTile(plan.to[0], plan.to[1]);
+        await rightClickTile(plan.to[0], plan.to[1]);
         await sleep(50);
         if (!(await waitIdle())) break;
       }

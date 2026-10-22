@@ -122,6 +122,19 @@ function autoBattle(g, m, squad) {
   check(Tac.tile(b2, gx, gy) === Tac.FLOOR, 'frag grenade destroys cover');
   check(t2.ap === 0 && t2.charges.grenade === 0, 'grenade spends AP and charge');
   // cover depends on the viewing angle: target at (10,10) behind high cover to the east
+  // deployment: the squad starts packed in a 3x3 block on the west edge
+  [11, 12, 13].forEach(function (sd) {
+    var bd = Tac.create(g, Object.assign({}, m, { kind: 'purge', diff: 2, seed: sd }), g.soldiers.slice(0, 5)), mid = bd.H >> 1;
+    var sq = bd.units.filter(function (u) { return u.side === 'player' && !u.isStatic; });
+    check(sq.every(function (u) { return u.x <= 2 && Math.abs(u.y - mid) <= 1 && Tac.tile(bd, u.x, u.y) === Tac.FLOOR; }), 'squad deploys inside the 3x3 block (seed ' + sd + ')');
+  });
+  // fog memory: unexplored tiles stay blank; anything once seen stays explored after the squad moves on
+  var bf = Tac.create(g, Object.assign({}, m, { kind: 'purge', diff: 1, seed: 7 }), g.soldiers.slice(0, 4));
+  var seen0 = bf.visible.slice(), sq = bf.units.filter(function (u) { return u.side === 'player'; });
+  check(bf.explored && bf.explored.indexOf(false) >= 0 && seen0.every(function (v, i) { return !v || bf.explored[i]; }), 'battle starts with unexplored ground and everything in sight explored');
+  sq.forEach(function (u) { u.x = bf.W - 2; u.y = 1; });
+  Tac.refreshVis(bf);
+  check(seen0.every(function (v, i) { return !v || bf.explored[i]; }) && bf.visible.some(function (v, i) { return v && !seen0[i]; }), 'explored ground is remembered after moving away');
   var bc = Tac.create(g, Object.assign({}, m, { kind: 'purge', diff: 1 }), g.soldiers.slice(0, 4));
   for (var cy = 0; cy < Tac.MAP_H; cy++) for (var cx = 0; cx < Tac.MAP_W; cx++) bc.tiles[cy * Tac.MAP_W + cx] = Tac.FLOOR;
   bc.tiles[10 * Tac.MAP_W + 11] = Tac.HIGH;
