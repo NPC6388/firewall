@@ -117,7 +117,7 @@ function autoBattle(g, m, squad) {
   var b2 = Tac.create(g, Object.assign({}, m, { kind: 'purge', diff: 1 }), g.soldiers.slice(0, 4));
   var t2 = b2.units.filter(function (u) { return u.kind === 'trooper'; })[0];
   var gx = t2.x + 3, gy = t2.y;
-  b2.tiles[gy * Tac.MAP_W + gx] = Tac.LOW; b2.visible[gy * Tac.MAP_W + gx] = true;
+  b2.tiles[gy * Tac.MAP_W + gx] = Tac.LOW; b2.props[gy * Tac.MAP_W + gx] = 0; b2.visible[gy * Tac.MAP_W + gx] = true;
   check(!!Tac.act.grenade(b2, t2, gx, gy), 'grenade throws');
   check(Tac.tile(b2, gx, gy) === Tac.FLOOR, 'frag grenade destroys cover');
   check(t2.ap === 0 && t2.charges.grenade === 0, 'grenade spends AP and charge');
@@ -229,7 +229,7 @@ function autoBattle(g, m, squad) {
   for (var ms = 0; ms < 60; ms++) {
     var bm = Tac.create(g, Object.assign({}, m, { kind: 'purge', diff: 2, seed: 900 + ms * 7919 }), g.soldiers.slice(0, 4));
     lay[bm.layout] = 1;
-    if (bm.tiles.indexOf(Tac.PIT) >= 0) pitMaps++;
+    if (bm.tiles.some(function (tv, ti) { return tv === Tac.PIT && !bm.props[ti]; })) pitMaps++;
     for (var dy = (Tac.MAP_H >> 1) - 3; dy <= (Tac.MAP_H >> 1) + 3; dy++) for (var dx = 0; dx < 3; dx++) if (bm.tiles[dy * Tac.MAP_W + dx] !== Tac.FLOOR) deployOk = false;
   }
   check(['compound', 'street', 'yard', 'plaza', 'blocks'].every(function (k) { return lay[k]; }), 'all five map layouts appear (' + Object.keys(lay).join(',') + ')');
@@ -343,6 +343,75 @@ function autoBattle(g, m, squad) {
   }
   check(shots === 0, 'FIREWALL holds fire on the approach turn of a raid (' + shots + ' shots)');
   check(covered >= units * 0.8, 'raid defenders start in cover facing FIREWALL (' + covered + '/' + units + ')');
+})();
+
+// Obstacle variants: fuel barrels chain-explode, barriers and pillars shrug off blasts, glass shatters on a miss, fences block feet but not eyes.
+(function () {
+  var g = S.newGame(21), r = S.rng(g), m = Strat.spawnMission(g, r, 'purge'); S.saveRng(g, r);
+  var b = Tac.create(g, Object.assign({}, m, { diff: 1 }), g.soldiers.slice(0, 4)), W = b.W;
+  check(Array.isArray(b.props) && b.props.length === b.tiles.length, 'battle carries a props array');
+  check(JSON.stringify(JSON.parse(JSON.stringify(b)).props) === JSON.stringify(b.props), 'props survive a JSON snapshot');
+  check(Tac.createTraining(g, g.soldiers.slice(0, 1)).props.every(function (p) { return !p; }), 'combat training has no obstacle variants');
+  var seenKinds = {};
+  for (var sd = 1; sd <= 40; sd++) Tac.create(g, Object.assign({}, m, { diff: 2, seed: sd * 131 }), g.soldiers.slice(0, 4)).props.forEach(function (p) { if (p) seenKinds[p] = 1; });
+  check(['barrel', 'barrier', 'pillar', 'glass', 'fence'].every(function (k) { return seenKinds[k]; }), 'map generation places all five obstacle types');
+  var wipe = function () {
+    b.tiles.fill(Tac.FLOOR); b.props.fill(0); b.outcome = null;
+    b.units.forEach(function (u) { if (u.side === 'enemy') u.alive = false; });
+    b.units.filter(function (u) { return u.side === 'player'; }).forEach(function (u, i) { u.x = 0; u.y = i; u.hp = u.maxHp = 10; u.armor = 0; u.shield = 0; });
+  };
+  var put = function (x, y, t, p) { b.tiles[y * W + x] = t; b.props[y * W + x] = p || 0; };
+  // barrels: a blast on one sets off the next, each hurting units within 1 tile (2 damage, armor ignored)
+  wipe();
+  var vic = b.units.filter(function (u) { return u.side === 'player'; })[0], bystander = b.units.filter(function (u) { return u.side === 'player'; })[1];
+  put(10, 10, Tac.LOW, 'barrel'); put(11, 10, Tac.LOW, 'barrel'); put(12, 11, Tac.LOW, 'barrier');
+  vic.x = 12; vic.y = 10; vic.armor = 2; bystander.x = 20; bystander.y = 20;
+  var ev = [];
+  check(Tac.clearTile(b, 10, 10, ev, 'blast'), 'a blast clears a barrel');
+  check(Tac.tile(b, 11, 10) === Tac.FLOOR && Tac.propOf(b, 11, 10) === 0, 'the explosion chains into the next barrel');
+  check(vic.hp === 8, 'a chained barrel does 2 damage (armor ignored) to a unit 1 tile away (hp ' + vic.hp + ')');
+  check(bystander.hp === 10, 'units farther away are not hurt');
+  check(ev.filter(function (e) { return e.t === 'boom'; }).length === 2, 'each barrel emits a boom event');
+  check(Tac.tile(b, 12, 11) === Tac.LOW, 'a barrel blast does not clear other cover');
+  // grenade: barrier and pillar survive, plain cover and glass fall, a barrel next to the blast goes off
+  wipe();
+  var th = b.units.filter(function (u) { return u.kind === 'trooper'; })[0] || b.units.filter(function (u) { return u.side === 'player'; })[0];
+  th.abilities = th.abilities.concat(th.abilities.indexOf('grenade') < 0 ? ['grenade'] : []); th.charges.grenade = 1; th.ap = 2; th.x = 5; th.y = 10;
+  put(9, 10, Tac.LOW, 'barrier'); put(9, 9, Tac.HIGH, 'pillar'); put(9, 11, Tac.HIGH, 'glass'); put(10, 10, Tac.LOW, 0); put(10, 9, Tac.LOW, 'barrel');
+  b.visible.fill(true);
+  check(!!Tac.act.grenade(b, th, 9, 10), 'grenade throws at the obstacles');
+  check(Tac.tile(b, 9, 10) === Tac.LOW && Tac.propOf(b, 9, 10) === 'barrier', 'a concrete barrier survives a grenade');
+  check(Tac.tile(b, 9, 9) === Tac.HIGH && Tac.propOf(b, 9, 9) === 'pillar', 'a pillar survives a grenade');
+  check(Tac.tile(b, 9, 11) === Tac.FLOOR && Tac.propOf(b, 9, 11) === 0, 'a grenade shatters glass');
+  check(Tac.tile(b, 10, 10) === Tac.FLOOR && Tac.tile(b, 10, 9) === Tac.FLOOR, 'plain cover and the barrel in the blast are gone');
+  // glass: a missed shot at a unit using it as cover shatters it; a hit does not
+  wipe();
+  var sh = b.units.filter(function (u) { return u.side === 'player'; })[0], tg = b.units.filter(function (u) { return u.side === 'enemy'; })[0];
+  tg.alive = true; b.outcome = null; tg.hp = tg.maxHp = 30; tg.armor = 0; tg.x = 18; tg.y = 10; sh.x = 12; sh.y = 10; sh.ap = 2; sh.range = 14; sh.aim = 100;
+  put(17, 10, Tac.HIGH, 'glass'); b.visible.fill(true);
+  var realChance = b.rng.chance;
+  check(Tac.hitInfo(b, sh, tg).cover === 40, 'glass counts as full cover');
+  b.rng.chance = function () { return true; };
+  Tac.act.shoot(b, sh, tg);
+  check(Tac.tile(b, 17, 10) === Tac.HIGH && Tac.propOf(b, 17, 10) === 'glass', 'a hit leaves the glass standing');
+  sh.ap = 2; b.rng.chance = function () { return false; };
+  var evg = Tac.act.shoot(b, sh, tg);
+  b.rng.chance = realChance;
+  check(Tac.tile(b, 17, 10) === Tac.FLOOR && Tac.propOf(b, 17, 10) === 0, 'a missed shot shatters the glass cover');
+  check(evg.some(function (e) { return e.t === 'shatter'; }), 'shattering emits a shatter event');
+  check(Tac.hitInfo(b, sh, tg).cover === 0, 'the target is exposed after the glass breaks');
+  // fence: blocks movement, blast-proof, no cover, does not block sight
+  wipe();
+  for (var fy = 0; fy < b.H; fy++) put(11, fy, Tac.PIT, 'fence');
+  var wk = b.units.filter(function (u) { return u.side === 'player'; })[0];
+  wk.x = 9; wk.y = 10; wk.ap = 2;
+  var rc = Tac.reach(b, wk, 12);
+  check(rc.d[10 * W + 10] > 0 && rc.d[10 * W + 12] === -1, 'a fence blocks movement');
+  check(Tac.los(b, 9, 10, 13, 10), 'a fence does not block line of sight');
+  put(14, 10, Tac.WALL, 0); check(!Tac.los(b, 9, 10, 15, 10), 'while a wall still does');
+  var gen = Tac.clearTile(b, 11, 10, [], 'blast');
+  check(!gen && Tac.tile(b, 11, 10) === Tac.PIT && Tac.propOf(b, 11, 10) === 'fence', 'a fence is blast-proof');
+  check(Tac.coverTile(b, 11, 10) === Tac.FLOOR, 'a fence gives no cover');
 })();
 
 // ---------------------------------------------------------------- battles

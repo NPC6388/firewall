@@ -41,6 +41,15 @@ XG.DATA = {
   // Lattice campaign: your machines deploy at the mark that matches the FIREWALL squad's level (Lat.earthLevel).
   latticeMarks: ['Mk I', 'Mk II', 'Mk III', 'Mk IV', 'Mk V', 'Mk VI'],
   markBonus: { aim: 0, hp: 1 }, // +aim per mark pushed bot Lattice campaigns to 85% wins; HP alone evens the late battles
+  // Battle obstacle variants (b.props[tile] holds the key). base = the tile code the rules run on (2 LOW, 3 HIGH, 4 PIT);
+  // names per biome (city / relay / uplink / cyber); rule = the short phrase the hover panel shows.
+  props: {
+    barrel:  { base: 2, rule: 'Explodes when destroyed', names: { city: 'Fuel barrel', relay: 'Coolant tank', uplink: 'Coolant tank', cyber: 'Unstable packet' } },
+    barrier: { base: 2, rule: 'Blast-proof', names: { city: 'Concrete barrier', relay: 'Armored bulkhead', uplink: 'Armored bulkhead', cyber: 'Hardened block' } },
+    pillar:  { base: 3, rule: 'Blast-proof', names: { city: 'Concrete pillar', relay: 'Support pillar', uplink: 'Support pillar', cyber: 'Anchored node' } },
+    glass:   { base: 3, rule: 'Shatters on a miss', names: { city: 'Glass panel', relay: 'Crystal panel', uplink: 'Armored glass', cyber: 'Soft firewall' } },
+    fence:   { base: 4, rule: 'Blocks movement only', names: { city: 'Chain-link fence', relay: 'Laser fence', uplink: 'Laser fence', cyber: 'Filter gate' } }
+  },
 
   abilities: {
     shoot:     { name: 'Shoot',        key: '1', target: 'enemy', ends: true,  desc: 'Fire your weapon. Ends turn.' },

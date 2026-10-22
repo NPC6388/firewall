@@ -30,6 +30,31 @@ XG.Tac = (function () {
   }
   function free(b, x, y) { return inB(b, x, y) && tile(b, x, y) === FLOOR && !unitAt(b, x, y); }
 
+  // Obstacle variants: b.props[tile] is 0 (plain) or a key of DATA.props (barrel, barrier, pillar, glass, fence). The tile code
+  // underneath (LOW/HIGH/PIT) still drives LOS, cover and pathing. Everything that destroys cover goes through clearTile.
+  function propOf(b, x, y) { return b.props && inB(b, x, y) ? b.props[y * b.W + x] || 0 : 0; }
+  // Remove destructible cover. cause: 'blast' (grenade, detonation, barrel) or 'shot' (a miss at glass cover).
+  // Returns true when the tile was cleared. Walls and fences never fall; barriers and pillars shrug off blasts.
+  function clearTile(b, x, y, ev, cause) {
+    var t = tile(b, x, y), p = propOf(b, x, y);
+    if (t !== LOW && t !== HIGH) return false;
+    if (cause === 'blast' && (p === 'barrier' || p === 'pillar')) return false;
+    if (cause === 'shot' && p !== 'glass') return false;
+    b.tiles[y * b.W + x] = FLOOR;
+    if (b.props) b.props[y * b.W + x] = 0;
+    if (p === 'glass') { ev.push({ t: 'shatter', x: x, y: y }); log(b, ev, 'A glass panel shatters.', ''); }
+    if (p === 'barrel') {
+      ev.push({ t: 'boom', fx: x, fy: y, x: x, y: y, r: 1, kind: 'barrel' });
+      log(b, ev, 'An explosive container detonates.', 'bad');
+      b.units.filter(function (u) { return u.alive && cheb(u.x, u.y, x, y) <= 1; }).forEach(function (u) { damage(b, u, 2, ev, null, { ignoreArmor: true, cause: 'is caught in the blast' }); });
+      for (var yy = y - 1; yy <= y + 1; yy++) for (var xx = x - 1; xx <= x + 1; xx++) {
+        var q = propOf(b, xx, yy);
+        if (q === 'barrel' || q === 'glass') clearTile(b, xx, yy, ev, 'blast'); // chain reaction
+      }
+    }
+    return true;
+  }
+
   // Bresenham; walls always block, tall cover blocks unless it's next to either end (peeking).
   // Two tall-cover tiles back to back on the line (a double row) always block: only a corner peek gets around them.
   function lineClear(b, x0, y0, x1, y1) {
@@ -269,6 +294,57 @@ XG.Tac = (function () {
       for (var sx = 0; sx < 3; sx++) for (var sy = mid - 3; sy <= mid + 3; sy++) set(sx, sy, FLOOR);
       set(3, mid - 2, LOW); set(3, mid + 2, LOW); set(3, mid - 1, FLOOR); set(3, mid, FLOOR); set(3, mid + 1, FLOOR);
 
+      // Obstacle variants (fuel barrels, blast-proof barriers and pillars, glass panels, fences). They get their own RNG stream,
+      // seeded from the finished layout, so the layouts themselves are unchanged. Only loose cover away from walls, doors and the
+      // deployment area is converted; fences are new impassable, see-through lines laid on open floor (connectivity is checked below).
+      var pr = new Array(W * H).fill(0), pj = new XG.RNG(tilesKey({ tiles: t }) + W);
+      var near8 = function (x2, y2, test) {
+        for (var dy = -1; dy <= 1; dy++) for (var dx = -1; dx <= 1; dx++) if ((dx || dy) && test(get(x2 + dx, y2 + dy))) return true;
+        return false;
+      };
+      var comps = [], mark = {};
+      for (var ci0 = 0; ci0 < W * H; ci0++) {
+        var cv = t[ci0];
+        if ((cv !== LOW && cv !== HIGH) || mark[ci0]) continue;
+        var comp = [], stack = [ci0], loose = true; mark[ci0] = 1;
+        while (stack.length) {
+          var si = stack.pop(), sx2 = si % W, sy2 = (si - sx2) / W; comp.push(si);
+          if (sx2 < 5 || nearDoor(sx2, sy2) || near8(sx2, sy2, function (v) { return v === WALL; })) loose = false;
+          [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (o) {
+            var nx = sx2 + o[0], ny = sy2 + o[1], ni = ny * W + nx;
+            if (inB(nx, ny) && t[ni] === cv && !mark[ni]) { mark[ni] = 1; stack.push(ni); }
+          });
+        }
+        if (loose) comps.push({ cells: comp, base: cv });
+      }
+      comps.forEach(function (cp) {
+        var r = pj.next(), n = cp.cells.length, v = null;
+        if (cp.base === LOW) v = r < 0.16 ? 'barrier' : null;
+        else if (n === 1) v = r < 0.14 ? 'pillar' : r < 0.26 ? 'glass' : null;
+        else if (n === 2) v = r < 0.12 ? 'glass' : null;
+        if (v) { cp.done = true; cp.cells.forEach(function (ci) { pr[ci] = v; }); }
+      });
+      var small = comps.filter(function (cp) { return cp.base === LOW && !cp.done && cp.cells.length <= 3; });
+      for (var nb = pj.int(1, Math.max(1, Math.round(A))), bi = 0; nb > 0 && small.length && bi < 20; bi++) {
+        var bc = pj.pick(small);
+        if (bc.cells.some(function (ci) { return pr[ci]; })) continue;
+        nb--; pr[bc.cells[0]] = 'barrel';
+        if (bc.cells.length > 1 && pj.next() < 0.5) pr[bc.cells[1]] = 'barrel'; // a pair chains
+      }
+      for (var nf = pj.int(1, A > 2 ? 3 : 2); nf > 0; nf--) {
+        for (var ft = 0; ft < 25; ft++) {
+          var fh = pj.next() < 0.5, fl = pj.int(3, 5), fx0 = pj.int(6, W - 3), fy0 = pj.int(1, H - 2), fc = [], fok = true;
+          for (var fi = 0; fi < fl && fok; fi++) {
+            var ex = fx0 + (fh ? fi : 0), ey = fy0 + (fh ? 0 : fi);
+            if (!inB(ex, ey) || get(ex, ey) !== FLOOR || nearDoor(ex, ey) || near8(ex, ey, function (v) { return v === WALL || v === PIT; })) fok = false;
+            fc.push([ex, ey]);
+          }
+          if (!fok) continue;
+          fc.forEach(function (cc) { set(cc[0], cc[1], PIT); pr[cc[1] * W + cc[0]] = 'fence'; });
+          break;
+        }
+      }
+
       // connectivity
       var seen = new Array(W * H).fill(false), q = [mid * W + 1], cnt = 0, floors = 0;
       seen[q[0]] = true;
@@ -280,9 +356,9 @@ XG.Tac = (function () {
         });
       }
       t.forEach(function (v) { if (v === FLOOR) floors++; });
-      if (cnt >= floors * 0.9) { b.tiles = t; b.reachable = seen; b.layout = layout; return; }
+      if (cnt >= floors * 0.9) { b.tiles = t; b.props = pr; b.reachable = seen; b.layout = layout; return; }
     }
-    b.tiles = new Array(W * H).fill(FLOOR); b.reachable = new Array(W * H).fill(true); b.layout = 'open';
+    b.tiles = new Array(W * H).fill(FLOOR); b.props = new Array(W * H).fill(0); b.reachable = new Array(W * H).fill(true); b.layout = 'open';
   }
 
   // -------------------------------------------------------------- units
@@ -400,7 +476,7 @@ XG.Tac = (function () {
   function createTraining(g, squad) {
     var W = BASE_W, H = BASE_H;
     var b = {
-      W: W, H: H, tiles: new Array(W * H).fill(FLOOR), reachable: new Array(W * H).fill(true), units: [], nextId: 1, turn: 1, side: 'player', human: 'player',
+      W: W, H: H, tiles: new Array(W * H).fill(FLOOR), props: new Array(W * H).fill(0), reachable: new Array(W * H).fill(true), units: [], nextId: 1, turn: 1, side: 'player', human: 'player',
       rng: new XG.RNG(4242), mission: { kind: 'purge', diff: 1, name: 'Combat training', city: 'HALCYON simulation', site: 'range' },
       grammar: false, emp: false, overclock: 0, visible: null, scans: [], sever: 0, outcome: null, salvage: 0, log: [], enemyQueue: [], pods: [], training: true
     };
@@ -710,6 +786,10 @@ XG.Tac = (function () {
     if (!hit) {
       ev.push({ t: 'text', x: t.x, y: t.y, text: 'MISS', color: '#9aa7b8' });
       log(b, ev, tag + ': miss.', '');
+      if (hi.cover > 0) { // a miss at a target using glass as cover shatters the glass
+        var cs = coverDetail(b, t.x, t.y, a.x, a.y).side;
+        if (cs && propOf(b, t.x + cs[0], t.y + cs[1]) === 'glass') clearTile(b, t.x + cs[0], t.y + cs[1], ev, 'shot');
+      }
       if (t.side === 'enemy') alert(b, t, ev);
       return true;
     }
@@ -858,8 +938,7 @@ XG.Tac = (function () {
         damage(b, t, d, ev, u, { ignoreArmor: emp });
       });
       if (!emp) for (var yy = y - 1; yy <= y + 1; yy++) for (var xx = x - 1; xx <= x + 1; xx++) {
-        var tt = tile(b, xx, yy);
-        if (tt === LOW || tt === HIGH) b.tiles[yy * b.W + xx] = FLOOR;
+        clearTile(b, xx, yy, ev, 'blast');
       }
       return after(b, ev);
     },
@@ -938,7 +1017,7 @@ XG.Tac = (function () {
       log(b, ev, u.name + ' overloads its cells and detonates.', 'good');
       b.units.filter(function (t) { return t.alive && t !== u && cheb(t.x, t.y, x, y) <= 1; }).forEach(function (t) { damage(b, t, 3, ev, u, {}); });
       for (var yy = y - 1; yy <= y + 1; yy++) for (var xx = x - 1; xx <= x + 1; xx++) {
-        var tt = tile(b, xx, yy); if (tt === LOW || tt === HIGH) b.tiles[yy * b.W + xx] = FLOOR;
+        clearTile(b, xx, yy, ev, 'blast');
       }
       kill(b, u, ev, null, 'is gone');
       return after(b, ev);
@@ -1226,7 +1305,7 @@ XG.Tac = (function () {
   function abort(b) { if (!b.outcome) b.outcome = 'abort'; }
 
   return {
-    MAP_W: MAP_W, MAP_H: MAP_H, BASE_W: BASE_W, BASE_H: BASE_H, FLOOR: FLOOR, WALL: WALL, LOW: LOW, HIGH: HIGH, PIT: PIT, SIGHT: SIGHT, rangePenalty: rangePenalty, refreshVis: refreshVis,
+    MAP_W: MAP_W, MAP_H: MAP_H, BASE_W: BASE_W, BASE_H: BASE_H, FLOOR: FLOOR, WALL: WALL, LOW: LOW, HIGH: HIGH, PIT: PIT, SIGHT: SIGHT, propOf: propOf, clearTile: clearTile, rangePenalty: rangePenalty, refreshVis: refreshVis,
     create: create, squadRank: squadRank, createLattice: createLattice, createTraining: createTraining, refillAP: refillAP, act: act, endPlayerTurn: endPlayerTurn, enemyStep: enemyStep, ai: ai,
     endTurn: endTurn, aiStep: aiStep,
     reach: reach, pathTo: pathTo, moveRange: moveRange, hitInfo: hitInfo, targets: targets, tileOk: tileOk,

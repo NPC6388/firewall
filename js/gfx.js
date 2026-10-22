@@ -60,10 +60,10 @@ XG.Gfx = (function () {
     var s = gs(b), n = W_(b) * H_(b), changed = !s.tiles || s.dpr !== dpr || s.dirty, bio = biomeOf(b);
     if (bio !== s.biome) { s.biome = bio; s.veins = null; changed = true; }
     if (s.tiles) for (var i = 0; i < n; i++) if (s.tiles[i] !== b.tiles[i]) {
-      if (s.tiles[i] !== FLOOR && b.tiles[i] === FLOOR) s.decals.push({ k: 'rubble', x: i % W_(b), y: Math.floor(i / W_(b)), was: s.tiles[i], seed: i });
+      if (s.tiles[i] !== FLOOR && b.tiles[i] === FLOOR) s.decals.push({ k: s.props && s.props[i] === 'glass' ? 'shards' : 'rubble', x: i % W_(b), y: Math.floor(i / W_(b)), was: s.tiles[i], seed: i });
       changed = true;
     }
-    if (changed) { s.tiles = b.tiles.slice(); s.dpr = dpr; s.dirty = false; bake(b, s, dpr); }
+    if (changed) { s.tiles = b.tiles.slice(); s.props = b.props ? b.props.slice() : null; s.dpr = dpr; s.dirty = false; bake(b, s, dpr); }
     return s;
   }
   function decal(b, k, x, y, size) { var s = gs(b); s.decals.push({ k: k, x: x, y: y, size: size || 1, seed: s.decals.length * 7 + x * 31 + y }); s.dirty = true; }
@@ -80,7 +80,7 @@ XG.Gfx = (function () {
     if (B.veins) s.veins.forEach(function (v) { strokePath(c, v, rgba(B.veins, .16), 1.6); });
     // ambient occlusion along solid edges
     for (y = 0; y < H; y++) for (x = 0; x < W; x++) if (tileAt(b, x, y) !== WALL) aoTile(c, b, x, y);
-    for (y = 0; y < H; y++) for (x = 0; x < W; x++) if (tileAt(b, x, y) === PIT) pitTile(c, B, b, x, y);
+    for (y = 0; y < H; y++) for (x = 0; x < W; x++) if (tileAt(b, x, y) === PIT && propAt(b, x, y) !== 'fence') pitTile(c, B, b, x, y);
     // cast shadows (light from the upper left), drawn once on a mask so overlaps don't stack
     var sh = document.createElement('canvas'); sh.width = s.canvas.width; sh.height = s.canvas.height;
     var sc = sh.getContext('2d'); sc.setTransform(dpr, 0, 0, dpr, 0, 0); sc.fillStyle = '#000';
@@ -94,9 +94,12 @@ XG.Gfx = (function () {
     s.decals.forEach(function (d) { drawDecal(c, B, d); });
     for (y = 0; y < H; y++) for (x = 0; x < W; x++) {
       t = tileAt(b, x, y);
-      if (t === LOW) lowCover(c, B, b, x, y);
+      var pv = propAt(b, x, y);
+      if (pv && t !== PIT) propTile(c, B, b, x, y, pv, s.leds);
+      else if (t === LOW) lowCover(c, B, b, x, y);
       else if (t === HIGH) highCover(c, B, b, x, y, s.leds);
     }
+    for (y = 0; y < H; y++) for (x = 0; x < W; x++) if (propAt(b, x, y) === 'fence' && tileAt(b, x, y) === PIT) fenceTile(c, B, b, x, y);
     for (y = 0; y < H; y++) for (x = 0; x < W; x++) if (tileAt(b, x, y) === WALL) wallTile(c, B, b, x, y, s.leds);
     for (y = 0; y < H; y++) for (x = 0; x < W; x++) if (tileAt(b, x, y) === FLOOR) doorTile(c, B, b, x, y);
   }
@@ -207,7 +210,7 @@ XG.Gfx = (function () {
   // A hole in the ground (impassable, no cover): dark depths lit faintly from below, the far wall visible in 3/4 view,
   // a ragged lip where it meets the floor. Cyber: a void with grid lines falling away into it.
   function pitTile(c, B, b, x, y) {
-    var px = x * TS, py = y * TS, P = B.pit, open = function (dx, dy) { return tileAt(b, x + dx, y + dy) !== PIT; };
+    var px = x * TS, py = y * TS, P = B.pit, open = function (dx, dy) { return tileAt(b, x + dx, y + dy) !== PIT || propAt(b, x + dx, y + dy) === 'fence'; };
     var n = open(0, -1), s = open(0, 1), w = open(-1, 0), e = open(1, 0);
     c.fillStyle = P.deep; c.fillRect(px, py, TS, TS);
     var g = c.createRadialGradient(px + TS / 2, py + TS * .7, 2, px + TS / 2, py + TS * .7, TS * .8);
@@ -316,6 +319,135 @@ XG.Gfx = (function () {
       c.fillStyle = rgba(rgbOf(B.stripe), .35); c.fillRect(x0, frontY + 9, x1 - x0, 3);
     }
   }
+  // ---- obstacle variants (b.props): drawn over their base tile code. See DATA.props for the rules.
+  function propAt(b, x, y) { return b.props && x >= 0 && y >= 0 && x < W_(b) && y < H_(b) ? b.props[y * W_(b) + x] || 0 : 0; }
+  // Hazard stripes (yellow on black) clipped to a rectangle.
+  function hazard(c, x0, y0, w, h) {
+    c.save(); c.beginPath(); c.rect(x0, y0, w, h); c.clip();
+    c.fillStyle = '#16140c'; c.fillRect(x0, y0, w, h); c.fillStyle = '#ffd166';
+    for (var sx = x0 - h; sx < x0 + w + h; sx += 7) { c.beginPath(); c.moveTo(sx, y0 + h); c.lineTo(sx + h, y0); c.lineTo(sx + h + 3.5, y0); c.lineTo(sx + 3.5, y0 + h); c.fill(); }
+    c.restore();
+  }
+  // Fuel barrel / coolant tank / unstable packet: red or steel drum with hazard banding, a warning sign and a blinking beacon.
+  function barrelTile(c, B, b, x, y, leds) {
+    var px = x * TS, py = y * TS, cx = px + TS / 2, cyb = B.cyber, tank = B.veins && !cyb;
+    leds.push({ x: cx - 1.5, y: py + 4, c: '#ff4d6d', p: hash(x, y, 80) * 6, w: 3, h: 3, slow: true });
+    if (cyb) { // a jittering red-magenta data cube with a warning glyph
+      c.fillStyle = 'rgba(255,61,110,.18)'; c.fillRect(px + 7, py + 8, TS - 14, TS - 14);
+      c.strokeStyle = '#ff3d6e'; c.lineWidth = 2; c.strokeRect(px + 9, py + 10, TS - 18, TS - 18);
+      c.strokeStyle = 'rgba(255,61,242,.8)'; c.lineWidth = 1; c.strokeRect(px + 12, py + 7, TS - 18, TS - 18);
+      c.beginPath(); c.moveTo(px + 9, py + 10); c.lineTo(px + 12, py + 7); c.moveTo(px + TS - 9, py + 10); c.lineTo(px + TS - 6, py + 7); c.moveTo(px + TS - 9, py + TS - 8); c.lineTo(px + TS - 6, py + TS - 11); c.stroke();
+      c.fillStyle = '#ffd166'; c.beginPath(); c.moveTo(cx, py + 14); c.lineTo(cx + 8, py + 28); c.lineTo(cx - 8, py + 28); c.closePath(); c.fill();
+      c.fillStyle = '#16140c'; c.fillRect(cx - 1, py + 18, 2, 5); c.fillRect(cx - 1, py + 24, 2, 2);
+      c.fillStyle = 'rgba(255,61,110,.7)'; for (var j = 0; j < 5; j++) c.fillRect(px + 8 + hash(x, y, 81 + j) * 22, py + 33 + hash(x, y, 86 + j) * 3, 4 + hash(x, y, 91 + j) * 6, 1.5);
+      return;
+    }
+    var dark = tank ? '#1d4a63' : '#7a1f19', mid = tank ? '#3b86a8' : '#c0392b', hi = tank ? '#7fd0ea' : '#e8705c';
+    var x0 = px + 9, x1 = px + TS - 9, top = py + 9, bot = py + TS - 5;
+    c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(cx + 2, bot + 1, 14, 4.5, 0, 0, Math.PI * 2); c.fill();
+    var g = c.createLinearGradient(x0, 0, x1, 0); g.addColorStop(0, dark); g.addColorStop(.35, hi); g.addColorStop(.6, mid); g.addColorStop(1, dark);
+    c.fillStyle = g; c.fillRect(x0, top + 4, x1 - x0, bot - top - 4);
+    c.beginPath(); c.ellipse(cx, bot, (x1 - x0) / 2, 4, 0, 0, Math.PI); c.fill();
+    c.fillStyle = hi; c.beginPath(); c.ellipse(cx, top + 4, (x1 - x0) / 2, 4.5, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = dark; c.beginPath(); c.ellipse(cx, top + 4, 4.5, 2, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = 'rgba(0,0,0,.4)'; c.fillRect(x0, top + 9, x1 - x0, 1.5); c.fillRect(x0, bot - 4, x1 - x0, 1.5);
+    hazard(c, x0, top + 12, x1 - x0, 6);
+    c.fillStyle = '#ffd166'; c.beginPath(); c.moveTo(cx, top + 19); c.lineTo(cx + 5, top + 27); c.lineTo(cx - 5, top + 27); c.closePath(); c.fill();
+    c.fillStyle = '#16140c'; c.fillRect(cx - .8, top + 21, 1.6, 3); c.fillRect(cx - .8, top + 25, 1.6, 1.4);
+    if (tank) { c.fillStyle = rgba(B.accent, .9); c.fillRect(x1 - 6, top + 7, 3, 3); }
+  }
+  // Concrete barrier / armored bulkhead / hardened block: pale solid blocks that join into a wall. Blast-proof.
+  function barrierTile(c, B, b, x, y) {
+    var px = x * TS, py = y * TS, jl = propAt(b, x - 1, y) === 'barrier', jr = propAt(b, x + 1, y) === 'barrier';
+    var x0 = px + (jl ? 0 : 2), x1 = px + TS - (jr ? 0 : 2), top = py + 13, frontY = py + 20, bot = py + TS - 5;
+    var face = B.cyber ? [34, 58, 76] : [112, 116, 120];
+    c.fillStyle = shade(face, 40); c.fillRect(x0, top, x1 - x0, frontY - top);
+    c.fillStyle = shade(face, 6); c.fillRect(x0, frontY, x1 - x0, bot - frontY);
+    c.fillStyle = shade(face, -20); // the sloped foot
+    c.beginPath(); c.moveTo(x0, bot); c.lineTo(x0 + (jl ? 0 : 3), bot - 5); c.lineTo(x1 - (jr ? 0 : 3), bot - 5); c.lineTo(x1, bot); c.closePath(); c.fill();
+    c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(x0, top, x1 - x0, 1.5);
+    c.fillStyle = 'rgba(0,0,0,.4)'; if (!jl) c.fillRect(x0, top, 1, bot - top); c.fillRect(x1 - 1, top, 1, bot - top);
+    if (B.cyber) { c.strokeStyle = rgba(B.accent, .85); c.lineWidth = 1; c.strokeRect(x0 + .5, top + .5, x1 - x0 - 1, bot - top - 1); }
+    else { c.fillStyle = B.veins ? rgba(B.accent, .8) : '#d8d8d0'; c.fillRect(x0 + 5, frontY + 3, x1 - x0 - 10, 2); } // reflective strip
+    c.fillStyle = 'rgba(255,255,255,.5)'; // rivets: reads as heavy
+    c.fillRect(x0 + 4, frontY + 8, 2, 2); c.fillRect(x1 - 6, frontY + 8, 2, 2);
+  }
+  // Concrete pillar / support column / anchored node: a round column that stands taller than any wall segment. Blast-proof.
+  function pillarTile(c, B, b, x, y) {
+    var px = x * TS, py = y * TS, cx = px + TS / 2, r = 11, top = py + 4, bot = py + TS - 5;
+    c.fillStyle = 'rgba(0,0,0,.3)'; c.beginPath(); c.ellipse(cx + 2, bot + 1, r + 4, 5, 0, 0, Math.PI * 2); c.fill();
+    var col = B.cyber ? [10, 40, 60] : [118, 122, 128];
+    var g = c.createLinearGradient(cx - r, 0, cx + r, 0);
+    g.addColorStop(0, shade(col, -30)); g.addColorStop(.3, shade(col, 38)); g.addColorStop(.7, shade(col, 0)); g.addColorStop(1, shade(col, -40));
+    c.fillStyle = g; c.fillRect(cx - r, top + 4, r * 2, bot - top - 6);
+    c.fillRect(cx - r - 3, bot - 5, r * 2 + 6, 6); // plinth
+    c.beginPath(); c.ellipse(cx, bot + 1, r + 3, 3, 0, 0, Math.PI); c.fill();
+    c.fillStyle = shade(col, 52); c.beginPath(); c.ellipse(cx, top + 4, r, 4.5, 0, 0, Math.PI * 2); c.fill();
+    c.fillRect(cx - r - 3, top + 5, r * 2 + 6, 3);
+    c.fillStyle = shade(col, -50); c.beginPath(); c.ellipse(cx, top + 4, r - 4, 2, 0, 0, Math.PI * 2); c.fill();
+    if (B.veins || B.cyber) { c.fillStyle = rgba(B.accent, .9); c.fillRect(cx - r, top + 14, r * 2, 2); c.fillRect(cx - r, top + 22, r * 2, 2); }
+    else { c.fillStyle = 'rgba(0,0,0,.28)'; c.fillRect(cx - r, top + 15, r * 2, 1); c.fillRect(cx - r, top + 24, r * 2, 1); }
+  }
+  // Glass panel / crystal panel / soft firewall: a framed translucent pane with sheen. Full cover until a shot at it misses.
+  function glassTile(c, B, b, x, y) {
+    var px = x * TS, py = y * TS, jl = propAt(b, x - 1, y) === 'glass', jr = propAt(b, x + 1, y) === 'glass';
+    var x0 = px + (jl ? 0 : 3), x1 = px + TS - (jr ? 0 : 3), top = py + 5, bot = py + TS - 5, w = x1 - x0;
+    c.fillStyle = 'rgba(0,0,0,.28)'; c.fillRect(x0 + 2, bot, w, 3);
+    var tint = B.cyber ? '255,61,242' : B.veins ? '199,230,255' : '170,225,255';
+    c.fillStyle = 'rgba(' + tint + ',.30)'; c.fillRect(x0, top, w, bot - top);
+    c.save(); c.beginPath(); c.rect(x0, top, w, bot - top); c.clip();
+    c.fillStyle = 'rgba(255,255,255,.28)';
+    for (var s = x0 - 30; s < x1; s += 22) { c.beginPath(); c.moveTo(s + 30, top); c.lineTo(s + 38, top); c.lineTo(s + 8, bot); c.lineTo(s, bot); c.fill(); }
+    if (B.cyber) { c.fillStyle = 'rgba(255,61,242,.5)'; for (var yy = top + 3; yy < bot; yy += 5) for (var xx = x0 + 2 + (yy % 2) * 2; xx < x1; xx += 5) c.fillRect(xx, yy, 1.5, 1.5); }
+    c.restore();
+    c.fillStyle = '#c5d6e8'; c.fillRect(x0, top - 2, w, 3); c.fillRect(x0, bot - 1, w, 3); // frame rails
+    if (!jl) c.fillRect(x0, top - 2, 3, bot - top + 4);
+    if (!jr) c.fillRect(x1 - 3, top - 2, 3, bot - top + 4);
+    c.strokeStyle = 'rgba(' + tint + ',.9)'; c.lineWidth = 1; c.strokeRect(x0 + .5, top + .5, w - 1, bot - top - 1);
+  }
+  // Chain-link fence / laser fence / filter gate: upright, thin, impassable but see-through. Runs connect along their axis.
+  function fenceTile(c, B, b, x, y) {
+    var px = x * TS, py = y * TS, f = function (dx, dy) { return propAt(b, x + dx, y + dy) === 'fence'; };
+    var vert = (f(0, -1) || f(0, 1)) && !(f(-1, 0) || f(1, 0)), beam = B.veins || B.cyber, bc = B.cyber ? '79,209,255' : B.accent;
+    var cx = px + TS / 2, base = py + TS - 8, Hh = 22, k;
+    if (vert) { // seen end-on: a narrow mesh band the length of the tile, capped by a rail and posts
+      c.fillStyle = 'rgba(0,0,0,.3)'; c.fillRect(cx - 2, py, 6, TS);
+      if (beam) { c.save(); c.globalCompositeOperation = 'lighter'; c.fillStyle = rgba(bc, .25); c.fillRect(cx - 4, py, 8, TS); c.fillStyle = rgba(bc, .95); c.fillRect(cx - 1, py, 2, TS); c.restore(); }
+      else {
+        c.fillStyle = 'rgba(200,215,230,.16)'; c.fillRect(cx - 3, py, 6, TS);
+        c.strokeStyle = 'rgba(215,225,238,.7)'; c.lineWidth = 1; c.beginPath();
+        for (k = 0; k < TS; k += 5) { c.moveTo(cx - 3, py + k); c.lineTo(cx + 3, py + k + 5); c.moveTo(cx + 3, py + k); c.lineTo(cx - 3, py + k + 5); }
+        c.stroke(); c.fillStyle = '#b4bfcc'; c.fillRect(cx - 3, py, 1.5, TS); c.fillRect(cx + 1.5, py, 1.5, TS);
+      }
+      c.fillStyle = beam ? '#26364a' : '#8c97a6'; c.fillRect(cx - 3, py + TS / 2 - 3, 6, 6);
+      c.fillStyle = beam ? rgba(bc, 1) : '#e1e8f0'; c.fillRect(cx - 1.5, py + TS / 2 - 1.5, 3, 3);
+      return;
+    }
+    c.fillStyle = 'rgba(0,0,0,.3)'; c.fillRect(px, base, TS, 3);
+    if (beam) {
+      c.save(); c.globalCompositeOperation = 'lighter';
+      for (k = 0; k < 3; k++) {
+        var by = base - 3 - k * 7;
+        c.fillStyle = rgba(bc, .22); c.fillRect(px, by - 2, TS, 5);
+        c.fillStyle = rgba(bc, .95); c.fillRect(px, by - .5, TS, 1.5);
+      }
+      c.restore();
+    } else {
+      c.fillStyle = 'rgba(200,215,230,.14)'; c.fillRect(px, base - Hh, TS, Hh);
+      c.strokeStyle = 'rgba(215,225,238,.7)'; c.lineWidth = 1; c.beginPath();
+      for (k = 0; k < TS; k += 5) { c.moveTo(px + k, base - Hh); c.lineTo(px + k + 5, base); c.moveTo(px + k + 5, base - Hh); c.lineTo(px + k, base); }
+      c.stroke(); c.fillStyle = '#b4bfcc'; c.fillRect(px, base - Hh - 1, TS, 2);
+    }
+    c.fillStyle = beam ? '#26364a' : '#8c97a6'; c.fillRect(cx - 2, base - Hh - 2, 4, Hh + 3);
+    c.fillStyle = beam ? rgba(bc, 1) : '#e1e8f0'; c.fillRect(cx - 2, base - Hh - 3, 4, 2);
+  }
+  function propTile(c, B, b, x, y, p, leds) {
+    if (p === 'barrel') barrelTile(c, B, b, x, y, leds);
+    else if (p === 'barrier') barrierTile(c, B, b, x, y);
+    else if (p === 'pillar') pillarTile(c, B, b, x, y);
+    else if (p === 'glass') glassTile(c, B, b, x, y);
+    else if (p === 'fence') fenceTile(c, B, b, x, y);
+  }
   function doorTile(c, B, b, x, y) {
     var Wm = W_(b), Hm = H_(b), wall = function (a, c2) { return a >= 0 && c2 >= 0 && a < Wm && c2 < Hm && b.tiles[c2 * Wm + a] === WALL; };
     var h = wall(x - 1, y) && wall(x + 1, y), v = wall(x, y - 1) && wall(x, y + 1);
@@ -339,6 +471,12 @@ XG.Gfx = (function () {
         var rx = d.x * TS + 5 + hash(d.seed, i, 52) * 30, ry = d.y * TS + 8 + hash(d.seed, i, 53) * 26, s = 2 + hash(d.seed, i, 54) * 4;
         c.fillStyle = B.cyber ? rgba(B.accent, .3) : shade(d.was === HIGH ? B.high : B.low, 10 - i * 2);
         c.beginPath(); c.moveTo(rx, ry - s); c.lineTo(rx + s, ry); c.lineTo(rx + s * .2, ry + s * .8); c.lineTo(rx - s, ry + s * .2); c.closePath(); c.fill();
+      }
+    } else if (d.k === 'shards') {
+      for (var gi = 0; gi < 12; gi++) {
+        var gx = d.x * TS + 4 + hash(d.seed, gi, 52) * 32, gy = d.y * TS + 10 + hash(d.seed, gi, 53) * 26, gs2 = 1.5 + hash(d.seed, gi, 54) * 3;
+        c.fillStyle = gi % 3 ? 'rgba(190,230,255,.55)' : 'rgba(255,255,255,.7)';
+        c.beginPath(); c.moveTo(gx, gy - gs2); c.lineTo(gx + gs2, gy + gs2 * .6); c.lineTo(gx - gs2 * .8, gy + gs2); c.closePath(); c.fill();
       }
     } else if (d.k === 'oil') {
       c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(cx, cy + 6, 10, 5, 0, 0, Math.PI * 2); c.fill();
@@ -814,6 +952,10 @@ XG.Gfx = (function () {
       emit(L, 14, { now: now, x: x, y: y, spread: 22, speed: [8, 40], life: [900, 1600], size: [8, 14], rgb: ['26,28,34', '40,38,40'], kind: 'smoke', g: -24, delay: 150 });
       emit(L, 10, { now: now, x: x, y: y, speed: [120, 300], life: [400, 800], size: [2, 4], rgb: '90,100,120', kind: 'shard', g: 600, drag: 1 });
     },
+    shatter: function (L, x, y, now) { // a glass panel bursts
+      emit(L, 22, { now: now, x: x, y: y, spread: 12, speed: [60, 300], life: [350, 800], size: [1.5, 3.5], rgb: ['190,230,255', '255,255,255', '120,200,255'], kind: 'shard', g: 700, drag: 1 });
+      emit(L, 10, { now: now, x: x, y: y, spread: 12, speed: [80, 260], life: [150, 300], size: [1, 1.4], rgb: '255,255,255', kind: 'spark', drag: 3 });
+    },
     emp: function (L, x, y, r, now) {
       emit(L, 1, { now: now, x: x, y: y, speed: [0, 0], life: [260, 300], size: [80 * r, 90 * r], rgb: '79,209,255', kind: 'flash' });
       emit(L, 3, { now: now, x: x, y: y, speed: [0, 0], life: [360, 560], size: [70 * r, 80 * r], rgb: ['79,209,255', '199,146,255'], kind: 'ring', delay: 120 });
@@ -900,6 +1042,8 @@ XG.Gfx = (function () {
 
   return {
     TS: TS, REDUCED: REDUCED, hash: hash, rgbOf: rgbOf, biomeOf: biomeOf, BIOMES: BIOMES, pitName: function (b) { return BIOMES[biomeOf(b)].pit.name; },
+    propName: function (b, x, y) { var p = propAt(b, x, y), P = p && XG.DATA.props[p]; return P ? P.names[biomeOf(b)] : null; },
+    propRule: function (b, x, y) { var p = propAt(b, x, y), P = p && XG.DATA.props[p]; return P ? P.rule : null; },
     terrain: terrain, decal: decal, ambient: ambient, motes: motes, fog: fog, lights: lights, vignette: vignette,
     unit: unit, icon: icon, portrait: portrait, pal: pal, emit: emit, particles: particles, FX: FX, bolt: bolt, tracer: tracer, banner: banner, sweep: sweep
   };

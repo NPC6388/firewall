@@ -120,6 +120,7 @@ XG.Audio = (function () {
       tone({ type: 'sine', f: [80, 28], dur: .8, gain: .6 });
       noise({ dur: 1.6, gain: .12, at: .1, attack: .1, filter: ['lowpass', 500, 120], verb: .6 });
     },
+    shatter: function () { noise({ dur: .35, gain: .2, filter: ['highpass', 3500, 2500, 1] }); tone({ type: 'sine', f: [3200, 2400], dur: .25, gain: .05, verb: .4 }); },
     emp: function () {
       tone({ type: 'sawtooth', f: [120, 2400], dur: .45, gain: .14, filter: ['bandpass', 1200, 4] });
       noise({ dur: .7, gain: .18, filter: ['highpass', 2000, 6000, 1], verb: .5 });

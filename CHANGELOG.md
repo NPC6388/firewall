@@ -9,6 +9,9 @@ The in-game **Help → Patch notes** tab shows everything from the first `##` he
 ## Unreleased
 
 ### 2026-10-22
+- **Battle:** five new obstacles on the map. Fuel barrels (coolant tanks, unstable packets) explode when destroyed, hurting
+  everyone next to them and setting off neighbouring barrels. Concrete barriers and pillars are blast-proof. Glass panels
+  are full cover but shatter when a shot at someone behind them misses (or in a blast). Fences block movement but not sight.
 - **Battle:** a double row of tall cover (two racks or barriers back to back) now blocks sight completely, even
   with someone pressed against each side. Lean around the end of the row to see past it.
 - **Battle:** Swarm Drones watch you: the pupil in each drone's eye follows your cursor around the map.

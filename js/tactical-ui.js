@@ -653,13 +653,16 @@ XG.TacUI = (function () {
       html = '<b>Unexplored</b><div class="dim">Nobody has seen this ground yet.</div>';
     } else if (h && h.x >= 0 && h.x < W && h.y >= 0 && h.y < H) {
       var t = Tac.tile(b, h.x, h.y);
-      html = '<b>' + (t === Tac.PIT ? XG.Gfx.pitName(b) : ['Floor', 'Wall', 'Low cover', 'High cover'][t]) + '</b>' + (b.visible[h.y * W + h.x] ? '' : ' <span class="dim">(not in sight)</span>');
-      if (t === Tac.PIT) html += '<div class="dim">Impassable. Gives no cover and does not block line of sight.</div>';
+      var pn = XG.Gfx.propName(b, h.x, h.y);
+      html = '<b>' + (pn || (t === Tac.PIT ? XG.Gfx.pitName(b) : ['Floor', 'Wall', 'Low cover', 'High cover'][t])) + '</b>' + (b.visible[h.y * W + h.x] ? '' : ' <span class="dim">(not in sight)</span>');
+      if (pn) html += '<div class="' + (Tac.propOf(b, h.x, h.y) === 'barrel' ? 'warn' : 'dim') + '">' + XG.Gfx.propRule(b, h.x, h.y) + (t === Tac.PIT ? '. Impassable, gives no cover, does not block line of sight.' : t === Tac.LOW ? '. Half cover.' : '. Full cover.') + '</div>';
+      else if (t === Tac.PIT) html += '<div class="dim">Impassable. Gives no cover and does not block line of sight.</div>';
       if (t === 0) {
         var cf = coverFacing(h.x, h.y), sides = SIDES.map(function (o) {
           var c = Tac.coverTile(b, h.x + o[0], h.y + o[1]), s = sideState(cf, o);
           var tag = s === 'idle' ? ' <span class="bad">(no use: faces no visible enemy)</span>' : s === 'fading' ? ' <span class="warn">(angled)</span>' : '';
-          var what = c === 1 ? 'wall' : c === 3 ? 'high cover' : Tac.tile(b, h.x + o[0], h.y + o[1]) === 0 ? 'Sentinel' : 'crate';
+          var what = c === 1 ? 'wall' : c === 3 ? 'high cover' : Tac.tile(b, h.x + o[0], h.y + o[1]) === 0 ? 'Sentinel' : 'crate', pnm = XG.Gfx.propName(b, h.x + o[0], h.y + o[1]);
+          if (pnm) what = pnm.toLowerCase() + (Tac.propOf(b, h.x + o[0], h.y + o[1]) === 'barrel' ? ' <span class="warn">(explodes)</span>' : '');
           return c ? '<br>· ' + o[3] + ': ' + what + ', <b>' + (c === 2 ? 'half cover −20' : 'full cover −40') + '</b>' + tag : null;
         }).filter(Boolean);
         html += '<div class="dim">Cover here: ' + (sides.length ? sides.join('') : 'none') + '</div>';
@@ -1094,7 +1097,8 @@ XG.TacUI = (function () {
       var bc = center(e.x, e.y);
       if (e.kind === 'emp') { G.FX.emp(L, bc[0], bc[1], e.r || 1, now); shake(4, now); A.play('emp'); }
       else { G.FX.explosion(L, bc[0], bc[1], e.r || 1, now); shake(8, now); A.play('boom'); if (G.biomeOf(b) !== 'cyber') G.decal(b, 'scorch', e.x, e.y, 1.8); }
-    } else if (e.t === 'spawn') { var sc = center(e.x, e.y); G.FX.warp(L, sc[0], sc[1], now); A.play('spawn'); }
+    } else if (e.t === 'shatter') { if (seen(e.x, e.y)) { var gc = center(e.x, e.y); G.FX.shatter(L, gc[0], gc[1], now); A.play('shatter'); } }
+    else if (e.t === 'spawn') { var sc = center(e.x, e.y); G.FX.warp(L, sc[0], sc[1], now); A.play('spawn'); }
     else if (e.t === 'scan') A.play('scan');
     else if (e.t === 'text' && seen(e.x, e.y)) {
       var tc = center(e.x, e.y);
@@ -1114,7 +1118,7 @@ XG.TacUI = (function () {
     var b = st.b, vis = function (x, y) { return b.visible[y * W + x]; }, mine = function (id) { var u = Tac.unitById(b, id); return u && u.side === HS(); };
     if (e.t === 'move') return e.path.length > 1 ? e.path.filter(function (p, i) { return (mine(e.id) || vis(p[0], p[1])) && (i === 0 || i === e.path.length - 1 || !mine(e.id)); }) : [];
     if (e.t === 'shot' || e.t === 'hack') return mine(e.from) || mine(e.to) || vis(e.fx, e.fy) || vis(e.tx, e.ty) ? [[e.fx, e.fy], [e.tx, e.ty]] : [];
-    if (e.t === 'boom') return [[e.x, e.y]];
+    if (e.t === 'boom' || e.t === 'shatter') return [[e.x, e.y]];
     if (e.t === 'text' || e.t === 'dmg' || e.t === 'heal' || e.t === 'death' || e.t === 'spawn' || e.t === 'scan') return (e.id && mine(e.id)) || vis(e.x, e.y) ? [[e.x, e.y]] : [];
     return [];
   }

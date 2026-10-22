@@ -138,6 +138,16 @@ Each sprint ends with something playable. **Sprints 0–4 = the MVP.**
   scrolling, zooming camera. Every mission timer is unchanged: playtest, and lengthen timers only if the larger map
   makes them too hard.
 
+**Backlog: the bot team uses special abilities** (idea, 2026-10-22)
+- The AI-controlled side (the Lattice in the FIREWALL campaign, the FIREWALL squad in the Lattice campaign) should use
+  limited-charge specials, not just move and shoot. Today `ai()` uses only the Harmonic's Data Spike: bot Troopers
+  never throw their 1 grenade, bot Medics never heal, bot Hackers never hack, bot Sentinels never shield.
+- Each special needs an `ai()` hook with a simple rule, e.g. grenade when 2+ targets or a cover-stripping throw is in
+  range; medkit an adjacent ally below half HP; hack the most dangerous machine in range; shield the most exposed ally;
+  drones Detonate when adjacent to 2+ hostiles. New bot-only specials could follow (Warden frag launcher, Harmonic
+  mass Spike, cyber programs' firewall wall / quarantine field), shown on the hover panel so the player can read them.
+- Rebalance both campaigns afterwards (`smoke.js 30 4 30 40`): a bot that throws grenades is a lot more dangerous.
+
 **Sprint 7: Strategy depth**
 - **Cyber-Ops layer:** hackers dive into a fast node-graph "netrun" minigame between missions to slow regions or steal intel.
 - Regional **Firewall Relays** (build per region to cap infection), Dark Events (Lattice plays a card each month).
