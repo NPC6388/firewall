@@ -2,7 +2,7 @@
 var XG = globalThis.XG = globalThis.XG || {};
 
 XG.TacUI = (function () {
-  var Tac = XG.Tac, D = XG.DATA, TS = 40, W = Tac.W, H = Tac.H;
+  var Tac = XG.Tac, D = XG.DATA, TS = 40, W = Tac.BASE_W, H = Tac.BASE_H; // W/H: the current battle's map size (set in startWith)
   var $ = function (id) { return document.getElementById(id); };
   var st = null, cv, ctx, dpr = 1, bound = false;
 
@@ -14,12 +14,14 @@ XG.TacUI = (function () {
   function startWith(g, b, onDone, snap) {
     cv = $('tac-canvas'); ctx = cv.getContext('2d');
     if (XG.Comms) XG.Comms.clear();
+    W = b.W || Tac.BASE_W; H = b.H || Tac.BASE_H;
     st = {
       snap: b.training ? null : snap || JSON.stringify(b),
       g: g, b: b, onDone: onDone, sel: null, mode: null, aim: null, hover: null,
       queue: [], cur: null, floaters: [], fx: [], parts: [], face: {}, faceDisp: {}, flash: {}, shake: null, lastNow: 0,
       displayPos: {}, displayHp: {}, dying: {}, hidden: {}, seen: {},
-      reachCache: null, finished: false, lastLog: 0, dirty: true
+      reachCache: null, finished: false, lastLog: 0, dirty: true,
+      cam: { x: 0, y: 0, z: 1 }, camGoal: null, camFit: true, keys: {}, mouse: null, drag: null
     };
     $('tac-log').innerHTML = '';
     syncLog();
@@ -27,6 +29,8 @@ XG.TacUI = (function () {
     XG.UI.show('screen-tactical');
     bindOnce();
     resize();
+    var su = selUnit() || st.b.units.filter(function (u) { return u.alive && u.side === HS(); })[0];
+    if (su) centerOn(su.x, su.y, true);
     if (b.side !== b.human) banner(lat() ? 'FIREWALL TURN' : 'LATTICE TURN', 'enemy');
     XG.Audio.scene(lat() ? 'battle-lat' : 'battle');
     if (XG.Tutorial) XG.Tutorial.battleStart(g, b, { hud: function () { hud(); } });
@@ -40,17 +44,43 @@ XG.TacUI = (function () {
     if (bound) return; bound = true;
     cv.addEventListener('mousemove', function (e) {
       if (!st) return;
-      var t = tileFromEvent(e);
-      if (!st.hover || t.x !== st.hover.x || t.y !== st.hover.y) { st.hover = t; hoverPanel(); }
+      st.mouse = { x: e.clientX, y: e.clientY };
+      updateHover();
     });
-    cv.addEventListener('mouseleave', function () { if (st) { st.hover = null; hoverPanel(); } });
+    cv.addEventListener('mouseleave', function () { if (st) { st.mouse = null; st.hover = null; hoverPanel(); } });
     cv.addEventListener('click', function (e) { click(tileFromEvent(e)); });
-    cv.addEventListener('contextmenu', function (e) { e.preventDefault(); cancel(); });
+    // camera: right or middle drag pans (a right click without dragging still cancels), the wheel zooms at the cursor
+    cv.addEventListener('mousedown', function (e) {
+      if (!st || (e.button !== 1 && e.button !== 2)) return;
+      if (e.button === 1) e.preventDefault(); // no autoscroll
+      st.drag = { x: e.clientX, y: e.clientY, cx: st.cam.x, cy: st.cam.y, moved: false };
+      st.dragMoved = false;
+    });
+    window.addEventListener('mousemove', function (e) {
+      var d = st && st.drag; if (!d) return;
+      if (Math.abs(e.clientX - d.x) + Math.abs(e.clientY - d.y) > 4) d.moved = true;
+      if (!d.moved || st.camFit) return;
+      var k = viewScale();
+      st.camGoal = null;
+      setCam(d.cx - (e.clientX - d.x) * k / st.cam.z, d.cy - (e.clientY - d.y) * k / st.cam.z);
+    });
+    window.addEventListener('mouseup', function () { if (st && st.drag) { st.dragMoved = st.drag.moved; st.drag = null; } });
+    cv.addEventListener('contextmenu', function (e) { e.preventDefault(); if (!st.dragMoved && !(st.drag && st.drag.moved)) cancel(); st.dragMoved = false; });
+    cv.addEventListener('wheel', function (e) {
+      if (!st || st.camFit) return; // a map that fits whole doesn't zoom (and the page may scroll)
+      e.preventDefault();
+      var r = cv.getBoundingClientRect(), k = viewScale();
+      zoomAt((e.clientX - r.left - cv.clientLeft) * k, (e.clientY - r.top - cv.clientTop) * k, e.deltaY < 0 ? 1.12 : 1 / 1.12);
+    }, { passive: false });
+    document.addEventListener('keyup', function (e) { if (st && ARROWS[e.key]) st.keys[e.key] = false; });
+    window.addEventListener('blur', function () { if (st) st.keys = {}; });
     window.addEventListener('resize', function () { if (st) resize(); });
     if (typeof ResizeObserver === 'function') new ResizeObserver(function () { if (st) resize(); }).observe(document.querySelector('.tac-bar')); // e.g. the squad wraps
     document.addEventListener('keydown', function (e) {
       if (!st || $('screen-tactical').classList.contains('hidden') || XG.UI.isModal()) return;
       if (e.key === 'Escape') cancel();
+      else if (ARROWS[e.key]) { e.preventDefault(); st.keys[e.key] = true; st.camGoal = null; }
+      else if (e.key === 'c' || e.key === 'C') { var cu = selUnit(); if (cu) centerOn(cu.x, cu.y); }
       else if (e.key === 'Tab') { e.preventDefault(); if (st.mode) cycleTarget(e.shiftKey ? -1 : 1); else cycle(); }
       else if (e.key === 'Enter') endTurn();
       else if (e.key === 'o' || e.key === 'O') overclock();
@@ -82,19 +112,116 @@ XG.TacUI = (function () {
     };
   }
 
+  // ------------------------------------------------------------ camera
+  // The canvas fills the battle area (VW x VH CSS px). st.cam.x/y is the map point (unzoomed px, TS per tile) at the
+  // view's top-left and st.cam.z the zoom. A map that fits whole at today's tile size or more (combat training) is
+  // drawn whole and centred, as before: st.camFit, no panning or zooming.
+  var VW = 880, VH = 640, ZMIN = .5, ZMAX = 1.5, ARROWS = { ArrowLeft: 1, ArrowRight: 1, ArrowUp: 1, ArrowDown: 1 };
   function resize() {
     dpr = window.devicePixelRatio || 1;
-    cv.width = W * TS * dpr; cv.height = H * TS * dpr;
     var wrap = cv.parentElement, aw = wrap.clientWidth - 16;
     var barH = document.querySelector('.tac-bar').offsetHeight;
     document.documentElement.style.setProperty('--bar-h', barH + 'px'); // the comms card sits just above the bar
-    var ah = window.innerWidth <= 980 ? 1e9 : window.innerHeight - $('tac-top').offsetHeight - barH - 20;
-    var sc = Math.min(aw / (W * TS), ah / (H * TS));
-    cv.style.width = Math.floor(W * TS * sc) + 'px'; cv.style.height = Math.floor(H * TS * sc) + 'px';
+    var ah = window.innerWidth <= 980 ? Math.min(aw * H / W, window.innerHeight * .7) : window.innerHeight - $('tac-top').offsetHeight - barH - 20;
+    aw = Math.max(160, Math.floor(aw)); ah = Math.max(120, Math.floor(ah));
+    var fit = Math.min(aw / (W * TS), ah / (H * TS));
+    st.camFit = !!st.b.training || fit >= 1;
+    if (st.camFit) { // as before: the canvas holds the whole map at its own resolution and CSS scales it to fit
+      VW = W * TS; VH = H * TS;
+      st.cam = { x: 0, y: 0, z: 1 }; st.camGoal = null;
+      cv.width = Math.round(VW * dpr); cv.height = Math.round(VH * dpr);
+      cv.style.width = Math.floor(W * TS * fit) + 'px'; cv.style.height = Math.floor(H * TS * fit) + 'px';
+      return;
+    } else {
+      VW = aw; VH = ah;
+      ZMIN = Math.min(ZMAX, Math.max(.5, fit));
+      st.cam.z = Math.max(ZMIN, Math.min(ZMAX, st.cam.z || 1));
+      setCam(st.cam.x, st.cam.y);
+    }
+    cv.width = Math.round(VW * dpr); cv.height = Math.round(VH * dpr);
+    cv.style.width = VW + 'px'; cv.style.height = VH + 'px';
+  }
+  // CSS px of the view per client px (1 unless the page is zoomed or the canvas got squeezed).
+  function viewScale() { return cv.clientWidth ? VW / cv.clientWidth : 1; }
+  function clampCam(c) {
+    var vw = VW / st.cam.z, vh = VH / st.cam.z, mw = W * TS, mh = H * TS;
+    c.x = mw <= vw ? (mw - vw) / 2 : Math.max(0, Math.min(mw - vw, c.x));
+    c.y = mh <= vh ? (mh - vh) / 2 : Math.max(0, Math.min(mh - vh, c.y));
+    return c;
+  }
+  function setCam(x, y) { st.cam.x = x; st.cam.y = y; clampCam(st.cam); }
+  // Is the tile inside the view, at least `margin` map px from its edges?
+  function onScreen(x, y, margin) {
+    var px = x * TS + TS / 2, py = y * TS + TS / 2, vw = VW / st.cam.z, vh = VH / st.cam.z;
+    var m = Math.min(margin, vw / 4, vh / 4);
+    return px >= st.cam.x + m && px <= st.cam.x + vw - m && py >= st.cam.y + m && py <= st.cam.y + vh - m;
+  }
+  // Centre the view on a point in map px: glide there (snap with reduced motion or when asked).
+  function centerPx(px, py, snap) {
+    if (st.camFit) return;
+    var goal = clampCam({ x: px - VW / st.cam.z / 2, y: py - VH / st.cam.z / 2 });
+    if (snap || XG.Gfx.REDUCED) { st.camGoal = null; setCam(goal.x, goal.y); updateHover(); }
+    else st.camGoal = goal;
+  }
+  function centerOn(x, y, snap) { centerPx(x * TS + TS / 2, y * TS + TS / 2, snap); }
+  // Bring tiles into view if any of them is off screen (or hugging an edge); leave the camera alone if they're all
+  // visible. Several tiles (a shot's two ends, a path) are framed together when they fit. Returns true when it glides.
+  function focusTiles(pts) {
+    if (st.camFit || !pts.length) return false;
+    var m = TS * 1.5;
+    if (pts.every(function (p) { return onScreen(p[0], p[1], m); })) return false;
+    var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    pts.forEach(function (p) { x0 = Math.min(x0, p[0]); y0 = Math.min(y0, p[1]); x1 = Math.max(x1, p[0]); y1 = Math.max(y1, p[1]); });
+    var fits = (x1 - x0 + 1) * TS + 2 * m <= VW / st.cam.z && (y1 - y0 + 1) * TS + 2 * m <= VH / st.cam.z, last = pts[pts.length - 1];
+    if (fits) centerPx((x0 + x1 + 1) * TS / 2, (y0 + y1 + 1) * TS / 2); else centerOn(last[0], last[1]);
+    return !!st.camGoal;
+  }
+  function zoomAt(sx, sy, f) {
+    var z = st.cam.z, nz = Math.max(ZMIN, Math.min(ZMAX, z * f));
+    if (nz === z) return;
+    var wx = st.cam.x + sx / z, wy = st.cam.y + sy / z;
+    st.cam.z = nz; st.camGoal = null;
+    setCam(wx - sx / nz, wy - sy / nz);
+    updateHover();
+  }
+  // Arrow keys, edge scrolling and the glide toward camGoal. Returns true while the camera is moving.
+  var PAN = 760, EDGE = 18;
+  function camStep(now) {
+    var dt = Math.min(50, now - (st.camT || now)); st.camT = now;
+    if (st.camFit || !dt) return false;
+    var ox = st.cam.x, oy = st.cam.y, dx = 0, dy = 0, k = st.keys;
+    if (!XG.UI.isModal()) { dx = (k.ArrowRight ? 1 : 0) - (k.ArrowLeft ? 1 : 0); dy = (k.ArrowDown ? 1 : 0) - (k.ArrowUp ? 1 : 0); }
+    if (st.mouse && !st.drag && !dx && !dy) {
+      var r = cv.getBoundingClientRect(), s = viewScale(), sx = (st.mouse.x - r.left - cv.clientLeft) * s, sy = (st.mouse.y - r.top - cv.clientTop) * s;
+      dx = sx < EDGE ? -1 : sx > VW - EDGE ? 1 : 0; dy = sy < EDGE ? -1 : sy > VH - EDGE ? 1 : 0;
+    }
+    if (dx || dy) { st.camGoal = null; setCam(st.cam.x + dx * PAN * dt / 1000 / st.cam.z, st.cam.y + dy * PAN * dt / 1000 / st.cam.z); }
+    else if (st.camGoal) {
+      var g = st.camGoal, f = 1 - Math.exp(-dt / 70);
+      if (Math.abs(g.x - st.cam.x) + Math.abs(g.y - st.cam.y) < 1) { st.camGoal = null; setCam(g.x, g.y); }
+      else setCam(st.cam.x + (g.x - st.cam.x) * f, st.cam.y + (g.y - st.cam.y) * f);
+    }
+    var moved = st.cam.x !== ox || st.cam.y !== oy;
+    if (moved) updateHover();
+    return moved || !!st.camGoal || !!(st.drag && st.drag.moved);
   }
   function tileFromEvent(e) {
-    var r = cv.getBoundingClientRect();
-    return { x: Math.floor((e.clientX - r.left) / r.width * W), y: Math.floor((e.clientY - r.top) / r.height * H) };
+    var r = cv.getBoundingClientRect(), s = viewScale();
+    var sx = (e.clientX - r.left - cv.clientLeft) * s, sy = (e.clientY - r.top - cv.clientTop) * s;
+    return { x: Math.floor((st.cam.x + sx / st.cam.z) / TS), y: Math.floor((st.cam.y + sy / st.cam.z) / TS) };
+  }
+  function updateHover() {
+    if (!st || !st.mouse) return;
+    var t = tileFromEvent({ clientX: st.mouse.x, clientY: st.mouse.y });
+    if (!st.hover || t.x !== st.hover.x || t.y !== st.hover.y) { st.hover = t; hoverPanel(); }
+  }
+  // For tests: scroll the tile into view (snapping) and return its centre in client coordinates.
+  function tileToClient(x, y) {
+    if (!st) return null;
+    if (!st.camFit && !onScreen(x, y, TS * 3)) centerOn(x, y, true);
+    st.camGoal = null;
+    var r = cv.getBoundingClientRect(), s = viewScale();
+    return { x: r.left + cv.clientLeft + (x * TS + TS / 2 - st.cam.x) * st.cam.z / s, y: r.top + cv.clientTop + (y * TS + TS / 2 - st.cam.y) * st.cam.z / s, tile: TS * st.cam.z / s };
   }
 
   // ----------------------------------------------------------- helpers
@@ -155,7 +282,11 @@ XG.TacUI = (function () {
       }
     }
   }
-  function select(id) { if (id !== st.sel) XG.Audio.play('select'); st.sel = id; st.mode = null; st.aim = null; hud(); hoverPanel(); }
+  function select(id) {
+    if (id !== st.sel) XG.Audio.play('select');
+    st.sel = id; st.mode = null; st.aim = null; hud(); hoverPanel();
+    var su = Tac.unitById(st.b, id); if (su) focusTiles([[su.x, su.y]]);
+  }
   function cancel() { if (st.mode) { st.mode = null; st.aim = null; hud(); hoverPanel(); } }
   function cycle() {
     var list = readyUnits();
@@ -313,7 +444,11 @@ XG.TacUI = (function () {
 
   function pump(now) {
     if (st.cur) { if (now < st.cur.end) return; finish(st.cur.e); st.cur = null; }
-    while (!st.cur && st.queue.length) begin(st.queue.shift(), now);
+    while (!st.cur && st.queue.length) {
+      var nx0 = st.queue[0];
+      if (!nx0.camDone) { nx0.camDone = true; if (focusTiles(eventTiles(nx0))) { st.cur = { e: { t: 'camwait' }, t0: now, end: now + 260 }; break; } }
+      begin(st.queue.shift(), now);
+    }
     if (st.cur || st.queue.length) return;
     st.displayPos = {}; st.displayHp = {};
     var b = st.b;
@@ -325,6 +460,7 @@ XG.TacUI = (function () {
       if (b.side === b.human && !b.outcome) {
         banner('YOUR TURN', 'player');
         st.sel = firstReady(); st.mode = null; st.aim = null; // every turn starts on the leader
+        var lu = selUnit(); if (lu) focusTiles([[lu.x, lu.y]]);
         hud();
       }
       return;
@@ -332,7 +468,7 @@ XG.TacUI = (function () {
     if (st.dirty) {
       st.dirty = false;
       var u = selUnit();
-      if (!u || u.ap <= 0) { var nx = firstReady(); if (nx && nx !== st.sel) st.sel = nx; }
+      if (!u || u.ap <= 0) { var nx = firstReady(); if (nx && nx !== st.sel) { st.sel = nx; var nu = selUnit(); if (nu) focusTiles([[nu.x, nu.y]]); } }
       hud(); hoverPanel();
     }
   }
@@ -552,7 +688,8 @@ XG.TacUI = (function () {
   function frame(now) {
     pump(now);
     if (!st) return;
-    var busy = st.cur || st.queue.length || st.fx.length || st.parts.length || st.floaters.length ||
+    var camMoving = camStep(now);
+    var busy = camMoving || st.cur || st.queue.length || st.fx.length || st.parts.length || st.floaters.length ||
       (st.shake && now - st.shake.t0 < 500) || (bannerEl && now - bannerEl.t0 < 2500);
     var quiet = now - lastInput, gap = busy || quiet < IDLE_MS ? 0 : quiet < LONG_IDLE_MS ? 33 : 83; // full, 30 fps, 12 fps
     if (gap && now - (st.lastDraw || 0) < gap - 4) return;
@@ -560,8 +697,8 @@ XG.TacUI = (function () {
   }
 
   function center(x, y) { return [x * TS + TS / 2, y * TS + TS / 2]; }
-  // Labels sit above a unit; on the top row there's no room, so they go below it instead.
-  function labelY(c) { return c[1] < TS ? c[1] + 58 : c[1]; }
+  // Labels sit above a unit; on the top row of the view there's no room, so they go below it instead.
+  function labelY(c) { return c[1] - st.cam.y < TS ? c[1] + 58 : c[1]; }
   function unitPos(u, now) {
     if (st.cur && st.cur.e.t === 'move' && st.cur.e.id === u.id) {
       var p = st.cur.e.path, k = Math.min(1, (now - st.cur.t0) / (st.cur.end - st.cur.t0)) * (p.length - 1);
@@ -577,9 +714,13 @@ XG.TacUI = (function () {
     var b = st.b, G = XG.Gfx;
     var dt = Math.min(50, now - (st.lastNow || now)); st.lastNow = now;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = '#070d16'; ctx.fillRect(0, 0, W * TS, H * TS);
-    var sh = shakeOffset(now); ctx.translate(sh[0], sh[1]);
-    ctx.drawImage(G.terrain(b, dpr).canvas, 0, 0, W * TS, H * TS);
+    ctx.fillStyle = '#070d16'; ctx.fillRect(0, 0, VW, VH);
+    var sh = shakeOffset(now), z = st.cam.z;
+    ctx.setTransform(dpr * z, 0, 0, dpr * z, dpr * (sh[0] - st.cam.x * z), dpr * (sh[1] - st.cam.y * z)); // map px from here on
+    // only the part of the baked terrain that is on screen (the full map is up to 3x the view)
+    var tx0 = Math.max(0, Math.floor(st.cam.x)), ty0 = Math.max(0, Math.floor(st.cam.y));
+    var tw = Math.min(W * TS - tx0, Math.ceil(VW / z) + 2), th = Math.min(H * TS - ty0, Math.ceil(VH / z) + 2);
+    ctx.drawImage(G.terrain(b, dpr).canvas, tx0 * dpr, ty0 * dpr, tw * dpr, th * dpr, tx0, ty0, tw, th);
     G.ambient(ctx, b, now);
     // light pools under visible units
     var pools = [];
@@ -645,14 +786,14 @@ XG.TacUI = (function () {
     st.floaters.forEach(function (f) {
       var k = (now - f.t0) / 1100; if (k < 0) return;
       var c = center(f.x, f.y), big = /CRIT/.test(f.text), pop = k < .12 ? .6 + k / .12 * .6 : k < .2 ? 1.2 - (k - .12) / .08 * .2 : 1;
-      ctx.save(); ctx.translate(c[0], Math.max(16, c[1] - 24 - k * 28)); ctx.scale(pop, pop);
+      ctx.save(); ctx.translate(c[0], Math.max(st.cam.y + 16, c[1] - 24 - k * 28)); ctx.scale(pop, pop);
       ctx.font = 'bold ' + (big ? 17 : 13) + 'px "Share Tech Mono", monospace';
       ctx.globalAlpha = 1 - k * k; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.85)'; ctx.strokeText(f.text, 0, 0);
       ctx.fillStyle = f.color; ctx.fillText(f.text, 0, 0); ctx.restore();
     });
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    G.vignette(ctx, W * TS, H * TS);
-    if (bannerEl && now - bannerEl.t0 < 1300) G.banner(ctx, bannerEl.text, bannerEl.color, (now - bannerEl.t0) / 1300, W * TS, H * TS, now);
+    G.vignette(ctx, VW, VH);
+    if (bannerEl && now - bannerEl.t0 < 1300) G.banner(ctx, bannerEl.text, bannerEl.color, (now - bannerEl.t0) / 1300, VW, VH, now);
   }
   function shake(mag, now) { if (!XG.Gfx.REDUCED && XG.Settings.get('shake')) st.shake = { t0: now, mag: Math.max(mag, st.shake && now - st.shake.t0 < 300 ? st.shake.mag : 0) }; }
   function shakeOffset(now) {
@@ -822,7 +963,7 @@ XG.TacUI = (function () {
     if (fl <= 0) delete st.flash[x.id];
     var kick = fl > 0 ? fl * 3 : 0, ang = facing(x, now);
     XG.Gfx.unit(ctx, x, c[0] - Math.cos(ang) * kick, c[1] - Math.sin(ang) * kick, {
-      facing: ang, now: now, alpha: alpha, flash: Math.max(0, fl), human: HS(), myTurn: st.b.side === HS(),
+      facing: ang, now: now, alpha: alpha, flash: Math.max(0, fl), human: HS(), myTurn: st.b.side === HS(), top: st.cam.y,
       hp: st.displayHp[x.id] !== undefined ? st.displayHp[x.id] : x.hp
     });
     var h = st.hover;
@@ -953,5 +1094,15 @@ XG.TacUI = (function () {
     }
   }
 
-  return { start: start, startWith: startWith, debug: function () { return st; } };
+  // The tiles an event happens on, as far as the person can see them (the camera frames these before it plays).
+  function eventTiles(e) {
+    var b = st.b, vis = function (x, y) { return b.visible[y * W + x]; }, mine = function (id) { var u = Tac.unitById(b, id); return u && u.side === HS(); };
+    if (e.t === 'move') return e.path.length > 1 ? e.path.filter(function (p, i) { return (mine(e.id) || vis(p[0], p[1])) && (i === 0 || i === e.path.length - 1 || !mine(e.id)); }) : [];
+    if (e.t === 'shot' || e.t === 'hack') return mine(e.from) || mine(e.to) || vis(e.fx, e.fy) || vis(e.tx, e.ty) ? [[e.fx, e.fy], [e.tx, e.ty]] : [];
+    if (e.t === 'boom') return [[e.x, e.y]];
+    if (e.t === 'text' || e.t === 'dmg' || e.t === 'heal' || e.t === 'death' || e.t === 'spawn' || e.t === 'scan') return (e.id && mine(e.id)) || vis(e.x, e.y) ? [[e.x, e.y]] : [];
+    return [];
+  }
+
+  return { start: start, startWith: startWith, debug: function () { return st; }, tileToClient: tileToClient, centerOn: function (x, y) { if (st) centerOn(x, y, true); } };
 })();

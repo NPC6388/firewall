@@ -50,8 +50,8 @@ XG.Gfx = (function () {
   }
 
   // ------------------------------------------------------------ terrain
-  function W_(b) { return XG.Tac.W; }
-  function H_(b) { return XG.Tac.H; }
+  function W_(b) { return b.W; } // each battle carries its own map size
+  function H_(b) { return b.H; }
   function tileAt(b, x, y) { return x < 0 || y < 0 || x >= W_(b) || y >= H_(b) ? WALL : b.tiles[y * W_(b) + x]; }
   function solid(t) { return t === WALL || t === HIGH; }
 
@@ -397,7 +397,7 @@ XG.Gfx = (function () {
     if (REDUCED) return;
     var s = gs(b), B = BIOMES[s.biome], Wp = W_(b) * TS, Hp = H_(b) * TS;
     c.save(); c.globalCompositeOperation = 'lighter';
-    for (var i = 0; i < 28; i++) {
+    for (var i = 0, n = Math.round(28 * W_(b) * H_(b) / 352); i < n; i++) { // 28 per 22x16 of map
       var sx = hash(i, 1, 70), sy = hash(i, 2, 70), vx = (hash(i, 3, 70) - .5) * .012, vy = -.004 - hash(i, 4, 70) * .01;
       var x = ((sx * Wp + now * vx) % Wp + Wp) % Wp, y = ((sy * Hp + now * vy) % Hp + Hp) % Hp;
       var a = .12 + .12 * Math.sin(now / 700 + i);
@@ -411,7 +411,7 @@ XG.Gfx = (function () {
     for (var i = 0; i < W * H; i++) key += b.visible[i] ? '1' : '0';
     if (key !== s.fogKey) {
       s.fogKey = key;
-      if (!s.fogC) { s.fogC = document.createElement('canvas'); s.fogC.width = W * 3; s.fogC.height = H * 3; }
+      if (!s.fogC || s.fogC.width !== W * 3 || s.fogC.height !== H * 3) { s.fogC = document.createElement('canvas'); s.fogC.width = W * 3; s.fogC.height = H * 3; }
       var fc = s.fogC.getContext('2d'), img = fc.createImageData(W * 3, H * 3), d = img.data;
       for (var y = 0; y < H * 3; y++) for (var x = 0; x < W * 3; x++) {
         var o = (y * W * 3 + x) * 4, vis = b.visible[Math.floor(y / 3) * W + Math.floor(x / 3)];
@@ -443,7 +443,7 @@ XG.Gfx = (function () {
   }
   var vig = null;
   function vignette(c, w, h) {
-    if (!vig || vig.width !== w) {
+    if (!vig || vig.width !== w || vig.height !== h) {
       vig = document.createElement('canvas'); vig.width = w; vig.height = h;
       var v = vig.getContext('2d'), g = v.createRadialGradient(w / 2, h / 2, Math.min(w, h) * .35, w / 2, h / 2, Math.max(w, h) * .72);
       g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.55)'); v.fillStyle = g; v.fillRect(0, 0, w, h);
@@ -710,7 +710,7 @@ XG.Gfx = (function () {
 
   // HP plate, shield, and status icons around a unit.
   function badges(c, u, cx, cy, o) {
-    var P = pal(), enemy = u.side === 'enemy', n = u.maxHp, hp = o.hp, pw = Math.min(5, 30 / n), w = n * pw, x0 = cx - w / 2, y0 = Math.max(4, cy - 23); // top row: keep it on the map
+    var P = pal(), enemy = u.side === 'enemy', n = u.maxHp, hp = o.hp, pw = Math.min(5, 30 / n), w = n * pw, x0 = cx - w / 2, y0 = Math.max((o.top || 0) + 4, cy - 23); // top row of the view (o.top, map px): keep it on screen
     c.fillStyle = 'rgba(0,0,0,.65)'; c.fillRect(x0 - 2, y0 - 2, w + 3, 7);
     for (var i = 0; i < n; i++) { c.fillStyle = i < hp ? (enemy ? P.hpLat : P.hpFw) : '#2a1820'; c.fillRect(x0 + i * pw, y0, pw - 1, 3); }
     for (var s = 0; s < u.shield; s++) { c.fillStyle = '#c792ff'; c.fillRect(x0 + s * pw, y0 < 6 ? y0 + 4 : y0 - 4, pw - 1, 2); }

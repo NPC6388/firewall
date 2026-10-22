@@ -35,6 +35,11 @@ they assault the Uplink: hold it or lose.
 | `O` | HALCYON Overclock: +1 AP (after HALCYON Integration) |
 | `Space` | Confirm the armed ability (same as its key again); with nobody left with AP, end the turn; in combat training, press the coach's Next |
 | `Y` | Overwatch all, then end the turn (asks first) |
+| `H` | Hunker all, then end the turn (asks first) |
+| Arrow keys / mouse at the map edge | Scroll the battle map |
+| Right- or middle-drag | Pan the map (a right click without dragging still cancels) |
+| Mouse wheel | Zoom in and out |
+| `C` | Centre the view on the selected unit |
 | `Enter` | End turn |
 | `Esc` / right-click | Cancel |
 | `M` | Mute or unmute |

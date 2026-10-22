@@ -14,7 +14,7 @@ XG.Tutorial = (function () {
       { t: '<b>Take cover.</b> Hover a tile: shield icons show cover on each side (filled = full, half-filled = half). End your moves next to crates, racks or walls facing the enemy.',
         done: function (r, b) { return humans(b).some(function (u) { return u.alive && nextToCover(b, u); }); } },
       { t: '<b>Find the Lattice.</b> Hostiles hide in the fog until one of your units sees them. A <b>?</b> above one means it has not noticed you yet. Advance carefully, cover to cover.',
-        done: function (r, b) { return b.units.some(function (u) { return u.alive && u.side !== b.human && !u.isStatic && b.visible[u.y * XG.Tac.W + u.x]; }); } },
+        done: function (r, b) { return b.units.some(function (u) { return u.alive && u.side !== b.human && !u.isStatic && b.visible[u.y * b.W + u.x]; }); } },
       { t: '<b>Aim.</b> Click a hostile to aim at it. The panel on the right shows the hit chance and every modifier behind it: cover, angle, range.',
         done: function (r, b, u, mode) { return mode === 'shoot' || r.shots > 0; } },
       { t: '<b>Fire.</b> Click the target again, or press <b>1</b> or <b>Space</b>, to shoot. A unit with no shot can take <b>Overwatch</b> instead (<b>Y</b> puts everyone on overwatch).',
@@ -28,7 +28,7 @@ XG.Tutorial = (function () {
       { t: '<b>You are the Lattice.</b> Click one of your machines (or press Tab), then a <span class="cy">highlighted</span> tile to move. The objective is at the top: purge the defenders, or hold out until the turn limit.',
         done: function (r, b) { return moved(r, b); } },
       { t: '<b>Locate the enemy.</b> Earth\'s units hide in fog like anything else. Spread out and close in from more than one side: flanked targets are easier to hit.',
-        done: function (r, b) { return b.units.some(function (u) { return u.alive && u.side !== b.human && b.visible[u.y * XG.Tac.W + u.x]; }); } },
+        done: function (r, b) { return b.units.some(function (u) { return u.alive && u.side !== b.human && b.visible[u.y * b.W + u.x]; }); } },
       { t: '<b>Attack.</b> Click a target to aim; the right panel breaks down the odds. Click again or press <b>1</b> to fire. Harmonics\' <b>Data Spike</b> ignores cover and never misses.',
         done: function (r) { return r.shots > 0; } },
       { t: '<b>End the turn</b> (Enter). Earth answers on its turn.',
@@ -158,7 +158,7 @@ XG.Tutorial = (function () {
     var Tc = XG.Tac, tr = k.tr, ox = tr.x, oy = tr.y, r = Tc.reach(b, tr, 99), lim = Tc.moveRange(tr), best = null, bestIn = null;
     for (var i = 0; i < r.d.length; i++) {
       if (r.d[i] <= 0) continue;
-      tr.x = i % Tc.W; tr.y = (i - tr.x) / Tc.W;
+      tr.x = i % b.W; tr.y = (i - tr.x) / b.W;
       var kk = T(b);
       if (st.goal.ok(kk)) {
         var c = { x: tr.x, y: tr.y, d: r.d[i], s: st.goal.score ? st.goal.score(kk) : 0 };

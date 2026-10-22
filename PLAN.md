@@ -46,7 +46,7 @@ planet the Lattice hasn't touched. Earth vs. aliens, carbon *and* silicon on the
 | **Base** | 3×4 slot grid. Facilities: Research Lab, Fusion Generator, Fabrication Bay, Infirmary, Signal Array, Server Farm. Power budget, credit cost, build time. |
 | **Fabrication** | Global upgrades: EMP grenades, Faraday armor, Coil weapons, plus Sentinel chassis (a HALCYON squad unit). |
 | **Soldiers** | 4 classes: Trooper, Hacker, Field Scientist, HALCYON Sentinel. Ranks from XP (+aim, +HP). Wounds take days to heal. Death is permanent (memorial wall). |
-| **Tactical** | 22×16 procedural grid. 2 AP; move = 1 AP, attacks end the turn. Half/full cover, flanking, Bresenham LOS with peeking, fog of war, pod alerts, overwatch, grenades that destroy cover, hacking (stun, or override with Lattice Grammar), medkits, scan/mark, shields, HALCYON Overclock (+AP). |
+| **Tactical** | 38×28 procedural grid with a scrolling, zooming camera (combat training: 22×16). 2 AP; move = 1 AP, attacks end the turn. Half/full cover, flanking, Bresenham LOS with peeking, fog of war, pod alerts, overwatch, grenades that destroy cover, hacking (stun, or override with Lattice Grammar), medkits, scan/mark, shields, HALCYON Overclock (+AP). |
 | **Enemies** | Swarm Drone, Warden Mech, Harmonic (hologram; *Data Spike* ignores cover), Lattice Relay (spawner), Uplink Core (finale boss-structure). |
 | **Story** | Intro, 5 research/mission beats, 3 Lattice taunts at 50/75/90% Convergence, victory and defeat endings. |
 | **Save** | Autosave to browser localStorage on the strategy layer. |
@@ -134,8 +134,9 @@ Each sprint ends with something playable. **Sprints 0–4 = the MVP.**
 - Ammo/reload, elevation (rooftops = aim bonus), destructible walls, explosive barrels / overloaded servers.
 - New enemies: *Shepherd* (re-hacks your Sentinel), *Mirror* (spoofs your squad on the minimap), *Swarm Queen*.
 - New mission types: rescue a scientist, extract an air-gapped drive, defend a hospital's backup generator, timed evac.
-- **Bigger maps:** triple the battle map area (each side about 1.73× longer). Keep every mission timer at its current
-  value, then playtest and lengthen timers only if the larger map makes them too hard.
+- **Bigger maps:** ✅ done 2026-10-22. Mission maps are 38x28 (3x the 22x16 area; combat training stays 22x16) with a
+  scrolling, zooming camera. Every mission timer is unchanged: playtest, and lengthen timers only if the larger map
+  makes them too hard.
 
 **Sprint 7: Strategy depth**
 - **Cyber-Ops layer:** hackers dive into a fast node-graph "netrun" minigame between missions to slow regions or steal intel.

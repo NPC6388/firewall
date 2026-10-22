@@ -6,7 +6,7 @@ var ctx = vm.createContext({ console: console, Math: Math, Date: Date, JSON: JSO
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', f), 'utf8'), ctx, { filename: f });
 });
 var XG = ctx.XG, Tac = XG.Tac, S = XG.State;
-var N = +process.argv[2] || 400, g = S.newGame(3), stats = {}, shown = {}, pitHist = [0, 0, 0];
+var N = +process.argv[2] || 400, g = S.newGame(3), stats = {}, shown = {}, pitHist = [0, 0, 0, 0, 0, 0, 0];
 for (var i = 0; i < N; i++) {
   var b = Tac.create(g, { kind: 'purge', diff: 2, seed: 1000 + i * 7919, name: 'x', city: 'x' }, g.soldiers.slice(0, 4));
   var st = stats[b.layout] = stats[b.layout] || { n: 0, cover: 0, high: 0, wall: 0, pit: 0, open: 0 };
@@ -17,25 +17,25 @@ for (var i = 0; i < N; i++) {
     if (t === Tac.LOW) st.cover++; else if (t === Tac.HIGH) st.high++; else if (t === Tac.WALL) st.wall++; else if (t === Tac.PIT) st.pit++;
     // open floor: no cover on any side
     if (t === Tac.FLOOR) {
-      var x = k % Tac.W, y = (k - x) / Tac.W;
+      var x = k % b.W, y = (k - x) / b.W;
       if (![[1, 0], [-1, 0], [0, 1], [0, -1]].some(function (o) { var c = Tac.coverTile(b, x + o[0], y + o[1]); return c !== Tac.FLOOR; })) st.open++;
     }
     if (t === Tac.PIT && !seenPit[k]) { // count connected pit features
       pits++; var q = [k]; seenPit[k] = 1;
-      while (q.length) { var c = q.pop(), cx = c % Tac.W, cy = (c - cx) / Tac.W;
-        [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (o) { var nx = cx + o[0], ny = cy + o[1], ni = ny * Tac.W + nx;
-          if (nx >= 0 && ny >= 0 && nx < Tac.W && ny < Tac.H && b.tiles[ni] === Tac.PIT && !seenPit[ni]) { seenPit[ni] = 1; q.push(ni); } }); }
+      while (q.length) { var c = q.pop(), cx = c % b.W, cy = (c - cx) / b.W;
+        [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (o) { var nx = cx + o[0], ny = cy + o[1], ni = ny * b.W + nx;
+          if (nx >= 0 && ny >= 0 && nx < b.W && ny < b.H && b.tiles[ni] === Tac.PIT && !seenPit[ni]) { seenPit[ni] = 1; q.push(ni); } }); }
     }
   }
-  pitHist[Math.min(2, pits)]++;
+  pitHist[Math.min(6, pits)]++;
   if (!shown[b.layout]) {
     shown[b.layout] = 1;
     console.log('\n' + b.layout + ' (seed ' + (1000 + i * 7919) + ')');
-    for (var yy = 0; yy < Tac.H; yy++) {
+    for (var yy = 0; yy < b.H; yy++) {
       var row = '';
-      for (var xx = 0; xx < Tac.W; xx++) {
+      for (var xx = 0; xx < b.W; xx++) {
         var u = Tac.unitAt(b, xx, yy);
-        row += u ? (u.side === 'player' ? 'F' : 'E') : '.#cH~'[b.tiles[yy * Tac.W + xx]];
+        row += u ? (u.side === 'player' ? 'F' : 'E') : '.#cH~'[b.tiles[yy * b.W + xx]];
       }
       console.log('  ' + row);
     }
@@ -46,4 +46,4 @@ Object.keys(stats).forEach(function (k) {
   var s = stats[k], f = function (v) { return (v / s.n).toFixed(1).padStart(8); };
   console.log(k.padEnd(10) + String(s.n).padStart(5) + f(s.cover) + ' ' + f(s.high) + '  ' + f(s.wall) + ' ' + f(s.pit) + '  ' + f(s.open));
 });
-console.log('pit features per map (0/1/2+):', pitHist.join(' / '));
+console.log('pit features per map (0/1/2/3/4/5/6+):', pitHist.join(' / '));

@@ -22,7 +22,7 @@ export default async function ({ ev, shot, sleep, send }) {
         while(T.tile(b,x,y)!==0) y++;
         b.units.push(Object.assign({}, base, {id:500+i, kind:k, name:E.name, color:E.color||col[k], glyph:E.glyph, side: D.enemies[k]?'enemy':'player', alive:true, x:x, y:y,
           hp:4, maxHp:6, shield: k==='warden'?2:0, overwatch: i===0, hunker: i===5, marked: i===4?1:0, stunned: i===6?1:0, alerted: i!==5, machine: !!E.machine, isStatic:false, ap:2 })); });
-      b.visible=b.visible.map(()=>true); s.sel=500; return b.units.length;})()`);
+      b.visible=b.visible.map(()=>true); s.sel=500; XG.TacUI.centerOn(11, 8); return b.units.length;})()`);
     await sleep(700);
     await zoom('g-' + kind);
   }

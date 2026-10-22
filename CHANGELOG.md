@@ -9,6 +9,9 @@ The in-game **Help → Patch notes** tab shows everything from the first `##` he
 ## Unreleased
 
 ### 2026-10-22
+- **Battle:** maps are three times bigger (38x28 tiles) with more buildings, cover and terrain to fight through.
+  The view scrolls: arrow keys, the map edge or a right-drag pan, the wheel zooms, C centres on your unit, and the
+  camera follows the action. Mission timers are unchanged; combat training keeps its small range.
 - **Lattice campaign:** when FIREWALL raids your cell, your units start dug in behind cover facing the attackers, and
   FIREWALL spends its first turn moving in without firing, so the first shots are yours or your overwatch's.
 - **Lattice:** longer weapon range. Swarm Drones reach 12 tiles (was 10), Warden Mechs and Harmonics 13 (was 12),

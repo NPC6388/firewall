@@ -3,8 +3,7 @@ export default async function ({ ev, shot, sleep, send }) {
   const key = async (k) => { await send('Input.dispatchKeyEvent', { type: 'keyDown', key: k, text: k }); await send('Input.dispatchKeyEvent', { type: 'keyUp', key: k }); };
   const waitIdle = async () => { for (let i = 0; i < 200; i++) { if (await ev(`(function(){var s=XG.TacUI.debug(); return !s || (!s.cur && !s.queue.length && s.b.side==='player');})()`)) return; await sleep(80); } };
   const clickTile = async (x, y, press = true) => {
-    const box = await ev(`(function(){var r=document.getElementById('tac-canvas').getBoundingClientRect(); return [r.left,r.top,r.width,r.height];})()`);
-    const cx = box[0] + (x + .5) * box[2] / 22, cy = box[1] + (y + .5) * box[3] / 16;
+    const p = await ev(`XG.TacUI.tileToClient(${x},${y})`), cx = p.x, cy = p.y; // scrolls the camera to the tile first
     await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: cx, y: cy });
     if (press) { await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: cx, y: cy, button: 'left', clickCount: 1 });
       await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: cx, y: cy, button: 'left', clickCount: 1 }); }

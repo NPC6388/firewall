@@ -10,8 +10,7 @@ export default async function ({ ev, sleep, send }) {
   await ev(`document.getElementById('sq-go').click()`); await sleep(500);
   await ev(`(function(){var c=document.getElementById('coach'); if (c) c.classList.add('hidden');})()`);
   const u = JSON.parse(await ev(`JSON.stringify((function(){var s=XG.TacUI.debug(), u=s.b.units.filter(function(u){return u.side==='player'})[1]; return {id:u.id,x:u.x,y:u.y};})())`));
-  const r = JSON.parse(await ev(`JSON.stringify((function(){var r=document.getElementById('tac-canvas').getBoundingClientRect();return [r.left,r.top,r.width/XG.Tac.W]})())`));
-  const hover = async (x, y) => { await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: r[0] + (x + .5) * r[2], y: r[1] + (y + .5) * r[2] }); await sleep(300); };
+  const hover = async (x, y) => { const p = await ev(`XG.TacUI.tileToClient(${x},${y})`); await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p.x, y: p.y }); await sleep(300); };
   for (const ap of [2, 1, 0, 3]) {
     await ev(`(function(){var s=XG.TacUI.debug(); XG.Tac.unitById(s.b, ${u.id}).ap=${ap};})()`);
     await hover(u.x + 3, u.y + 3); await hover(u.x, u.y);

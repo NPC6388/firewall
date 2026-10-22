@@ -99,9 +99,9 @@ function autoBattle(g, m, squad) {
   check(!!core, 'uplink has a core');
   // park both next to the core
   tr.x = core.x - 1; tr.y = core.y; hk.x = core.x; hk.y = core.y + (core.y > 0 ? -1 : 1);
-  if (Tac.tile(b, hk.x, hk.y) !== Tac.FLOOR) { b.tiles[hk.y * Tac.W + hk.x] = Tac.FLOOR; }
-  b.tiles[tr.y * Tac.W + tr.x] = Tac.FLOOR;
-  b.visible[core.y * Tac.W + core.x] = true;
+  if (Tac.tile(b, hk.x, hk.y) !== Tac.FLOOR) { b.tiles[hk.y * Tac.MAP_W + hk.x] = Tac.FLOOR; }
+  b.tiles[tr.y * Tac.MAP_W + tr.x] = Tac.FLOOR;
+  b.visible[core.y * Tac.MAP_W + core.x] = true;
   check(Tac.act.sever(b, tr, core) === null, 'trooper cannot sever');
   check(Tac.targets(b, hk, 'sever').indexOf(core) >= 0, 'adjacent hacker can sever');
   // every class and Lattice unit can hunker except the HALCYON Sentinel
@@ -117,30 +117,30 @@ function autoBattle(g, m, squad) {
   var b2 = Tac.create(g, Object.assign({}, m, { kind: 'purge', diff: 1 }), g.soldiers.slice(0, 4));
   var t2 = b2.units.filter(function (u) { return u.kind === 'trooper'; })[0];
   var gx = t2.x + 3, gy = t2.y;
-  b2.tiles[gy * Tac.W + gx] = Tac.LOW; b2.visible[gy * Tac.W + gx] = true;
+  b2.tiles[gy * Tac.MAP_W + gx] = Tac.LOW; b2.visible[gy * Tac.MAP_W + gx] = true;
   check(!!Tac.act.grenade(b2, t2, gx, gy), 'grenade throws');
   check(Tac.tile(b2, gx, gy) === Tac.FLOOR, 'frag grenade destroys cover');
   check(t2.ap === 0 && t2.charges.grenade === 0, 'grenade spends AP and charge');
   // cover depends on the viewing angle: target at (10,10) behind high cover to the east
   var bc = Tac.create(g, Object.assign({}, m, { kind: 'purge', diff: 1 }), g.soldiers.slice(0, 4));
-  for (var cy = 0; cy < Tac.H; cy++) for (var cx = 0; cx < Tac.W; cx++) bc.tiles[cy * Tac.W + cx] = Tac.FLOOR;
-  bc.tiles[10 * Tac.W + 11] = Tac.HIGH;
+  for (var cy = 0; cy < Tac.MAP_H; cy++) for (var cx = 0; cx < Tac.MAP_W; cx++) bc.tiles[cy * Tac.MAP_W + cx] = Tac.FLOOR;
+  bc.tiles[10 * Tac.MAP_W + 11] = Tac.HIGH;
   check(Tac.coverValue(bc, 10, 10, 18, 10) === 40, 'head-on full cover is 40');
   check(Tac.coverValue(bc, 10, 10, 18, 13) === 40, 'shot 21° off-axis keeps full cover');
   var c45 = Tac.coverDetail(bc, 10, 10, 15, 15);
   check(c45.value > 20 && c45.value < 40 && c45.base === 40 && c45.angle === 45, '45° shot gets partial full cover (' + c45.value + ')');
   check(Tac.coverValue(bc, 10, 10, 13, 18) === 0, 'steep shot past 63° flanks the cover');
   // corner peeking: wall at x=6, y=5..10; a unit at (5,5) leans out north and can see (10,5); one at (4,5) can't
-  for (var py = 0; py < Tac.H; py++) for (var px = 0; px < Tac.W; px++) bc.tiles[py * Tac.W + px] = Tac.FLOOR;
-  for (var wy = 5; wy <= 10; wy++) bc.tiles[wy * Tac.W + 6] = Tac.WALL;
+  for (var py = 0; py < Tac.MAP_H; py++) for (var px = 0; px < Tac.MAP_W; px++) bc.tiles[py * Tac.MAP_W + px] = Tac.FLOOR;
+  for (var wy = 5; wy <= 10; wy++) bc.tiles[wy * Tac.MAP_W + 6] = Tac.WALL;
   check(Tac.los(bc, 5, 5, 10, 5), 'a unit on the corner of a wall can fire down the line past it');
   check(!Tac.los(bc, 4, 5, 10, 5), 'a unit a step back from the corner cannot');
   check(!Tac.los(bc, 5, 8, 10, 8), 'peeking does not see through the middle of a wall');
-  for (var cy2 = 0; cy2 < Tac.H; cy2++) for (var cx2 = 0; cx2 < Tac.W; cx2++) bc.tiles[cy2 * Tac.W + cx2] = Tac.FLOOR;
-  bc.tiles[10 * Tac.W + 11] = Tac.HIGH;
+  for (var cy2 = 0; cy2 < Tac.MAP_H; cy2++) for (var cx2 = 0; cx2 < Tac.MAP_W; cx2++) bc.tiles[cy2 * Tac.MAP_W + cx2] = Tac.FLOOR;
+  bc.tiles[10 * Tac.MAP_W + 11] = Tac.HIGH;
   // a hacked drone on your side can be shot, and is listed after real hostiles
   var bh = Tac.create(g, Object.assign({}, m, { kind: 'purge', diff: 2, seed: 11 }), g.soldiers.slice(0, 4));
-  for (var hy = 0; hy < Tac.H; hy++) for (var hx = 0; hx < Tac.W; hx++) bh.tiles[hy * Tac.W + hx] = Tac.FLOOR;
+  for (var hy = 0; hy < Tac.MAP_H; hy++) for (var hx = 0; hx < Tac.MAP_W; hx++) bh.tiles[hy * Tac.MAP_W + hx] = Tac.FLOOR;
   var sh2 = bh.units.filter(function (u) { return u.kind === 'trooper'; })[0], ds = bh.units.filter(function (u) { return u.kind === 'drone'; });
   ds[0].x = sh2.x + 3; ds[0].y = sh2.y; ds[0].side = 'player'; ds[0].origSide = 'enemy'; ds[0].override = 2;
   ds[1].x = sh2.x + 4; ds[1].y = sh2.y + 1;
@@ -167,10 +167,10 @@ function autoBattle(g, m, squad) {
   var hi = Tac.hitInfo(bc, sh, tg);
   check(hi.ok && hi.parts.reduce(function (s, p) { return s + p[1]; }, 0) === hi.chance, 'hit breakdown sums to the chance (' + JSON.stringify(hi.parts) + ')');
   tg.hunker = false; tg.marked = 0;
-  bc.tiles[10 * Tac.W + 11] = Tac.LOW;
+  bc.tiles[10 * Tac.MAP_W + 11] = Tac.LOW;
   check(Tac.coverValue(bc, 10, 10, 15, 15) < 20 && Tac.coverValue(bc, 10, 10, 15, 15) > 10, 'half cover also fades with angle');
   // a HALCYON Sentinel (mech chassis) is half cover for whoever stands beside it; other units are not
-  bc.tiles[10 * Tac.W + 11] = Tac.FLOOR;
+  bc.tiles[10 * Tac.MAP_W + 11] = Tac.FLOOR;
   var sk = sh.kind; sh.x = 11; sh.y = 10;
   check(Tac.coverValue(bc, 10, 10, 18, 10) === 0, 'a trooper beside you is no cover');
   sh.kind = 'sentinel';
@@ -180,25 +180,55 @@ function autoBattle(g, m, squad) {
   sh.alive = true; sh.kind = sk;
   // a pit: impassable, no cover, and you can see and shoot across it
   sh.x = 15; sh.y = 15;
-  bc.tiles[10 * Tac.W + 11] = Tac.PIT; bc.tiles[10 * Tac.W + 12] = Tac.PIT;
+  bc.tiles[10 * Tac.MAP_W + 11] = Tac.PIT; bc.tiles[10 * Tac.MAP_W + 12] = Tac.PIT;
   check(Tac.coverValue(bc, 10, 10, 18, 10) === 0, 'a pit beside you is no cover');
   check(Tac.los(bc, 10, 10, 18, 10), 'a pit does not block line of sight');
   var walker = bc.units.filter(function (u) { return u.side === 'player' && u !== sh; })[0];
   walker.x = 10; walker.y = 9; walker.ap = 2;
   var rr = Tac.reach(bc, walker, 4);
-  check(rr.d[10 * Tac.W + 11] < 0 && rr.d[10 * Tac.W + 13] > 0, 'a pit cannot be entered, only walked around');
-  bc.tiles[10 * Tac.W + 11] = Tac.FLOOR; bc.tiles[10 * Tac.W + 12] = Tac.FLOOR;
+  check(rr.d[10 * Tac.MAP_W + 11] < 0 && rr.d[10 * Tac.MAP_W + 13] > 0, 'a pit cannot be entered, only walked around');
+  bc.tiles[10 * Tac.MAP_W + 11] = Tac.FLOOR; bc.tiles[10 * Tac.MAP_W + 12] = Tac.FLOOR;
   // map layouts: all five turn up, the deployment zone stays clear, and some maps carry pits
   var lay = {}, pitMaps = 0, deployOk = true;
   for (var ms = 0; ms < 60; ms++) {
     var bm = Tac.create(g, Object.assign({}, m, { kind: 'purge', diff: 2, seed: 900 + ms * 7919 }), g.soldiers.slice(0, 4));
     lay[bm.layout] = 1;
     if (bm.tiles.indexOf(Tac.PIT) >= 0) pitMaps++;
-    for (var dy = (Tac.H >> 1) - 3; dy <= (Tac.H >> 1) + 3; dy++) for (var dx = 0; dx < 3; dx++) if (bm.tiles[dy * Tac.W + dx] !== Tac.FLOOR) deployOk = false;
+    for (var dy = (Tac.MAP_H >> 1) - 3; dy <= (Tac.MAP_H >> 1) + 3; dy++) for (var dx = 0; dx < 3; dx++) if (bm.tiles[dy * Tac.MAP_W + dx] !== Tac.FLOOR) deployOk = false;
   }
   check(['compound', 'street', 'yard', 'plaza', 'blocks'].every(function (k) { return lay[k]; }), 'all five map layouts appear (' + Object.keys(lay).join(',') + ')');
   check(pitMaps > 15 && pitMaps < 60, 'some but not all maps have impassable ground (' + pitMaps + '/60)');
   check(deployOk, 'deployment zone is always open floor');
+  // mission maps are 38x28, combat training stays 22x16, timers are unchanged, and the floor is reachable
+  var sizeOk = true, reachOk = true, worst = 1, lim = {};
+  var reachCheck = function (bb) {
+    if (bb.tiles.length !== bb.W * bb.H || bb.layout === 'open') reachOk = false;
+    var fl = 0, rc = 0;
+    bb.tiles.forEach(function (v, i) { if (v === Tac.FLOOR) { fl++; if (bb.reachable[i]) rc++; } });
+    worst = Math.min(worst, rc / fl);
+    bb.units.forEach(function (u) { if (!bb.reachable[u.y * bb.W + u.x]) reachOk = false; });
+  };
+  ['purge', 'relay', 'uplink'].forEach(function (kd, ki) {
+    for (var sd = 0; sd < 20; sd++) {
+      var bk = Tac.create(g, Object.assign({}, m, { kind: kd, diff: 1 + sd % 5, seed: 31 + sd * 104729 + ki }), g.soldiers.slice(0, 4));
+      if (bk.W !== 38 || bk.H !== 28 || bk.turnLimit) sizeOk = false;
+      reachCheck(bk);
+    }
+  });
+  ['raid', 'strike', 'breach', 'uplink'].forEach(function (kd) {
+    for (var sd = 0; sd < 10; sd++) {
+      var lg = XG.Lat.newGame(70 + sd); lg.day = 10 + sd * 5;
+      var lm = XG.Lat.spawnMission(lg, S.rng(lg), kd), bl = Tac.createLattice(lm, ['warden', 'drone', 'drone'], XG.Lat.earthSquad(lg, lm), {});
+      if (bl.W !== 38 || bl.H !== 28) sizeOk = false;
+      lim[kd] = bl.turnLimit;
+      reachCheck(bl);
+    }
+  });
+  var btr = Tac.createTraining(g, g.soldiers.slice(0, 1));
+  check(btr.W === 22 && btr.H === 16 && btr.tiles.length === 22 * 16, 'combat training stays 22x16');
+  check(sizeOk, 'mission and Lattice battle maps are 38x28');
+  check(lim.raid === 10 && lim.uplink === 0 && lim.strike === 25 && lim.breach === 25, 'turn limits unchanged (' + JSON.stringify(lim) + ')');
+  check(reachOk && worst >= 0.9, 'every generated map is connected and every unit starts on reachable floor (worst ' + Math.round(worst * 100) + '% of floor reachable)');
   // comms mood follows Convergence (and Trace pulls the Lattice campaign back a step); lines never break mood
   var Cm = XG.Comms;
   check(Cm.mood({ convergence: 10 }) === 'calm' && Cm.mood({ convergence: 50 }) === 'uneasy' && Cm.mood({ convergence: 85 }) === 'dire', 'comms mood tiers by Convergence');
@@ -212,9 +242,9 @@ function autoBattle(g, m, squad) {
   // override flips sides then purges
   var b3 = Tac.create(g, Object.assign({}, m, { kind: 'purge', diff: 1, seed: 7 }), g.soldiers.slice(0, 4));
   var h3 = b3.units.filter(function (u) { return u.kind === 'hacker'; })[0], d3 = b3.units.filter(function (u) { return u.kind === 'drone'; })[0];
-  d3.x = h3.x + 3; d3.y = h3.y; b3.tiles[d3.y * Tac.W + d3.x] = Tac.FLOOR;
-  for (var x = h3.x + 1; x < d3.x; x++) b3.tiles[h3.y * Tac.W + x] = Tac.FLOOR;
-  b3.visible[d3.y * Tac.W + d3.x] = true; h3.hackSkill = 200;
+  d3.x = h3.x + 3; d3.y = h3.y; b3.tiles[d3.y * Tac.MAP_W + d3.x] = Tac.FLOOR;
+  for (var x = h3.x + 1; x < d3.x; x++) b3.tiles[h3.y * Tac.MAP_W + x] = Tac.FLOOR;
+  b3.visible[d3.y * Tac.MAP_W + d3.x] = true; h3.hackSkill = 200;
   check(!!Tac.act.hack(b3, h3, d3), 'hack resolves');
   check(d3.side === 'player' && d3.override === 2 && d3.ap === 2, 'override hands the drone over');
   check(h3.hacks === 1 && h3.hackSkill === 201, 'successful hack adds +1 hack skill in battle');
@@ -271,7 +301,7 @@ function autoBattle(g, m, squad) {
   for (var i = 0; i < 6; i++) {
     var g = XG.Lat.newGame(500 + i); g.day = 30; g.trace = 50;
     var m = XG.Lat.spawnMission(g, S.rng(g), 'raid'), b = Tac.createLattice(m, ['warden', 'drone', 'drone', 'harmonic'], XG.Lat.earthSquad(g, m), {});
-    b.units.forEach(function (u) { if (u.side === 'enemy') { units++; if (Tac.coverValue(b, u.x, u.y, 1, Tac.H >> 1) > 0) covered++; } });
+    b.units.forEach(function (u) { if (u.side === 'enemy') { units++; if (Tac.coverValue(b, u.x, u.y, 1, Tac.MAP_H >> 1) > 0) covered++; } });
     for (var k = 0; k < 50 && b.side !== b.human && !b.outcome; k++)
       Tac.aiStep(b).forEach(function (e) { if (e.t === 'shot' && Tac.unitById(b, e.from).side === 'player') shots++; });
   }
@@ -383,8 +413,8 @@ function autoLattice(g, m, types) {
   var b = Tac.createLattice(m, ['harmonic', 'drone', 'drone'], Lat.earthSquad(g, m), Lat.mods(g));
   check(b.side === 'enemy' && b.human === 'enemy', 'strike: the Lattice moves first');
   var h = b.units.filter(function (u) { return u.kind === 'harmonic'; })[0], foe = b.units.filter(function (u) { return u.sid; })[0];
-  foe.x = h.x + 4; foe.y = h.y; for (var x = h.x + 1; x <= foe.x; x++) b.tiles[h.y * Tac.W + x] = Tac.FLOOR;
-  b.visible[foe.y * Tac.W + foe.x] = true;
+  foe.x = h.x + 4; foe.y = h.y; for (var x = h.x + 1; x <= foe.x; x++) b.tiles[h.y * Tac.MAP_W + x] = Tac.FLOOR;
+  b.visible[foe.y * Tac.MAP_W + foe.x] = true;
   var hp0 = foe.hp + foe.shield;
   check(!!Tac.act.spike(b, h, foe) && foe.hp + foe.shield <= hp0 - 1 && h.cooldowns.spike === 3, 'Data Spike hits and goes on cooldown');
   var d = b.units.filter(function (u) { return u.kind === 'drone'; })[0];

@@ -7,6 +7,7 @@ XG.CHANGELOG = [
    {
     "name": "2026-10-22",
     "items": [
+     "<b>Battle:</b> maps are three times bigger (38x28 tiles) with more buildings, cover and terrain to fight through. The view scrolls: arrow keys, the map edge or a right-drag pan, the wheel zooms, C centres on your unit, and the camera follows the action. Mission timers are unchanged; combat training keeps its small range.",
      "<b>Lattice campaign:</b> when FIREWALL raids your cell, your units start dug in behind cover facing the attackers, and FIREWALL spends its first turn moving in without firing, so the first shots are yours or your overwatch's.",
      "<b>Lattice:</b> longer weapon range. Swarm Drones reach 12 tiles (was 10), Warden Mechs and Harmonics 13 (was 12), level with the FIREWALL assault rifle.",
      "<b>Lattice campaign:</b> your machines now keep pace with FIREWALL's veterans. They deploy at a mark (Mk I to Mk VI) matching the rank of the squad they face, with +1 HP per mark, so late-game drones are no longer paper.",

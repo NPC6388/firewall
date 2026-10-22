@@ -2,8 +2,8 @@
 export default async function ({ ev, shot, sleep, send }) {
   const key = async (k) => { await send('Input.dispatchKeyEvent', { type: 'keyDown', key: k, text: k }); await send('Input.dispatchKeyEvent', { type: 'keyUp', key: k }); };
   const hover = async (x, y) => {
-    const box = await ev(`(function(){var r=document.getElementById('tac-canvas').getBoundingClientRect(); return [r.left,r.top,r.width,r.height];})()`);
-    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: box[0] + (x + .5) * box[2] / 22, y: box[1] + (y + .5) * box[3] / 16 });
+    const p = await ev(`XG.TacUI.tileToClient(${x},${y})`); // scrolls the camera to the tile first
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p.x, y: p.y });
   };
   const waitIdle = async () => { for (let i = 0; i < 100; i++) { if (await ev(`(function(){var s=XG.TacUI.debug(); return !s.cur && !s.queue.length;})()`)) return; await sleep(80); } };
   await ev(`localStorage.clear(); location.reload()`); await sleep(1200);

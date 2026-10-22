@@ -3,8 +3,8 @@ export default async function ({ ev, shot, sleep, send }) {
   const press = async (k, code, vk) => { await send('Input.dispatchKeyEvent', { type: 'keyDown', key: k, code, text: k.length === 1 ? k : undefined, windowsVirtualKeyCode: vk }); await send('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code, windowsVirtualKeyCode: vk }); };
   const state = () => ev(`(function(){var b=XG.TacUI.debug().b;return JSON.stringify({step:(XG.Tutorial.state()||{}).step, turn:b.turn, units:b.units.map(u=>[u.short||u.name,u.x,u.y,u.hp,u.ap])})})()`);
   const nudge = () => ev(`(document.querySelector('.coach-nudge')||{}).innerText||''`);
-  const clickTile = async (x, y) => { const p = JSON.parse(await ev(`JSON.stringify((function(){var r=document.querySelector('#screen-tactical canvas').getBoundingClientRect();return {l:r.left,t:r.top,w:r.width/XG.Tac.W,h:r.height/XG.Tac.H}})())`));
-    const X = p.l + (x + .5) * p.w, Y = p.t + (y + .5) * p.h;
+  const clickTile = async (x, y) => { const p = await ev(`XG.TacUI.tileToClient(${x},${y})`); // scrolls the camera to the tile first
+    const X = p.x, Y = p.y;
     for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', { type, x: X, y: Y, button: 'left', clickCount: 1 }); await sleep(1200); };
   const goal = async () => JSON.parse(await ev(`JSON.stringify(XG.Tutorial.goal())`));
   await ev(`localStorage.clear(); location.reload()`); await sleep(1200);

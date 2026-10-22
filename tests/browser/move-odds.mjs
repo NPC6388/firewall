@@ -1,8 +1,8 @@
 // Hovering a move tile shows hit odds vs each visible hostile from that tile.
 export default async function ({ ev, shot, sleep, send }) {
   const hover = async (x, y) => {
-    const box = await ev(`(function(){var r=document.getElementById('tac-canvas').getBoundingClientRect(); return [r.left,r.top,r.width,r.height];})()`);
-    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: box[0] + (x + .5) * box[2] / 22, y: box[1] + (y + .5) * box[3] / 16 });
+    const p = await ev(`XG.TacUI.tileToClient(${x},${y})`); // scrolls the camera to the tile first
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p.x, y: p.y });
   };
   await ev(`localStorage.clear(); location.reload()`); await sleep(1200);
   await ev(`document.querySelector('[data-action="new-game"]').click()`); await sleep(300);

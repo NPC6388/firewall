@@ -4,12 +4,14 @@ var XG = globalThis.XG = globalThis.XG || {};
 
 XG.Tac = (function () {
   var D = XG.DATA;
-  var W = 22, H = 16, SIGHT = 11;
+  // Mission maps are 38x28 (about 3x the area of the original 22x16); combat training keeps the 22x16 range.
+  // Every battle carries its own size in b.W / b.H. Map generation scales its layouts from the 22x16 base.
+  var MAP_W = 38, MAP_H = 28, BASE_W = 22, BASE_H = 16, SIGHT = 11;
   var FLOOR = 0, WALL = 1, LOW = 2, HIGH = 3, PIT = 4; // PIT: impassable, but no cover and see-through
 
   // ------------------------------------------------------------ geometry
-  function inB(x, y) { return x >= 0 && y >= 0 && x < W && y < H; }
-  function tile(b, x, y) { return inB(x, y) ? b.tiles[y * W + x] : WALL; }
+  function inB(b, x, y) { return x >= 0 && y >= 0 && x < b.W && y < b.H; }
+  function tile(b, x, y) { return inB(b, x, y) ? b.tiles[y * b.W + x] : WALL; }
   function dist(ax, ay, bx, by) { var dx = ax - bx, dy = ay - by; return Math.sqrt(dx * dx + dy * dy); }
   function cheb(ax, ay, bx, by) { return Math.max(Math.abs(ax - bx), Math.abs(ay - by)); }
   function sign(v) { return v > 0 ? 1 : v < 0 ? -1 : 0; }
@@ -26,7 +28,7 @@ XG.Tac = (function () {
     if (t === PIT) return FLOOR;
     return t === FLOOR && (u = unitAt(b, x, y)) && u.kind === 'sentinel' ? LOW : t;
   }
-  function free(b, x, y) { return inB(x, y) && tile(b, x, y) === FLOOR && !unitAt(b, x, y); }
+  function free(b, x, y) { return inB(b, x, y) && tile(b, x, y) === FLOOR && !unitAt(b, x, y); }
 
   // Bresenham; walls always block, tall cover blocks unless it's next to either end (peeking).
   function lineClear(b, x0, y0, x1, y1) {
@@ -52,7 +54,7 @@ XG.Tac = (function () {
       var t = tile(b, x + o[0], y + o[1]);
       if (t !== WALL && t !== HIGH) return;
       [[o[1], o[0]], [-o[1], -o[0]]].forEach(function (q) {
-        var px = x + q[0], py = y + q[1], pt = inB(px, py) ? tile(b, px, py) : WALL;
+        var px = x + q[0], py = y + q[1], pt = inB(b, px, py) ? tile(b, px, py) : WALL;
         if (pt !== WALL && pt !== HIGH && !out.some(function (p) { return p[0] === px && p[1] === py; })) out.push([px, py]);
       });
     });
@@ -93,36 +95,40 @@ XG.Tac = (function () {
 
   // BFS over 8 directions, no corner cutting. Returns dist array + prev for paths.
   function reach(b, u, maxSteps) {
-    var n = W * H, d = new Array(n).fill(-1), prev = new Array(n).fill(-1), q = [u.y * W + u.x];
+    var n = b.W * b.H, d = new Array(n).fill(-1), prev = new Array(n).fill(-1), q = [u.y * b.W + u.x];
     d[q[0]] = 0;
     for (var qi = 0; qi < q.length; qi++) {
-      var c = q[qi], cx = c % W, cy = (c - cx) / W;
+      var c = q[qi], cx = c % b.W, cy = (c - cx) / b.W;
       if (d[c] >= maxSteps) continue;
       for (var ox = -1; ox <= 1; ox++) for (var oy = -1; oy <= 1; oy++) {
         if (!ox && !oy) continue;
         var nx = cx + ox, ny = cy + oy;
         if (!free(b, nx, ny)) continue;
         if (ox && oy && (tile(b, cx + ox, cy) !== FLOOR || tile(b, cx, cy + oy) !== FLOOR)) continue;
-        var ni = ny * W + nx;
+        var ni = ny * b.W + nx;
         if (d[ni] !== -1) continue;
         d[ni] = d[c] + 1; prev[ni] = c; q.push(ni);
       }
     }
-    return { d: d, prev: prev };
+    return { d: d, prev: prev, W: b.W };
   }
   function pathTo(r, x, y) {
-    var i = y * W + x, p = [];
+    var i = y * r.W + x, p = [];
     if (r.d[i] < 0) return null;
-    while (r.prev[i] !== -1) { p.unshift([i % W, (i - i % W) / W]); i = r.prev[i]; }
+    while (r.prev[i] !== -1) { p.unshift([i % r.W, (i - i % r.W) / r.W]); i = r.prev[i]; }
     return p;
   }
   function moveRange(u) { return u.ap >= 2 ? u.mobility * 2 : u.ap === 1 ? u.mobility : 0; }
 
   // -------------------------------------------------------------- map gen
-  // Each map picks a layout, then 0-2 impassable features (PIT: sinkhole, chasm...), then scattered cover.
+  // Each map picks a layout, then impassable features (PIT: sinkhole, chasm...), then scattered cover.
   // Pits stop movement but give no cover and don't block sight. The deployment zone (x < 4) is always kept clear.
+  // Counts were tuned on 22x16 and scale with the map's area (A); spans scale with its width/height (kx, ky).
   var LAYOUTS = ['compound', 'street', 'yard', 'plaza', 'blocks'];
   function genMap(b, rng) {
+    var W = b.W, H = b.H, A = (W * H) / (BASE_W * BASE_H), kx = W / BASE_W, ky = H / BASE_H;
+    var inB = function (x, y) { return x >= 0 && y >= 0 && x < W && y < H; };
+    var sc = function (lo, hi) { return rng.int(Math.round(lo * A), Math.round(hi * A)); }; // a count, scaled by area
     var layout = rng.pick(LAYOUTS);
     for (var attempt = 0; attempt < 40; attempt++) {
       var t = new Array(W * H).fill(FLOOR), doors = {};
@@ -173,32 +179,34 @@ XG.Tac = (function () {
       var k2, x, y;
 
       if (layout === 'compound') { // a few large buildings in open ground
-        for (k2 = 0, x = 0, y = rng.int(2, 4); k2 < 60 && x < y; k2++) {
+        for (k2 = 0, x = 0, y = sc(2, 4); k2 < 60 * A && x < y; k2++) {
           var bw = rng.int(5, 8), bh = rng.int(4, 6);
           if (building(rng.int(5, W - bw - 1), rng.int(1, H - bh - 1), bw, bh)) x++;
         }
       } else if (layout === 'blocks') { // a dense district of small buildings and narrow lanes
-        for (k2 = 0, x = 0, y = rng.int(5, 7); k2 < 120 && x < y; k2++) {
+        for (k2 = 0, x = 0, y = sc(5, 7); k2 < 120 * A && x < y; k2++) {
           var sw = rng.int(4, 5), sh = rng.int(3, 4);
           if (building(rng.int(5, W - sw), rng.int(0, H - sh), sw, sh)) x++;
         }
-      } else if (layout === 'street') { // a road through the middle, shopfronts along both edges, wrecks on the road
-        [[0, rng.int(3, 4)], [H - rng.int(3, 4), 0]].forEach(function (row, ri) {
-          var by = row[0], bh = ri ? H - row[0] : row[1];
-          for (var bx = rng.int(5, 7); bx < W - 2; bx += rng.int(1, 2)) {
+      } else if (layout === 'street') { // roads between rows of shopfronts (edges, plus a middle row on tall maps), wrecks on the roads
+        var rows = [[0, rng.int(3, 4), rng.int(5, 7)], [H - rng.int(3, 4), 0, rng.int(5, 7)]];
+        if (H >= 22) { var mh = rng.int(4, 6); rows.push([(H >> 1) - (mh >> 1), mh, rng.int(10, 13)]); } // back-to-back middle row, set back from the squad
+        rows.forEach(function (row, ri) {
+          var by = row[0], bh = ri === 1 ? H - row[0] : row[1];
+          for (var bx = row[2]; bx < W - 2; bx += rng.int(1, 2)) {
             var bw2 = Math.min(rng.int(3, 6), W - bx);
             if (bw2 >= 3) building(bx, by, bw2, bh, 0);
             bx += bw2;
           }
         });
         var vehicle = function (horiz) { // cars and trucks along the road, barricades across it
-          for (var tr = 0; tr < 12; tr++) {
-            var vx = rng.int(5, W - 4), vy = rng.int(5, H - 7);
+          for (var tr = 0; tr < 12 * A; tr++) {
+            var vx = rng.int(5, W - 4), vy = H >= 22 ? rng.int(4, H - 5) : rng.int(5, H - 7);
             if (clear(vx, vy, horiz ? 3 : 1, horiz ? 1 : 3)) { piece(vx, vy, horiz && rng.next() < 0.4 ? 'long' : 'low', horiz); return; }
           }
         };
-        for (k2 = rng.int(4, 6); k2 > 0; k2--) vehicle(true);
-        for (k2 = rng.int(2, 3); k2 > 0; k2--) vehicle(false);
+        for (k2 = sc(4, 6); k2 > 0; k2--) vehicle(true);
+        for (k2 = sc(2, 3); k2 > 0; k2--) vehicle(false);
       } else if (layout === 'yard') { // container stacks in rows, with gaps to slip through
         var vert = rng.next() < 0.6, gap = rng.int(3, 4);
         for (var lane = vert ? rng.int(5, 6) : rng.int(1, 2); lane < (vert ? W - 1 : H - 1); lane += gap) {
@@ -211,22 +219,29 @@ XG.Tac = (function () {
             p += run + rng.int(1, 3);
           }
         }
-        if (rng.next() < 0.5) building(rng.int(12, W - 5), rng.int(0, H - 4), 4, 4, 0);
-      } else { // plaza: an open square ringed by planters, buildings in the corners, a monument in the middle
-        var pcx = rng.int(11, 14), pcy = rng.int(6, H - 7), rad = rng.int(3, 4);
+        for (k2 = Math.round(A); k2 > 0; k2--) if (rng.next() < 0.5) building(rng.int(Math.round(12 * kx), W - 5), rng.int(0, H - 4), 4, 4, 0);
+      } else { // plaza: an open square ringed by planters, buildings in the corners (and mid-edges), a monument in the middle
+        var pcx = rng.int(Math.round(11 * kx), Math.round(14 * kx)), pcy = rng.int(Math.round(6 * ky), H - Math.round(7 * ky)), rad = rng.int(Math.round(3 * ky), Math.round(4 * ky));
         for (var a = 0; a < 360; a += 360 / (rad * 7)) {
           var px = Math.round(pcx + Math.cos(a * Math.PI / 180) * rad * 1.3), py = Math.round(pcy + Math.sin(a * Math.PI / 180) * rad);
           if (rng.next() < 0.6 && get(px, py) === FLOOR) set(px, py, LOW);
         }
+        if (A > 2) for (var a2 = 0; a2 < 360; a2 += 360 / (rad * 4)) { // big squares get an inner ring of planters too
+          var ix = Math.round(pcx + Math.cos(a2 * Math.PI / 180) * rad * 0.7), iy = Math.round(pcy + Math.sin(a2 * Math.PI / 180) * rad * 0.55);
+          if (rng.next() < 0.5 && get(ix, iy) === FLOOR) set(ix, iy, LOW);
+        }
         if (rng.next() < 0.6) { set(pcx, pcy, HIGH); if (rng.next() < 0.5) set(pcx + 1, pcy, HIGH); }
-        [[0, 0], [1, 0], [0, 1], [1, 1]].forEach(function (q) {
-          var qw = rng.int(4, 6), qh = rng.int(4, 5);
-          if (rng.next() < 0.65) building(q[0] ? W - qw : rng.int(5, 7), q[1] ? H - qh : 0, qw, qh, 0);
+        var quads = [[0, 0], [1, 0], [0, 1], [1, 1]];
+        if (A > 2) quads.push([0.5, 0], [0.5, 1]);
+        quads.forEach(function (q) {
+          var qw = rng.int(Math.round(4 * kx), Math.round(6 * kx)), qh = rng.int(Math.round(4 * ky), Math.round(5 * ky));
+          if (q[0] === 0.5) { qw = rng.int(5, 8); qh = rng.int(3, 4); }
+          if (rng.next() < 0.65) building(q[0] === 0.5 ? pcx - (qw >> 1) : q[0] ? W - qw : rng.int(5, 7), q[1] ? H - qh : 0, qw, qh, 0);
         });
       }
 
-      // 0-2 impassable features: an irregular blob or a trench, away from the deployment zone and doorways
-      for (var f = rng.int(0, 2); f > 0; f--) {
+      // impassable features (0-2 per 22x16 of map): an irregular blob or a trench, away from the deployment zone and doorways
+      for (var f = sc(0, 2); f > 0; f--) {
         var fx = rng.int(6, W - 3), fy = rng.int(1, H - 2), cells = [[fx, fy]];
         if (rng.next() < 0.6) { // blob of 3-7 cells grown from a seed
           for (var g2 = rng.int(3, 7), tries = 0; cells.length < g2 && tries < 30; tries++) {
@@ -244,7 +259,7 @@ XG.Tac = (function () {
         cells.forEach(function (cc) { if (cc[0] >= 5 && get(cc[0], cc[1]) === FLOOR && !nearDoor(cc[0], cc[1])) set(cc[0], cc[1], PIT); });
       }
 
-      scatter(layout === 'compound' ? rng.int(16, 22) : layout === 'blocks' ? rng.int(6, 10) : layout === 'street' ? rng.int(4, 7) : layout === 'yard' ? rng.int(5, 8) : rng.int(8, 11),
+      scatter(layout === 'compound' ? sc(16, 22) : layout === 'blocks' ? sc(6, 10) : layout === 'street' ? sc(4, 7) : layout === 'yard' ? sc(5, 8) : sc(8, 11),
         layout === 'yard' ? [0.8, 0.15] : layout === 'street' ? [0.7, 0.2] : [0.5, 0.3]);
 
       // deployment zone with a little starting cover
@@ -328,6 +343,7 @@ XG.Tac = (function () {
 
   // squad: array of soldier objects (already chosen). mission: strategy mission object.
   function create(g, mission, squad) {
+    var W = MAP_W, H = MAP_H, kx = W / BASE_W;
     var rng = new XG.RNG(mission.seed || 12345);
     var b = {
       W: W, H: H, tiles: null, units: [], nextId: 1, turn: 1, side: 'player', human: 'player', rng: rng,
@@ -342,15 +358,15 @@ XG.Tac = (function () {
 
     var R = b.reachable;
     var cand = [];
-    for (var y = 0; y < H; y++) for (var x = 9; x < W; x++) if (R[y * W + x] && free(b, x, y)) cand.push([x, y]);
+    for (var y = 0; y < H; y++) for (var x = Math.round(9 * kx); x < W; x++) if (R[y * W + x] && free(b, x, y)) cand.push([x, y]);
     rng.shuffle(cand);
     var list = (COMPOSITION[mission.diff] || COMPOSITION[5]).slice();
     if (mission.kind === 'relay') {
       list.pop();
-      placeStatic(b, 'relay', cand, W - 6);
+      placeStatic(b, 'relay', cand, W - Math.round(6 * kx));
     } else if (mission.kind === 'uplink') {
       list = ['warden', 'harmonic', 'drone', 'drone'];
-      placeStatic(b, 'core', cand, W - 5);
+      placeStatic(b, 'core', cand, W - Math.round(5 * kx));
     }
     if (squadRank(squad) >= D.tuning.veteranDrone) list.push('drone'); // the Lattice sends more against veterans
     // pods of 2-3, centers spread out
@@ -361,8 +377,8 @@ XG.Tac = (function () {
       var c = null;
       for (var i = 0; i < cand.length && !c; i++) {
         var p = cand[i];
-        if (p[0] < 10 || !free(b, p[0], p[1])) continue;
-        if (centers.every(function (o) { return dist(o[0], o[1], p[0], p[1]) >= 5; })) c = p;
+        if (p[0] < Math.round(10 * kx) || !free(b, p[0], p[1])) continue;
+        if (centers.every(function (o) { return dist(o[0], o[1], p[0], p[1]) >= Math.round(5 * kx); })) c = p;
       }
       c = c || cand.filter(function (p) { return free(b, p[0], p[1]); })[0];
       centers.push(c);
@@ -380,6 +396,7 @@ XG.Tac = (function () {
   // Combat training range (tutorial): a fixed map, one trooper, a passive target drone behind a crate and a gunner
   // drone that only shoots back. The whole map is visible. Layout notes are in js/tutorial.js (the lessons use them).
   function createTraining(g, squad) {
+    var W = BASE_W, H = BASE_H;
     var b = {
       W: W, H: H, tiles: new Array(W * H).fill(FLOOR), reachable: new Array(W * H).fill(true), units: [], nextId: 1, turn: 1, side: 'player', human: 'player',
       rng: new XG.RNG(4242), mission: { kind: 'purge', diff: 1, name: 'Combat training', city: 'HALCYON simulation', site: 'range' },
@@ -408,7 +425,7 @@ XG.Tac = (function () {
   // A looping patrol: the pod's start plus two or three reachable points 3-8 tiles away, kept clear of the
   // squad's deployment edge so a pod never walks into the start zone on turn one.
   function patrolRoute(b, rng, c, cand) {
-    var route = [[c[0], c[1]]], n = rng.int(2, 3), pool = cand.filter(function (p) { var d = dist(p[0], p[1], c[0], c[1]); return d >= 3 && d <= 8 && p[0] >= 8; });
+    var kx = b.W / BASE_W, route = [[c[0], c[1]]], n = rng.int(2, 3), pool = cand.filter(function (p) { var d = dist(p[0], p[1], c[0], c[1]); return d >= 3 && d <= Math.round(8 * kx) && p[0] >= Math.round(8 * kx); });
     rng.shuffle(pool);
     for (var i = 0; i < pool.length && route.length <= n; i++) {
       var p = pool[i];
@@ -429,6 +446,7 @@ XG.Tac = (function () {
   // 'uplink' (hold the Uplink Core). types: Lattice unit kinds to deploy. earth: { g: {flags}, squad: [soldier-like] }.
   // mods: { swarm, detonate, shield, spikeBonus } from Lattice protocols.
   function createLattice(mission, types, earth, mods) {
+    var W = MAP_W, H = MAP_H, kx = W / BASE_W;
     mods = mods || {};
     var rng = new XG.RNG(mission.seed || 777);
     var b = {
@@ -440,7 +458,7 @@ XG.Tac = (function () {
     genMap(b, rng);
     var mid = H >> 1, left = [[1, mid], [1, mid - 1], [1, mid + 1], [0, mid - 2], [0, mid + 2], [2, mid], [0, mid], [2, mid - 2]];
     var R = b.reachable, cand = [];
-    for (var y = 0; y < H; y++) for (var x = 11; x < W; x++) if (R[y * W + x] && free(b, x, y)) cand.push([x, y]);
+    for (var y = 0; y < H; y++) for (var x = Math.round(11 * kx); x < W; x++) if (R[y * W + x] && free(b, x, y)) cand.push([x, y]);
     rng.shuffle(cand);
     var count = {}, strike = mission.kind === 'strike' || mission.kind === 'breach'; // you attack, you move first
     var addLat = function (type, p) {
@@ -458,9 +476,9 @@ XG.Tac = (function () {
       groupSpots(b, cand, earth.squad.length).forEach(function (p, i) { makeDefender(b, earth.g, earth.squad[i], p[0], p[1]); });
     } else {
       earth.squad.forEach(function (s, i) { makeDefender(b, earth.g, s, left[i][0], left[i][1]); });
-      if (mission.kind === 'uplink') placeStatic(b, 'core', cand, W - 5);
+      if (mission.kind === 'uplink') placeStatic(b, 'core', cand, W - Math.round(5 * kx));
       // dug in: pod centers and members on tiles with cover toward the FIREWALL deployment edge, well back from it
-      var dug = function (x, y) { return x >= 12 && coverValue(b, x, y, 1, mid) > 0; };
+      var dug = function (x, y) { return x >= Math.round(12 * kx) && coverValue(b, x, y, 1, mid) > 0; };
       var dcand = cand.filter(function (p) { return dug(p[0], p[1]); }).concat(cand.filter(function (p) { return !dug(p[0], p[1]); }));
       groupSpots(b, dcand, types.length, dug).forEach(function (p, i) { addLat(types[i], p); });
       b.approach = true; // FIREWALL's first turn is the approach: it moves in but holds fire
@@ -480,12 +498,12 @@ XG.Tac = (function () {
   }
   // Positions for n units in pods of up to 3, pod centers spread apart, all on reachable floor.
   function groupSpots(b, cand, n, pref) {
-    var out = [], centers = [];
+    var out = [], centers = [], apart = Math.round(4 * b.W / BASE_W);
     while (out.length < n) {
       var size = Math.min(3, n - out.length), c = null;
       for (var i = 0; i < cand.length && !c; i++) {
         var p = cand[i];
-        if (free(b, p[0], p[1]) && centers.every(function (o) { return dist(o[0], o[1], p[0], p[1]) >= 4; })) c = p;
+        if (free(b, p[0], p[1]) && centers.every(function (o) { return dist(o[0], o[1], p[0], p[1]) >= apart; })) c = p;
       }
       c = c || cand.filter(function (p) { return free(b, p[0], p[1]); })[0];
       if (!c) break;
@@ -504,7 +522,7 @@ XG.Tac = (function () {
   function nearestFreeExcept(b, x, y, r, used, pref) {
     var best = null, bd = 1e9;
     for (var yy = y - r; yy <= y + r; yy++) for (var xx = x - r; xx <= x + r; xx++) {
-      if (!free(b, xx, yy) || !b.reachable[yy * W + xx]) continue;
+      if (!free(b, xx, yy) || !b.reachable[yy * b.W + xx]) continue;
       if (used.some(function (p) { return p[0] === xx && p[1] === yy; })) continue;
       var d = dist(x, y, xx, yy) + b.rng.next() * 0.3 + (pref && !pref(xx, yy) ? 5 : 0); // pref: tiles failing it count as 5 further
       if (d < bd) { bd = d; best = [xx, yy]; }
@@ -515,7 +533,7 @@ XG.Tac = (function () {
   function nearestFree(b, x, y, r) {
     var best = null, bd = 1e9;
     for (var yy = y - r; yy <= y + r; yy++) for (var xx = x - r; xx <= x + r; xx++) {
-      if (!free(b, xx, yy) || !b.reachable[yy * W + xx]) continue;
+      if (!free(b, xx, yy) || !b.reachable[yy * b.W + xx]) continue;
       var d = dist(x, y, xx, yy) + b.rng.next() * 0.3;
       if (d < bd) { bd = d; best = [xx, yy]; }
     }
@@ -523,22 +541,50 @@ XG.Tac = (function () {
   }
 
   // -------------------------------------------------------- visibility
+  // What a viewer standing on a tile sees of the bare map (walls and cover only, its own corner peeks included) is cached
+  // per battle and tile layout; only tiles holding a unit need a fresh los() (the unit there may lean out). Refreshing
+  // fog after every step of every move is the hot path, and most viewers haven't moved since the last refresh.
+  var visCache = typeof WeakMap === 'function' ? new WeakMap() : null;
+  function tilesKey(b) {
+    var h = b.tiles.length;
+    for (var i = 0; i < b.tiles.length; i++) h = (h * 31 + b.tiles[i] + 1) | 0;
+    return h;
+  }
+  function staticSight(b, cache, x0, y0) {
+    var k = y0 * b.W + x0, out = cache.at[k];
+    if (out) return out;
+    out = [];
+    var A = peekSpots(b, x0, y0);
+    for (var y = Math.max(0, y0 - SIGHT); y <= Math.min(b.H - 1, y0 + SIGHT); y++)
+      for (var x = Math.max(0, x0 - SIGHT); x <= Math.min(b.W - 1, x0 + SIGHT); x++) {
+        if (dist(x0, y0, x, y) > SIGHT) continue;
+        var ok = clearEither(b, x0, y0, x, y);
+        for (var i = 0; !ok && i < A.length; i++) ok = clearEither(b, A[i][0], A[i][1], x, y);
+        if (ok) out.push(y * b.W + x);
+      }
+    cache.at[k] = out;
+    return out;
+  }
   function refreshVis(b) {
-    var v = new Array(W * H).fill(false);
+    var v = new Array(b.W * b.H).fill(false), key = tilesKey(b), cache = visCache && visCache.get(b);
+    if (!cache || cache.key !== key) { cache = { key: key, at: {} }; if (visCache) visCache.set(b, cache); }
     b.units.forEach(function (u) {
       if (!u.alive || u.side !== b.human) return;
-      for (var y = Math.max(0, u.y - SIGHT); y <= Math.min(H - 1, u.y + SIGHT); y++)
-        for (var x = Math.max(0, u.x - SIGHT); x <= Math.min(W - 1, u.x + SIGHT); x++)
-          if (!v[y * W + x] && dist(u.x, u.y, x, y) <= SIGHT && los(b, u.x, u.y, x, y)) v[y * W + x] = true;
+      var seen = staticSight(b, cache, u.x, u.y);
+      for (var i = 0; i < seen.length; i++) v[seen[i]] = true;
+      // a unit's tile can also be seen when that unit leans out of cover (see los)
+      b.units.forEach(function (o) {
+        if (o.alive && !v[o.y * b.W + o.x] && dist(u.x, u.y, o.x, o.y) <= SIGHT && los(b, u.x, u.y, o.x, o.y)) v[o.y * b.W + o.x] = true;
+      });
     });
     b.scans.forEach(function (s) {
-      for (var y = 0; y < H; y++) for (var x = 0; x < W; x++) if (dist(s.x, s.y, x, y) <= s.r) v[y * W + x] = true;
+      for (var y = 0; y < b.H; y++) for (var x = 0; x < b.W; x++) if (dist(s.x, s.y, x, y) <= s.r) v[y * b.W + x] = true;
     });
     if (b.training) v.fill(true);
     b.visible = v;
   }
   // b.human is the side the person controls ('player' = FIREWALL, 'enemy' = Lattice); fog is drawn from its view.
-  function isVisible(b, u) { return u.side === b.human || (b.visible && b.visible[u.y * W + u.x]); }
+  function isVisible(b, u) { return u.side === b.human || (b.visible && b.visible[u.y * b.W + u.x]); }
 
   function foesOf(b, u) {
     return b.units.filter(function (o) { return o.alive && o.side !== u.side; });
@@ -704,8 +750,8 @@ XG.Tac = (function () {
 
   function tileOk(b, u, id, x, y) {
     var A = D.abilities[id];
-    if (!inB(x, y) || dist(u.x, u.y, x, y) > A.range) return false;
-    if (id === 'grenade') return b.visible[y * W + x];
+    if (!inB(b, x, y) || dist(u.x, u.y, x, y) > A.range) return false;
+    if (id === 'grenade') return b.visible[y * b.W + x];
     return true;
   }
 
@@ -777,7 +823,7 @@ XG.Tac = (function () {
       });
       if (!emp) for (var yy = y - 1; yy <= y + 1; yy++) for (var xx = x - 1; xx <= x + 1; xx++) {
         var tt = tile(b, xx, yy);
-        if (tt === LOW || tt === HIGH) b.tiles[yy * W + xx] = FLOOR;
+        if (tt === LOW || tt === HIGH) b.tiles[yy * b.W + xx] = FLOOR;
       }
       return after(b, ev);
     },
@@ -856,7 +902,7 @@ XG.Tac = (function () {
       log(b, ev, u.name + ' overloads its cells and detonates.', 'good');
       b.units.filter(function (t) { return t.alive && t !== u && cheb(t.x, t.y, x, y) <= 1; }).forEach(function (t) { damage(b, t, 3, ev, u, {}); });
       for (var yy = y - 1; yy <= y + 1; yy++) for (var xx = x - 1; xx <= x + 1; xx++) {
-        var tt = tile(b, xx, yy); if (tt === LOW || tt === HIGH) b.tiles[yy * W + xx] = FLOOR;
+        var tt = tile(b, xx, yy); if (tt === LOW || tt === HIGH) b.tiles[yy * b.W + xx] = FLOOR;
       }
       kill(b, u, ev, null, 'is gone');
       return after(b, ev);
@@ -978,7 +1024,7 @@ XG.Tac = (function () {
     var onPath = {}; if (toGoal) toGoal.forEach(function (q, i) { onPath[q[0] + ',' + q[1]] = i; });
     for (var i = 0; i < r.d.length; i++) {
       if (r.d[i] <= 0) continue;
-      var x = i % W, y = (i - x) / W, d = dist(x, y, goal[0], goal[1]);
+      var x = i % b.W, y = (i - x) / b.W, d = dist(x, y, goal[0], goal[1]);
       if (u !== lead && d < 1) continue;
       var k = onPath[x + ',' + y], score = k !== undefined ? -k * 10 : d;
       if (k === undefined && toGoal) score = 1e3 + d;
@@ -1064,35 +1110,51 @@ XG.Tac = (function () {
     var r = reach(b, u, u.mobility), best = null, bs = tileScore(b, u, foes, u.x, u.y) + 4;
     for (var i = 0; i < r.d.length; i++) {
       if (r.d[i] <= 0) continue;
-      var x = i % W, y = (i - x) / W, s = tileScore(b, u, foes, x, y);
+      var x = i % b.W, y = (i - x) / b.W, s = tileScore(b, u, foes, x, y);
       if (s > bs) { bs = s; best = [x, y]; }
     }
-    if (!best) {
-      // nothing better nearby: if no shot either, march toward the nearest foe using a long BFS
-      var hasShot = foes.some(function (f) { return hitInfo(b, u, f).ok; });
-      if (hasShot) return null;
-      var far = reach(b, u, 60), tgt = foes[0], bd = 1e9, step = null;
-      foes.forEach(function (f) { var d = dist(u.x, u.y, f.x, f.y); if (d < bd) { bd = d; tgt = f; } });
-      // Walk the real path to the nearest tile with a line of fire on the target (so walls get walked
-      // around instead of hugged); fall back to the tile closest as the crow flies.
-      var cb = 1e9, steps = 1e9, ox = u.x, oy = u.y;
-      for (var j = 0; j < far.d.length; j++) {
-        if (far.d[j] <= 0) continue;
-        var jx = j % W, jy = (j - jx) / W;
-        if (far.d[j] < steps && dist(jx, jy, tgt.x, tgt.y) <= u.range && los(b, jx, jy, tgt.x, tgt.y)) { steps = far.d[j]; step = [jx, jy]; }
-      }
-      if (!step) for (var k2 = 0; k2 < far.d.length; k2++) {
-        if (far.d[k2] <= 0) continue;
-        var kx = k2 % W, ky = (k2 - kx) / W, dd = dist(kx, ky, tgt.x, tgt.y);
-        if (dd < cb) { cb = dd; step = [kx, ky]; }
-      }
-      u.x = ox; u.y = oy;
-      if (!step) return null;
-      var p = pathTo(far, step[0], step[1]);
-      if (!p || !p.length) return null;
-      return p[Math.min(p.length, u.mobility) - 1];
+    var shotFrom = function (x, y) {
+      var ox = u.x, oy = u.y; u.x = x; u.y = y;
+      var ok = foes.some(function (f) { return hitInfo(b, u, f).ok; });
+      u.x = ox; u.y = oy; return ok;
+    };
+    if (best) {
+      // A nearby tile with no shot from it only counts if it also gets closer, along real paths, to a firing spot;
+      // otherwise (e.g. a covered corner deep in a dead-end room on a big map) march instead of pacing back and forth.
+      if (shotFrom(best[0], best[1]) || shotFrom(u.x, u.y)) return best;
+      var mb = march(b, u, foes);
+      if (!mb) return best;
+      var alive = u.alive; u.alive = false; // the mover's own tile must not block the reverse search
+      var rev = reach(b, { x: mb.goal[0], y: mb.goal[1] }, 120);
+      u.alive = alive;
+      var dB = rev.d[best[1] * b.W + best[0]], dC = rev.d[u.y * b.W + u.x];
+      return dB >= 0 && (dC < 0 || dB < dC) ? best : mb.step;
     }
-    return best;
+    // nothing better nearby: if no shot either, march toward the nearest foe using a long BFS
+    if (shotFrom(u.x, u.y)) return null;
+    var m = march(b, u, foes);
+    return m ? m.step : null;
+  }
+  // Walk the real path to the nearest tile with a line of fire on the nearest foe (so walls get walked around
+  // instead of hugged); fall back to the tile closest to it as the crow flies. Returns { step, goal } or null.
+  function march(b, u, foes) {
+    var far = reach(b, u, 60), tgt = foes[0], bd = 1e9, step = null;
+    foes.forEach(function (f) { var d = dist(u.x, u.y, f.x, f.y); if (d < bd) { bd = d; tgt = f; } });
+    var cb = 1e9, steps = 1e9;
+    for (var j = 0; j < far.d.length; j++) {
+      if (far.d[j] <= 0) continue;
+      var jx = j % b.W, jy = (j - jx) / b.W;
+      if (far.d[j] < steps && dist(jx, jy, tgt.x, tgt.y) <= u.range && los(b, jx, jy, tgt.x, tgt.y)) { steps = far.d[j]; step = [jx, jy]; }
+    }
+    if (!step) for (var k2 = 0; k2 < far.d.length; k2++) {
+      if (far.d[k2] <= 0) continue;
+      var kx = k2 % b.W, ky = (k2 - kx) / b.W, dd = dist(kx, ky, tgt.x, tgt.y);
+      if (dd < cb) { cb = dd; step = [kx, ky]; }
+    }
+    if (!step) return null;
+    var p = pathTo(far, step[0], step[1]);
+    if (!p || !p.length) return null;
+    return { step: p[Math.min(p.length, u.mobility) - 1], goal: step };
   }
 
   function spawnTick(b, u, ev) {
@@ -1128,7 +1190,7 @@ XG.Tac = (function () {
   function abort(b) { if (!b.outcome) b.outcome = 'abort'; }
 
   return {
-    W: W, H: H, FLOOR: FLOOR, WALL: WALL, LOW: LOW, HIGH: HIGH, PIT: PIT, SIGHT: SIGHT,
+    MAP_W: MAP_W, MAP_H: MAP_H, BASE_W: BASE_W, BASE_H: BASE_H, FLOOR: FLOOR, WALL: WALL, LOW: LOW, HIGH: HIGH, PIT: PIT, SIGHT: SIGHT,
     create: create, squadRank: squadRank, createLattice: createLattice, createTraining: createTraining, refillAP: refillAP, act: act, endPlayerTurn: endPlayerTurn, enemyStep: enemyStep, ai: ai,
     endTurn: endTurn, aiStep: aiStep,
     reach: reach, pathTo: pathTo, moveRange: moveRange, hitInfo: hitInfo, targets: targets, tileOk: tileOk,

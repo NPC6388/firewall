@@ -5,8 +5,8 @@ export default async function ({ ev, shot, sleep, send }) {
     await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
   };
   const tile = async (x, y) => {
-    const b = await ev(`(function(){var r=document.getElementById('tac-canvas').getBoundingClientRect(); return [r.left,r.top,r.width,r.height];})()`);
-    return [b[0] + (x + .5) * b[2] / 22, b[1] + (y + .5) * b[3] / 16];
+    const p = await ev(`XG.TacUI.tileToClient(${x},${y})`); // scrolls the camera to the tile first
+    return [p.x, p.y];
   };
   await ev(`localStorage.clear(); location.reload()`); await sleep(1200);
   await click(5, 5); await sleep(150); // a real gesture unlocks audio
@@ -42,7 +42,7 @@ export default async function ({ ev, shot, sleep, send }) {
   await ev(`document.getElementById('sq-go').click()`); await sleep(700);
   console.log('coach:', await ev(`JSON.stringify(XG.Tutorial.state())`), await ev(`document.querySelector('.coach-h') && document.querySelector('.coach-h').textContent`));
   await shot('s6-coach');
-  const u = await ev(`(function(){var s=XG.TacUI.debug(), u=XG.Tac.unitById(s.b,s.sel); var r=XG.Tac.reach(s.b,u,u.mobility); for(var i=0;i<r.d.length;i++){ if(r.d[i]>=2&&r.d[i]<=4) return [i%22, Math.floor(i/22)]; } return null;})()`);
+  const u = await ev(`(function(){var s=XG.TacUI.debug(), u=XG.Tac.unitById(s.b,s.sel); var r=XG.Tac.reach(s.b,u,u.mobility); for(var i=0;i<r.d.length;i++){ if(r.d[i]>=2&&r.d[i]<=4) return [i%s.b.W, Math.floor(i/s.b.W)]; } return null;})()`);
   const p = await tile(u[0], u[1]); await click(p[0], p[1]); await sleep(900);
   console.log('after a move:', await ev(`JSON.stringify(XG.Tutorial.state())`));
   // breakdown: put a drone in view and hover it

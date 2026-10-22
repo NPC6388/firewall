@@ -10,8 +10,7 @@ export default async function ({ ev, shot, sleep, send }) {
   await ev(`document.getElementById('sq-go').click()`); await sleep(700);
 
   const clickTile = async (x, y) => {
-    const box = await ev(`(function(){var r=document.getElementById('tac-canvas').getBoundingClientRect(); return [r.left,r.top,r.width,r.height];})()`);
-    const cx = box[0] + (x + .5) * box[2] / 22, cy = box[1] + (y + .5) * box[3] / 16;
+    const p = await ev(`XG.TacUI.tileToClient(${x},${y})`), cx = p.x, cy = p.y; // scrolls the camera to the tile first
     await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: cx, y: cy });
     await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: cx, y: cy, button: 'left', clickCount: 1 });
     await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: cx, y: cy, button: 'left', clickCount: 1 });
@@ -29,8 +28,8 @@ export default async function ({ ev, shot, sleep, send }) {
       const plan = await ev(`(function(){var s=XG.TacUI.debug(),b=s.b,u=XG.Tac.unitById(b,${id}); if(!u||!u.alive||u.ap<=0) return null;
         var foes=b.units.filter(o=>o.alive&&o.side!=='player'&&XG.Tac.isVisible(b,o));
         if (XG.Tac.targets(b,u,'shoot').length) return {shoot:true};
-        var r=XG.Tac.reach(b,u,u.mobility), best=null, bd=1e9, tx=foes[0]||{x:20,y:8};
-        for (var i=0;i<r.d.length;i++){ if(r.d[i]<=0) continue; var x=i%22,y=(i-x)/22, d=Math.hypot(x-tx.x,y-tx.y)-XG.Tac.coverValue(b,x,y,tx.x,tx.y)/20; if(d<bd){bd=d;best=[x,y];} }
+        var r=XG.Tac.reach(b,u,u.mobility), best=null, bd=1e9, tx=foes[0]||{x:b.W-2,y:b.H>>1};
+        for (var i=0;i<r.d.length;i++){ if(r.d[i]<=0) continue; var x=i%b.W,y=(i-x)/b.W, d=Math.hypot(x-tx.x,y-tx.y)-XG.Tac.coverValue(b,x,y,tx.x,tx.y)/20; if(d<bd){bd=d;best=[x,y];} }
         return {sel:u.id, to:best};})()`);
       if (!plan) continue;
       if (plan.to) {
@@ -50,6 +49,25 @@ export default async function ({ ev, shot, sleep, send }) {
     }
     if (!(await waitIdle())) break;
     if (turn === 1 || turn === 3) await shot('11-turn' + turn);
+    if (turn === 1) { // camera: hold the right arrow to pan, then zoom out with the wheel, then C recentres
+      const cam0 = await ev(`JSON.stringify(XG.TacUI.debug().cam)`);
+      await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 });
+      await sleep(700);
+      await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 });
+      await sleep(100);
+      const cam1 = await ev(`JSON.stringify(XG.TacUI.debug().cam)`);
+      await shot('11-panned');
+      const mid = await ev(`(function(){var r=document.getElementById('tac-canvas').getBoundingClientRect(); return [r.left+r.width/2, r.top+r.height/2];})()`);
+      for (let k = 0; k < 6; k++) await send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: mid[0], y: mid[1], deltaX: 0, deltaY: 120 });
+      await sleep(150);
+      const cam2 = await ev(`JSON.stringify(XG.TacUI.debug().cam)`);
+      await shot('11-zoomed-out');
+      for (let k = 0; k < 6; k++) await send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: mid[0], y: mid[1], deltaX: 0, deltaY: -120 });
+      await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'c', code: 'KeyC', text: 'c', windowsVirtualKeyCode: 67 });
+      await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'c', code: 'KeyC', windowsVirtualKeyCode: 67 });
+      await sleep(500);
+      console.log('camera: start ' + cam0 + ' panned ' + cam1 + ' zoomed out ' + cam2 + ' recentred ' + await ev(`JSON.stringify(XG.TacUI.debug().cam)`));
+    }
     await ev(`document.getElementById('tac-endturn').click()`);
     await sleep(200);
     if (turn === 2) await shot('12-enemy-turn');

@@ -1,8 +1,8 @@
 // Cover fades with the viewing angle: the hover panel names the angle when cover is reduced.
 export default async function ({ ev, shot, sleep, send }) {
   const hover = async (x, y) => {
-    const box = await ev(`(function(){var r=document.getElementById('tac-canvas').getBoundingClientRect(); return [r.left,r.top,r.width,r.height];})()`);
-    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: box[0] + (x + .5) * box[2] / 22, y: box[1] + (y + .5) * box[3] / 16 });
+    const p = await ev(`XG.TacUI.tileToClient(${x},${y})`); // scrolls the camera to the tile first
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p.x, y: p.y });
   };
   await ev(`localStorage.clear(); location.reload()`); await sleep(1200);
   await ev(`document.querySelector('[data-action="new-game"]').click()`); await sleep(300);
@@ -15,7 +15,7 @@ export default async function ({ ev, shot, sleep, send }) {
     for (var i=0;i<b.tiles.length;i++) b.tiles[i]=T.FLOOR;
     b.units.forEach(function(x){ if(x!==u && x.side===u.side){ x.x=1; x.y=1+b.units.indexOf(x)%14; } });
     var es=b.units.filter(x=>x.side==='enemy'); es.forEach(function(x,i){ x.x=20; x.y=1+i; });
-    var e=es[0]; e.x=10; e.y=10; b.tiles[10*T.W+9]=T.HIGH; u.x=2; u.y=10;
+    var e=es[0]; e.x=10; e.y=10; b.tiles[10*b.W+9]=T.HIGH; u.x=2; u.y=10;
     b.visible=b.visible.map(()=>true); s.reachCache=null; return [u.x,u.y,e.x,e.y];})()`);
   await hover(pos[2], pos[3]); await sleep(150);
   console.log('head-on: ' + await ev(`document.getElementById('tac-hover').innerText`));
