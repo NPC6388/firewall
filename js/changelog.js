@@ -5,6 +5,12 @@ XG.CHANGELOG = [
   "name": "Unreleased",
   "groups": [
    {
+    "name": "2026-10-22",
+    "items": [
+     "<b>Battle:</b> the combat log now shows how many hostiles are still alive out of all you have discovered (e.g. 2/5)."
+    ]
+   },
+   {
     "name": "2026-10-21",
     "items": [
      "<b>Help:</b> Patch notes are live. The Help menu now lists every change, newest first.",

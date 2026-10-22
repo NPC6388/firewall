@@ -18,7 +18,7 @@ XG.TacUI = (function () {
       snap: b.training ? null : snap || JSON.stringify(b),
       g: g, b: b, onDone: onDone, sel: null, mode: null, aim: null, hover: null,
       queue: [], cur: null, floaters: [], fx: [], parts: [], face: {}, faceDisp: {}, flash: {}, shake: null, lastNow: 0,
-      displayPos: {}, displayHp: {}, dying: {}, hidden: {},
+      displayPos: {}, displayHp: {}, dying: {}, hidden: {}, seen: {},
       reachCache: null, finished: false, lastLog: 0, dirty: true
     };
     $('tac-log').innerHTML = '';
@@ -376,6 +376,7 @@ XG.TacUI = (function () {
       ? { raid: 'Wipe the squad or hold until turn ' + b.turnLimit + ' ends', strike: 'Destroy the FIREWALL squad', breach: 'Purge the security software', uplink: 'Keep the Uplink Core alive' }[b.mission.lkind]
       : { purge: 'Eliminate all hostiles', relay: 'Destroy the Relay and all hostiles', uplink: 'Destroy the Uplink Core or Sever it (' + b.sever + '/3)' }[b.mission.kind];
     var left = b.units.filter(function (x) { return x.alive && x.side !== HS() && visibleUnit(x); }).length;
+    countPanel();
     var mine = b.side === b.human;
     XG.Audio.intensity(left ? 1 : .15);
     if (XG.Tutorial) XG.Tutorial.battleUpdate(b, u, st.mode, st.aim);
@@ -514,6 +515,16 @@ XG.TacUI = (function () {
       }
     } else html = '<span class="dim">Hover a tile or hostile for details.</span>';
     $('tac-hover').innerHTML = html;
+  }
+  // Hostiles you have spotted at least once this battle, and how many of those are still up.
+  function countPanel() {
+    var b = st.b, found = 0, alive = 0;
+    b.units.forEach(function (x) {
+      if (x.side === HS()) return;
+      if (x.alive && !st.hidden[x.id] && b.visible[x.y * W + x.x]) st.seen[x.id] = true;
+      if (st.seen[x.id]) { found++; if (x.alive) alive++; }
+    });
+    $('tac-count').innerHTML = 'Hostiles alive / discovered: <b>' + alive + '/' + found + '</b>';
   }
   function syncLog() {
     if (!st) return;

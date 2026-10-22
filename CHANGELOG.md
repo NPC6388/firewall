@@ -8,6 +8,9 @@ The in-game **Help → Patch notes** tab shows everything from the first `##` he
 
 ## Unreleased
 
+### 2026-10-22
+- **Battle:** the combat log now shows how many hostiles are still alive out of all you have discovered (e.g. 2/5).
+
 ### 2026-10-21
 - **Help:** Patch notes are live. The Help menu now lists every change, newest first.
 - **XP:** a hostile your hacker has overridden and still controls when the battle ends earns the hacker the same XP as a
