@@ -58,7 +58,7 @@ XG.DATA = {
     // outside maps: windows in the building's outer wall (base LOW: impassable, see-through, half cover in front; a stray miss or a blast
     // shatters one into an empty frame, which stays impassable), and indoor furniture
     window:  { base: 2, rule: 'Window: impassable, but you can see and shoot through it. Half cover right in front of it; stand beside it behind the wall for full cover and lean out through it. A stray miss or a blast shatters it, leaving an open gap anyone can walk through', names: { city: 'Window', relay: 'Crystal window', uplink: 'Armored window', cyber: 'Port window' } },
-    frame:   { base: 2, rule: 'Shattered window: still impassable, see and shoot through it. Half cover right in front of it; stand beside it behind the wall for full cover and lean out through it', names: { city: 'Broken window', relay: 'Broken crystal window', uplink: 'Broken window', cyber: 'Open port' } },
+    frame:   { base: 2, rule: 'Shattered window (old save): breaks open into a walkable gap at the next blast or stray miss', names: { city: 'Broken window', relay: 'Broken crystal window', uplink: 'Broken window', cyber: 'Open port' } },
     desk:    { base: 2, rule: 'Furniture', names: { city: 'Office desk', relay: 'Console desk', uplink: 'Console desk', cyber: 'Process desk' } },
     rack:    { base: 3, rule: 'Furniture', names: { city: 'Server rack', relay: 'Relay rack', uplink: 'Coolant rack', cyber: 'Memory bank' } }
   },

@@ -154,6 +154,12 @@ Each sprint ends with something playable. **Sprints 0–4 = the MVP.**
   changes (tactical and strategic), each with the balance lever it touches and how to measure it (`smoke.js 30 4 30 40`
   bot rates plus the user's playtest feel), and the cheapest ones prototyped. The budget cap is part of the brief:
   check usage as it goes and stop and hand over at the halfway mark.
+- User's goals for it (2026-10-22): not just tactics. The strategic layer (facilities, tech tree) must matter and force
+  trade-offs, and the enemy should always feel *just a bit* more powerful, so there is a steady sense of dread. It must
+  feel the same whichever side you play. That needs more in-game guidance on which tech path or facility suits what:
+  hints, comments, and overheard talk, e.g. HALCYON arguing the trade-offs between two facilities with a scientist
+  off-screen (and a Lattice equivalent). Aim: a game the user wants to play now, which could later grow into a longer
+  story with fancier graphics (possibly as a follow-up game).
 
 **Sprint 7: Strategy depth**
 - **Cyber-Ops layer:** hackers dive into a fast node-graph "netrun" minigame between missions to slow regions or steal intel.

@@ -840,8 +840,9 @@ function autoBattle(g, m, squad) {
 })();
 
 // Rooms are strong points: a walled room (x 10..18, y 5..13) with two doorways on its east wall, (18,8) and (18,11). A unit inside
-// can be seen or shot only along a real ray through a doorway (from where the shooter stands or leans); a unit in a doorway
-// step-peeks only out of either side of the door; a lean beside a jamb sees only a narrow cone through the gap; fog shows exactly what LOS sees. Solid vs fire-through.
+// can be seen or shot only along a real ray through a doorway (from where the shooter stands or leans), where "through" is the
+// geometric rule: the ray clears both jambs, each shrunk by Tac.LOS_MARGIN; a unit in a doorway step-peeks only out of either
+// side of the door; a lean beside a jamb sees through the gap but not along the inside of the wall; fog shows exactly what LOS sees.
 (function () {
   var g = S.newGame(25), r = S.rng(g), m = Strat.spawnMission(g, r, 'purge'); S.saveRng(g, r);
   var b = Tac.create(g, Object.assign({}, m, { diff: 1, scenario: 'exterminate' }), g.soldiers.slice(0, 2)), W = b.W;
@@ -851,24 +852,23 @@ function autoBattle(g, m, squad) {
   var X0 = 10, X1 = 18, Y0 = 5, Y1 = 13, doors = [8, 11], inside = function (x, y) { return x > X0 && x < X1 && y > Y0 && y < Y1; };
   for (var y = Y0; y <= Y1; y++) for (var x = X0; x <= X1; x++) if (x === X0 || x === X1 || y === Y0 || y === Y1) b.tiles[y * W + x] = Tac.WALL;
   doors.forEach(function (dy) { b.tiles[dy * W + X1] = Tac.FLOOR; });
-  var cone = function (p, tx, ty) { if (!p[4]) return true; var vx = tx - p[0], vy = ty - p[1], al = vx * p[2] + vy * p[3], ac = Math.abs(vx * p[3] - vy * p[2]); return al > 0 && ac * 3 <= al; };
-  var rayDoor = function (a, c) { // does the straight ray between the two tile centres cross the east wall (x = 18) inside a doorway?
+  var Mg = Tac.LOS_MARGIN, rayDoor = function (a, c) { // does the straight ray between the two tile centres pass the east wall (x = 18) through a doorway, clear of both (shrunk) jambs?
     if ((a[0] - X1) * (c[0] - X1) >= 0) return a[0] === X1 && doors.indexOf(a[1]) >= 0 || c[0] === X1 && doors.indexOf(c[1]) >= 0;
-    var yy = a[1] + (X1 - a[0]) * (c[1] - a[1]) / (c[0] - a[0]);
-    return doors.some(function (dy) { return Math.abs(yy - dy) < 0.5; });
+    var yAt = function (x) { return a[1] + (x - a[0]) * (c[1] - a[1]) / (c[0] - a[0]); }, ya = yAt(X1 - 0.5 + Mg), yb = yAt(X1 + 0.5 - Mg);
+    return doors.some(function (dy) { return [ya, yb].every(function (yy) { return Math.abs(yy - dy) <= 0.5 + Mg + 1e-9; }); });
   };
   var leaks = [], seen = 0;
   for (var sy = 0; sy < 22; sy++) for (var sx = 4; sx <= 32; sx++) {
     if (inside(sx, sy) || b.tiles[sy * W + sx] !== Tac.FLOOR) continue;
     sh.x = sx; sh.y = sy;
-    var SL = [[sx, sy, 0, 0, false]].concat(Tac.peekSpots(b, sx, sy));
+    var SL = [[sx, sy]].concat(Tac.peekSpots(b, sx, sy));
     for (var ty = Y0 + 1; ty < Y1; ty++) for (var tx = X0 + 1; tx < X1; tx++) {
       if (Tac.dist(sx, sy, tx, ty) > 14) continue;
       tg.x = tx; tg.y = ty;
       if (!Tac.los(b, sx, sy, tx, ty)) continue;
       seen++;
-      var TL = [[tx, ty, 0, 0, false]].concat(Tac.peekSpots(b, tx, ty));
-      var ok = SL.some(function (p) { return TL.some(function (q) { return cone(p, q[0], q[1]) && cone(q, p[0], p[1]) && rayDoor(p, q); }); });
+      var TL = [[tx, ty]].concat(Tac.peekSpots(b, tx, ty));
+      var ok = SL.some(function (p) { return TL.some(function (q) { return rayDoor(p, q); }); });
       if (!ok) leaks.push(sx + ',' + sy + '>' + tx + ',' + ty);
     }
   }
@@ -877,11 +877,15 @@ function autoBattle(g, m, squad) {
   var dps = Tac.peekSpots(b, X1, 8);
   check(dps.length === 2 && dps.every(function (p) { return p[1] === 8 && (p[0] === X1 - 1 || p[0] === X1 + 1); }), 'room: a unit in a doorway step-peeks out of either side of the door only, never along the wall');
   sh.x = 19; sh.y = 7;
-  var deep = [[17, 6], [17, 10], [17, 12], [16, 6], [11, 12]].filter(function (p) { return Tac.los(b, 19, 7, p[0], p[1]); });
-  check(!deep.length && Tac.los(b, 19, 7, 14, 8), 'room: a lean beside a door jamb sees straight through the gap, not along the inside of the wall (' + JSON.stringify(deep) + ')');
+  var deep = [[17, 6], [17, 10], [17, 12], [16, 6]].filter(function (p) { return Tac.los(b, 19, 7, p[0], p[1]); });
+  check(!deep.length && Tac.los(b, 19, 7, 14, 8), 'room: a lean beside a door jamb sees through the gap, not along the inside of the wall (' + JSON.stringify(deep) + ')');
   tg.x = 17; tg.y = 7; var fan = [], wide = 0;
-  for (var fy = 0; fy < 22; fy++) for (var fx = 19; fx <= 32; fx++) { sh.x = fx; sh.y = fy; if (Tac.los(b, fx, fy, 17, 7)) { fan.push([fx, fy]); if (Math.abs(fx - X1) > 1 && Math.abs(fy - 8) * 3 > fx - 17 && Math.abs(fy - 11) > 1) wide++; } }
-  check(fan.length > 0 && !wide && Tac.hitInfo(b, { x: 25, y: 8, range: 14, aim: 70, close: 10, side: 'player' }, tg).cover === 40, 'room: a defender beside a doorway is seen only from a narrow arc in front of it, in full cover (' + fan.length + ' tiles, ' + wide + ' outside the arc)');
+  for (var fy = 0; fy < 22; fy++) for (var fx = 19; fx <= 32; fx++) { sh.x = fx; sh.y = fy; if (Tac.los(b, fx, fy, 17, 7)) { fan.push([fx, fy]); if (fx <= 20 && fy <= 6) wide++; } }
+  check(fan.length > 0 && !wide && Tac.hitInfo(b, { x: 25, y: 8, range: 14, aim: 70, close: 10, side: 'player' }, tg).cover === 40, 'room: a defender beside a doorway is seen only through the doorway, never from along the outside of the wall, in full cover (' + fan.length + ' tiles, ' + wide + ' along the wall)');
+  // a unit hugging the inside of the wall two tiles from the door: hidden from everywhere outside except a steep line through the doorway
+  tg.x = 17; tg.y = 6; var hug = [];
+  for (var hy = 0; hy < 22; hy++) for (var hx = 4; hx <= 32; hx++) { if (inside(hx, hy) || b.tiles[hy * W + hx] !== Tac.FLOOR) continue; sh.x = hx; sh.y = hy; if (Tac.dist(hx, hy, 17, 6) <= 14 && Tac.los(b, hx, hy, 17, 6)) hug.push([hx, hy]); }
+  check(hug.length <= 16 && hug.every(function (p) { return p[0] >= X1 && p[1] - 6 >= 1.5 * (p[0] - 17); }), 'room: a unit hugging the inside of the wall is hidden from outside except along a steep ray through the doorway (' + JSON.stringify(hug) + ')');
   // fog shows exactly what line of sight sees: the room stays dark except along the rays through its doorways
   sh.x = 21; sh.y = 6; tg.x = 40; tg.y = 40; b.visible = null; b.explored = null; Tac.refreshVis(b);
   var fogOk = true;
@@ -900,6 +904,51 @@ function autoBattle(g, m, squad) {
   check(!Tac.blocksFire(b, 15, 20) && Tac.los(b, 15, 14, 15, 21) && Tac.hitInfo(b, { x: 15, y: 14, range: 14, aim: 70, close: 10, side: 'player' }, tg).cover === 40, 'fire-through: glass is full cover you can see and shoot through');
   b.props[20 * W + 15] = 'pillar';
   check(Tac.blocksFire(b, 15, 20), 'solid: a pillar blocks sight and fire');
+  // geometric LOS: a staircase of solid tiles touching only at their corners is still a closed wall (no ray slips between a diagonal pair)
+  b.tiles.fill(Tac.FLOOR); b.props.fill(0); tg.x = 40; tg.y = 40; sh.x = 40; sh.y = 41;
+  for (var st = 20; st <= 23; st++) b.tiles[st * W + st] = Tac.WALL;
+  var slip = [];
+  for (var py = 14; py <= 30; py++) for (var px = 14; px <= 30; px++) for (var qy = 14; qy <= 30; qy++) for (var qx = 14; qx <= 30; qx++) {
+    if (px - py > -1 || qx - qy < 1) continue;
+    var cc = px + (qx - px) * (px - py) / ((px - py) - (qx - qy)); // where the segment crosses the diagonal x = y
+    if (cc > 20 && cc < 23 && Tac.lineClear(b, px, py, qx, qy)) slip.push(px + ',' + py + '>' + qx + ',' + qy);
+  }
+  check(!slip.length, 'LOS: no line slips between solid tiles that touch at a corner (' + slip.slice(0, 5).join(' ') + ')');
+  b.tiles.fill(Tac.FLOOR); b.tiles[20 * W + 20] = Tac.HIGH;
+  check(Tac.lineClear(b, 19, 19, 21, 21) === false && Tac.lineClear(b, 19, 20, 22, 18) && !Tac.lineClear(b, 18, 21, 22, 19), 'LOS: a line may clip the corner of tall cover, not its middle');
+})();
+
+// The user's "LOS in a box" screenshot (2026-10-22): a room with two windows in its west wall, one in its south wall, a gap in the
+// top wall and an opening east onto a corridor; racks (solid) and desks (fire-through) inside. Each yellow arrow the user drew is
+// a line the unit must see along, both ways (a unit placed at the far end sees it back). Local coordinates: the room is x 0..7, y 0..7.
+(function () {
+  var g = S.newGame(25), r = S.rng(g), m = Strat.spawnMission(g, r, 'purge'); S.saveRng(g, r);
+  var b = Tac.create(g, Object.assign({}, m, { diff: 1, scenario: 'exterminate' }), g.soldiers.slice(0, 2)), W = b.W;
+  b.tiles.fill(Tac.FLOOR); b.props.fill(0); b.faces.fill(0); b.tileHp = {}; b.outcome = null; delete b.outside;
+  var OX = 14, OY = 9, P = function (x, y, t, p) { b.tiles[(OY + y) * W + OX + x] = t; b.props[(OY + y) * W + OX + x] = p || 0; };
+  for (var y = 0; y <= 7; y++) for (var x = 0; x <= 7; x++) if (x === 0 || x === 7 || y === 0 || y === 7) P(x, y, Tac.WALL);
+  P(5, 0, Tac.FLOOR); P(7, 1, Tac.FLOOR);
+  P(0, 2, Tac.LOW, 'window'); P(0, 5, Tac.LOW, 'window'); P(3, 7, Tac.LOW, 'window');
+  P(2, 2, Tac.HIGH, 'rack'); P(4, 2, Tac.HIGH, 'rack'); P(2, 5, Tac.LOW, 'desk'); P(3, 5, Tac.LOW, 'desk'); P(5, 4, Tac.LOW, 'desk');
+  var probe = b.units[0], unit = b.units.filter(function (u) { return u.side === 'enemy'; })[0];
+  b.units = [probe, unit]; probe.alive = unit.alive = true;
+  // the units in the picture: S selected top right, TL top left, D1 below it, O the orange one, BL bottom left
+  var U = { S: [4, 1], TL: [1, 1], D1: [1, 3], O: [1, 4], BL: [1, 6] };
+  var arrows = [['S', 8, -2], ['S', 9, 1], ['S', -2, 2], ['S', 5, 3], ['S', 6, 5], ['S', 1, 6], ['S', -1, 6], ['TL', -2, 5], ['D1', -2, -1],
+    ['O', 2, 3], ['O', -2, 8], ['BL', -2, 2], ['BL', 2, 3], ['BL', 6, 5], ['BL', 5, 8], ['BL', 3, 7]];
+  var miss = [];
+  arrows.forEach(function (a) {
+    var sx = OX + U[a[0]][0], sy = OY + U[a[0]][1], tx = OX + a[1], ty = OY + a[2];
+    unit.x = sx; unit.y = sy; probe.x = tx; probe.y = ty;
+    if (Tac.tile(b, tx, ty) !== Tac.FLOOR) { probe.x = 0; probe.y = 0; }
+    if (!(Tac.dist(sx, sy, tx, ty) <= Tac.SIGHT && Tac.los(b, sx, sy, tx, ty) && Tac.los(b, tx, ty, sx, sy))) miss.push(a.join(','));
+  });
+  check(!miss.length, 'room arrows: every line the user drew is seen both ways (' + miss.join(' ') + ')');
+  // and the room still blocks what it should: a wall hides a unit straight behind it, and the rack hides the tile straight below it
+  unit.x = OX + 6; unit.y = OY + 3; probe.x = OX + 10; probe.y = OY + 3;
+  check(!Tac.los(b, unit.x, unit.y, probe.x, probe.y), 'room arrows: a unit hugging the east wall is still hidden straight through it');
+  unit.x = OX + 2; unit.y = OY + 1; probe.x = OX + 2; probe.y = OY + 4;
+  check(!Tac.lineClear(b, unit.x, unit.y, probe.x, probe.y), 'room arrows: a rack still blocks the line straight through it');
 })();
 
 // Outside maps: one building holds the server (node) or the defenders (exterminate); the attackers land in the yard.

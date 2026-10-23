@@ -96,79 +96,98 @@ XG.Tac = (function () {
   }
   // Solid for a straight line crossing the tile along axis a (either way): a mixed-side object counts if either face on that axis is full.
   function solidAcross(b, x, y, a) { return blocksFire(b, x, y, a[0], a[1]) || blocksFire(b, x, y, -a[0], -a[1]); }
-  // Bresenham; solid tiles always block (a shot past tall cover needs a real corner peek, see peekSpots). A mixed-side object blocks
-  // when the face toward either end of the line is full. A diagonal step never slips past a solid corner: the true ray between the
-  // tile centres is checked against the side tile it really crosses (a graze exactly through the corner point is blocked by either),
-  // so no line squeezes between a door jamb and the wall beside it.
+  // Geometric line of sight. Every tile is a unit square centred on its coordinates and a line runs between two tile centres.
+  // It is blocked when it passes through an OPAQUE tile (solid cover, see blocksFire; a mixed-side object counts when the face
+  // toward either end of the line is full). Each opaque square is shrunk by LOS_MARGIN on every side that faces an open tile, so
+  // a line may graze or clip the corner of a wall or tall cover (past a door jamb, out of a window at an angle). Sides shared by
+  // two opaque tiles stay closed (no slipping along the seam of a wall), and two opaque tiles that touch only at a corner close
+  // that corner (no slipping between a diagonal pair). Only the tiles the line really passes through are tested (a supercover
+  // grid walk), so it stays cheap; the test is symmetric. A shot past tall cover at a shallow angle still needs a lean (peekSpots).
+  var LOS_MARGIN = 0.25, Lb, Lx0, Ly0, Lx1, Ly1, Ldx, Ldy;
+  function losOpaque(x, y) {
+    var b = Lb, W = b.W;
+    if (x < 0 || y < 0 || x >= W || y >= b.H) return true;
+    var t = b.tiles[y * W + x];
+    if (t === WALL) return true;
+    if (t !== HIGH && t !== LOW) return false;
+    if (b.faces && b.faces[y * W + x]) return blocksFire(b, x, y, Lx0 - x, Ly0 - y) || blocksFire(b, x, y, Lx1 - x, Ly1 - y);
+    return t === HIGH && blocksFire(b, x, y);
+  }
+  // does the segment overlap the box [lx, hx] x [ly, hy] for a positive length? (touching an edge or a corner does not count)
+  function losCross(lx, ly, hx, hy) {
+    var t0 = 0, t1 = 1, a, c, s;
+    if (Ldx) { a = (lx - Lx0) / Ldx; c = (hx - Lx0) / Ldx; if (a > c) { s = a; a = c; c = s; } if (a > t0) t0 = a; if (c < t1) t1 = c; }
+    else if (Lx0 <= lx || Lx0 >= hx) return false;
+    if (Ldy) { a = (ly - Ly0) / Ldy; c = (hy - Ly0) / Ldy; if (a > c) { s = a; a = c; c = s; } if (a > t0) t0 = a; if (c < t1) t1 = c; }
+    else if (Ly0 <= ly || Ly0 >= hy) return false;
+    return t1 - t0 > 1e-9;
+  }
+  function losHit(x, y) {
+    if (!losOpaque(x, y)) return false;
+    var M = LOS_MARGIN, l = losOpaque(x - 1, y), r = losOpaque(x + 1, y), u = losOpaque(x, y - 1), d = losOpaque(x, y + 1);
+    if (losCross(x - 0.5 + (l ? 0 : M), y - 0.5 + (u ? 0 : M), x + 0.5 - (r ? 0 : M), y + 0.5 - (d ? 0 : M))) return true;
+    // a corner shared with a diagonal opaque tile while both tiles beside that corner are open: a small closed square on the corner
+    var V = M + 0.01;
+    for (var i = 0; i < 4; i++) {
+      var sx = i & 1 ? 1 : -1, sy = i & 2 ? 1 : -1;
+      if ((sx < 0 ? l : r) || (sy < 0 ? u : d) || !losOpaque(x + sx, y + sy)) continue;
+      if (losCross(x + sx / 2 - V, y + sy / 2 - V, x + sx / 2 + V, y + sy / 2 + V)) return true;
+    }
+    return false;
+  }
   function lineClear(b, x0, y0, x1, y1) {
-    var dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
-    var err = dx + dy, x = x0, y = y0, px, py;
-    var stops = function (tx, ty) {
-      var t = tile(b, tx, ty);
-      if (t === WALL) return true;
-      if (t !== HIGH && t !== LOW) return false;
-      if (b.faces && b.faces[ty * b.W + tx]) return blocksFire(b, tx, ty, x0 - tx, y0 - ty) || blocksFire(b, tx, ty, x1 - tx, y1 - ty);
-      return blocksFire(b, tx, ty);
-    };
-    while (!(x === x1 && y === y1)) {
-      var e2 = 2 * err;
-      px = x; py = y;
-      if (e2 >= dy) { err += dy; x += sx; }
-      if (e2 <= dx) { err += dx; y += sy; }
-      if (x !== px && y !== py) { // diagonal step: which side tile does the real ray cross?
-        var yb = y0 + (px + sx / 2 - x0) * (y1 - y0) / (x1 - x0), d = (yb - (py + sy / 2)) * sy;
-        if (d < -1e-9 ? stops(x, py) : d > 1e-9 ? stops(px, y) : stops(x, py) || stops(px, y)) return false;
-      }
-      if (x === x1 && y === y1) break;
-      if (stops(x, y)) return false;
+    var dx = x1 - x0, dy = y1 - y0;
+    if (!dx && !dy) return true;
+    Lb = b; Lx0 = x0; Ly0 = y0; Lx1 = x1; Ly1 = y1; Ldx = dx; Ldy = dy;
+    var sx = dx > 0 ? 1 : -1, sy = dy > 0 ? 1 : -1, ax = Math.abs(dx), ay = Math.abs(dy);
+    var tdx = ax ? 1 / ax : Infinity, tdy = ay ? 1 / ay : Infinity, tx = tdx / 2, ty = tdy / 2, x = x0, y = y0;
+    for (var n = ax + ay + 2; n > 0; n--) { // the end and start tiles are never tested (a unit stands there, or it is the tile being looked at)
+      if (Math.abs(tx - ty) < 1e-9) { // straight through a tile corner: both tiles beside it, then the diagonal one
+        if (losHit(x + sx, y) || losHit(x, y + sy)) return false;
+        x += sx; y += sy; tx += tdx; ty += tdy;
+      } else if (tx < ty) { x += sx; tx += tdx; }
+      else { y += sy; ty += tdy; }
+      if (x === x1 && y === y1) return true;
+      if (losHit(x, y)) return false;
     }
     return true;
   }
-  function clearEither(b, ax, ay, bx, by) { return lineClear(b, ax, ay, bx, by) || lineClear(b, bx, by, ax, ay); }
   // Peeking: a unit beside solid cover can lean one tile out to either side of it, so it can see and fire down a line it stands
-  // on the corner of. Works for both ends of the line (the target can be peeking too). Each lean is [x, y, ox, oy, narrow]:
-  // - only at the END of the obstruction: the tile diagonally past it (D, at lean + o) must be open, or the unit is mid-wall;
-  // - never from a tile wedged between two solids (a doorway, a slot): there it sees by real lines only;
-  // - narrow when D is a one-tile gap in a solid line (a doorway or a window): the lean then sees only a narrow cone through the
-  //   gap (within about 18 degrees of the axis o), never along the far side of the wall.
+  // on the corner of. Works for both ends of the line (the target can be peeking too). Each lean is [x, y, ox, oy]:
+  // - only at the END of the obstruction: the tile diagonally past it (lean + o) must be open, or the unit is mid-wall;
+  // - never from a tile wedged between two solids (a doorway, a slot), except the doorway step below.
+  // From the lean tile the same geometric line test decides what it sees (a lean beside a door jamb or a window sees through
+  // the gap at whatever angle the line really clears the wall, and nothing along the inside of it).
   function peekSpots(b, x, y) {
-    var out = [];
+    var out = [], has = function (px, py) { return out.some(function (p) { return p[0] === px && p[1] === py; }); };
     [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (o) {
       if (!solidAcross(b, x + o[0], y + o[1], o) || solidAcross(b, x - o[0], y - o[1], o)) return;
       [[o[1], o[0]], [-o[1], -o[0]]].forEach(function (q) {
         var px = x + q[0], py = y + q[1], gx = x + o[0] + q[0], gy = y + o[1] + q[1];
-        if (!inB(b, px, py) || solidAcross(b, px, py, q) || solidAcross(b, gx, gy, o)) return;
-        var narrow = solidAcross(b, gx + q[0], gy + q[1], q), had = out.filter(function (p) { return p[0] === px && p[1] === py; })[0];
-        if (had) { if (!narrow) had[4] = false; }
-        else out.push([px, py, o[0], o[1], narrow]);
+        if (!inB(b, px, py) || solidAcross(b, px, py, q) || solidAcross(b, gx, gy, o) || has(px, py)) return;
+        out.push([px, py, o[0], o[1]]);
       });
     });
     // In a doorway (solid on both sides along one axis): step-peek one tile out of either side of the door, seeing
-    // the whole open side from there (walls still block anything behind them).
+    // the whole open side from there (walls still block anything behind them), so it sees along the outside of the wall.
     [[1, 0], [0, 1]].forEach(function (o) {
       if (!solidAcross(b, x + o[0], y + o[1], o) || !solidAcross(b, x - o[0], y - o[1], o)) return;
       [[o[1], o[0]], [-o[1], -o[0]]].forEach(function (q) {
         var px = x + q[0], py = y + q[1];
-        if (inB(b, px, py) && !solidAcross(b, px, py, q) && !out.some(function (p) { return p[0] === px && p[1] === py; })) out.push([px, py, q[0], q[1], false]);
+        if (inB(b, px, py) && !solidAcross(b, px, py, q) && !has(px, py)) out.push([px, py, q[0], q[1]]);
       });
     });
     return out;
   }
-  // A narrow lean (through a doorway or window) only reaches targets inside its cone.
-  function coneOk(p, tx, ty) {
-    if (!p[4]) return true;
-    var vx = tx - p[0], vy = ty - p[1], along = vx * p[2] + vy * p[3], across = Math.abs(vx * p[3] - vy * p[2]);
-    return along > 0 && across * 3 <= along;
-  }
   function los(b, ax, ay, bx, by) {
-    if (clearEither(b, ax, ay, bx, by)) return true;
+    if (lineClear(b, ax, ay, bx, by)) return true;
     var A = peekSpots(b, ax, ay), i, j;
-    for (i = 0; i < A.length; i++) if (coneOk(A[i], bx, by) && clearEither(b, A[i][0], A[i][1], bx, by)) return true;
+    for (i = 0; i < A.length; i++) if (lineClear(b, A[i][0], A[i][1], bx, by)) return true;
     if (!unitAt(b, bx, by)) return false; // only a unit leans; an empty tile is seen or not from where you stand
     var B = peekSpots(b, bx, by);
-    for (i = 0; i < B.length; i++) if (coneOk(B[i], ax, ay) && clearEither(b, ax, ay, B[i][0], B[i][1])) return true;
+    for (i = 0; i < B.length; i++) if (lineClear(b, ax, ay, B[i][0], B[i][1])) return true;
     for (i = 0; i < A.length; i++) for (j = 0; j < B.length; j++) // both lean out (two units behind tall cover facing each other)
-      if (coneOk(A[i], B[j][0], B[j][1]) && coneOk(B[j], A[i][0], A[i][1]) && clearEither(b, A[i][0], A[i][1], B[j][0], B[j][1])) return true;
+      if (lineClear(b, A[i][0], A[i][1], B[j][0], B[j][1])) return true;
     return false;
   }
 
@@ -1074,8 +1093,8 @@ XG.Tac = (function () {
     for (var y = Math.max(0, y0 - SIGHT); y <= Math.min(b.H - 1, y0 + SIGHT); y++)
       for (var x = Math.max(0, x0 - SIGHT); x <= Math.min(b.W - 1, x0 + SIGHT); x++) {
         if (dist(x0, y0, x, y) > SIGHT) continue;
-        var ok = clearEither(b, x0, y0, x, y);
-        for (var i = 0; !ok && i < A.length; i++) ok = coneOk(A[i], x, y) && clearEither(b, A[i][0], A[i][1], x, y);
+        var ok = lineClear(b, x0, y0, x, y);
+        for (var i = 0; !ok && i < A.length; i++) ok = lineClear(b, A[i][0], A[i][1], x, y);
         if (ok) out.push(y * b.W + x);
       }
     cache.at[k] = out;
@@ -1162,7 +1181,7 @@ XG.Tac = (function () {
   // Corner standoff: both units hug the same wall or tall cover (each adjacent to one blocking tile) and the straight line between
   // them is blocked, so they only see each other by leaning round the corner. Symmetric: it replaces the shooter's aim with 50.
   function cornerStandoff(b, a, t) {
-    if (cheb(a.x, a.y, t.x, t.y) <= 1 || clearEither(b, a.x, a.y, t.x, t.y)) return false;
+    if (cheb(a.x, a.y, t.x, t.y) <= 1 || lineClear(b, a.x, a.y, t.x, t.y)) return false;
     for (var dy = -1; dy <= 1; dy++) for (var dx = -1; dx <= 1; dx++) {
       var bx = a.x + dx, by = a.y + dy, k = tile(b, bx, by);
       if ((dx || dy) && blocksFire(b, bx, by, -dx, -dy) && cheb(bx, by, t.x, t.y) <= 1) return true;
@@ -1985,6 +2004,6 @@ XG.Tac = (function () {
     endTurn: endTurn, aiStep: aiStep,
     reach: reach, pathTo: pathTo, moveRange: moveRange, hitInfo: hitInfo, targets: targets, tileOk: tileOk,
     abilityBlock: abilityBlock, coverValue: coverValue, coverDetail: coverDetail, los: los, isVisible: isVisible, unitAt: unitAt,
-    unitById: unitById, tile: tile, coverTile: coverTile, blocksFire: blocksFire, peekSpots: peekSpots, indoor: indoor, isServer: isServer, zoneState: zoneState, captureTick: captureTick, nodeTurns: nodeTurns, dist: dist, cheb: cheb, checkOutcome: checkOutcome, result: result, abort: abort
+    unitById: unitById, tile: tile, coverTile: coverTile, blocksFire: blocksFire, peekSpots: peekSpots, lineClear: lineClear, LOS_MARGIN: LOS_MARGIN, indoor: indoor, isServer: isServer, zoneState: zoneState, captureTick: captureTick, nodeTurns: nodeTurns, dist: dist, cheb: cheb, checkOutcome: checkOutcome, result: result, abort: abort
   };
 })();

@@ -754,7 +754,7 @@ XG.TacUI = (function () {
       if (pn) html += '<div class="' + (Tac.propOf(b, h.x, h.y) === 'barrel' ? 'warn' : 'dim') + '">' + XG.Gfx.propRule(b, h.x, h.y) + (/^(window|frame)$/.test(Tac.propOf(b, h.x, h.y)) ? '.' : XG.DATA.props[Tac.propOf(b, h.x, h.y)] && XG.DATA.props[Tac.propOf(b, h.x, h.y)].faces ? '. The face toward the attacker counts.' : t === Tac.PIT ? '. Impassable, gives no cover, does not block line of sight.' : t === Tac.LOW ? '. Half cover.' : '. Full cover.') + '</div>';
       else if (t === Tac.PIT) html += '<div class="dim">Impassable. Gives no cover and does not block line of sight.</div>';
       if (t === Tac.WALL || t === Tac.HIGH || t === Tac.LOW) html += '<div class="' + (Tac.blocksFire(b, h.x, h.y) ? 'warn' : 'dim') + '">' + (b.faces && b.faces[h.y * W + h.x] ? 'Solid from its full sides (blocks sight and fire), fire-through over its half sides.'
-        : Tac.blocksFire(b, h.x, h.y) ? 'Solid: blocks sight and fire. Shots past it need a lean round its end.' : 'Fire-through: ' + (t === Tac.HIGH ? 'full' : 'half') + ' cover, but it can be seen and shot over or through.') + '</div>';
+        : Tac.blocksFire(b, h.x, h.y) ? 'Solid: blocks sight and fire. Lines that only graze its corner pass; otherwise lean round its end.' : 'Fire-through: ' + (t === Tac.HIGH ? 'full' : 'half') + ' cover, but it can be seen and shot over or through.') + '</div>';
       if (t === 0) {
         var cf = coverFacing(h.x, h.y), sides = SIDES.map(function (o) {
           var c = Tac.coverTile(b, h.x + o[0], h.y + o[1], o[0], o[1]), s = sideState(cf, o);
