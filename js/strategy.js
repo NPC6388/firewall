@@ -178,6 +178,12 @@ XG.Strat = (function () {
       var r = new XG.RNG((Math.imul((seed >>> 0) || 1, 2246822519) ^ 0x27D4EB2F) >>> 0);
       return r.next() < D.tuning.nodeChance ? 'node' : 'exterminate';
     },
+    // The 'outside' map layout (server inside a building, attackers start in the yard), seeded by the mission seed on its own stream.
+    rollOutside: function (seed, scenario) {
+      var p = scenario === 'node' ? D.tuning.outsideChance : scenario === 'exterminate' ? D.tuning.outsideChanceExt : 0;
+      return !!p && new XG.RNG((Math.imul((seed >>> 0) || 1, 0x85EBCA6B) ^ 0x5BD1E995) >>> 0).next() < p;
+    },
+    nodeTurnsFor: function (m, kind) { return (Strat.rollOutside(m.seed, m.scenario) ? D.tuning.nodeTurnsOutside : D.tuning.nodeTurns)[kind || m.kind]; },
     scenarioTag: function (m) { return m.scenario === 'node' ? 'NODE' : m.scenario === 'exterminate' ? 'EXTERMINATE' : ''; },
     difficulty: function (g) { return Math.min(5, 1 + Math.floor((g.day - 1) / 18)); },
 
@@ -202,8 +208,8 @@ XG.Strat = (function () {
         m.reward = { salvage: r.int(8, 14) + diff * 3, credits: r.int(0, 2) * 10, infection: r.int(12, 20) };
         m.scenario = Strat.rollScenario(m.seed);
         m.brief = m.scenario === 'node'
-          ? 'Lattice cell guarding a server node in a ' + m.site + '. Capture it: end ' + D.tuning.nodeCapture + ' of your turns with an operative beside the server and no hostile there, within ' + D.tuning.nodeTurns.purge + ' turns. Wiping them out also works.'
-          : 'Lattice cell entrenched in a ' + m.site + '. Exterminate: eliminate all hostiles. No time limit.';
+          ? 'Lattice cell guarding a server node in a ' + m.site + '. Capture it: end ' + D.tuning.nodeCapture + ' of your turns with an operative beside the server and no hostile there, within ' + Strat.nodeTurnsFor(m) + ' turns. Wiping them out also works.' + (Strat.rollOutside(m.seed, m.scenario) ? ' The server is inside a building: cross the yard and break in.' : '')
+          : 'Lattice cell entrenched in a ' + m.site + '. Exterminate: eliminate all hostiles. No time limit.' + (Strat.rollOutside(m.seed, m.scenario) ? ' They hold a building: cross the yard and break in.' : '');
       } else if (kind === 'relay') {
         m.name = 'Relay Trace'; m.diff = Math.max(2, diff);
         m.reward = { salvage: 25, credits: 30, infection: 20 };

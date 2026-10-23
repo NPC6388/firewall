@@ -1,5 +1,6 @@
 // Prints tactical map stats and an ASCII sample of each layout: node tools/map-sampler.js [maps]
 // Legend: # wall, H tall cover, c low cover, ~ pit (impassable, no cover), . floor, F player, E enemy (deployment is random per edge, see Tac.deploy)
+// Outside layout (node missions, server inside a building): w window, d desk, R rack, S server; up to 3 samples, one per approach edge.
 var fs = require('fs'), path = require('path'), vm = require('vm');
 var ctx = vm.createContext({ console: console, Math: Math, Date: Date, JSON: JSON });
 ['data.js', 'state.js', 'strategy.js', 'tactical.js'].forEach(function (f) {
@@ -7,8 +8,9 @@ var ctx = vm.createContext({ console: console, Math: Math, Date: Date, JSON: JSO
 });
 var XG = ctx.XG, Tac = XG.Tac, S = XG.State;
 var N = +process.argv[2] || 400, g = S.newGame(3), stats = {}, shown = {}, pitHist = [0, 0, 0, 0, 0, 0, 0];
-for (var i = 0; i < N; i++) {
-  var b = Tac.create(g, { kind: 'purge', diff: 2, seed: 1000 + i * 7919, name: 'x', city: 'x' }, g.soldiers.slice(0, 4));
+var NO = Math.round(N / 4), edges = {};
+for (var i = 0; i < N + NO; i++) {
+  var out = i >= N, b = Tac.create(g, { kind: 'purge', diff: 2, seed: 1000 + i * 7919, name: 'x', city: 'x', scenario: out ? 'node' : null, layout: out ? 'outside' : null }, g.soldiers.slice(0, 4));
   var st = stats[b.layout] = stats[b.layout] || { n: 0, cover: 0, high: 0, wall: 0, pit: 0, open: 0 };
   st.n++;
   var pits = 0, seenPit = {};
@@ -28,14 +30,15 @@ for (var i = 0; i < N; i++) {
     }
   }
   pitHist[Math.min(6, pits)]++;
-  if (!shown[b.layout]) {
-    shown[b.layout] = 1;
-    console.log('\n' + b.layout + ' (seed ' + (1000 + i * 7919) + ')');
+  if (out ? !edges[b.outside.edge] && Object.keys(edges).length < 3 : !shown[b.layout]) {
+    shown[b.layout] = 1; if (out) edges[b.outside.edge] = 1;
+    console.log('\n' + b.layout + ' (seed ' + (1000 + i * 7919) + ')' + (out ? ' approach edge ' + b.outside.edge + ', building ' + b.outside.w + 'x' + b.outside.h + ' (' + Math.round(100 * b.outside.w * b.outside.h / (b.W * b.H)) + '% of the map), ' + b.outside.doors.length + ' entrances, turn limit ' + b.turnLimit : ''));
     for (var yy = 0; yy < b.H; yy++) {
       var row = '';
       for (var xx = 0; xx < b.W; xx++) {
         var u = Tac.unitAt(b, xx, yy);
-        row += u ? (u.side === 'player' ? 'F' : 'E') : '.#cH~'[b.tiles[yy * b.W + xx]];
+        var pp = b.props[yy * b.W + xx];
+        row += Tac.isServer(b, xx, yy) ? 'S' : u ? (u.side === 'player' ? 'F' : 'E') : pp === 'window' ? 'w' : pp === 'desk' ? 'd' : pp === 'rack' ? 'R' : '.#cH~'[b.tiles[yy * b.W + xx]];
       }
       console.log('  ' + row);
     }

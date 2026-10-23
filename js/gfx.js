@@ -62,7 +62,7 @@ XG.Gfx = (function () {
     if (s.tiles) for (var i = 0; i < n; i++) if (s.tiles[i] !== b.tiles[i]) {
       if (s.tiles[i] !== FLOOR && b.tiles[i] === FLOOR) s.decals.push({ k: s.props && s.props[i] === 'glass' ? 'shards' : 'rubble', x: i % W_(b), y: Math.floor(i / W_(b)), was: s.tiles[i], seed: i });
       changed = true;
-    }
+    } else if (s.props && b.props && s.props[i] !== b.props[i]) changed = true; // e.g. a window shattered into a frame
     if (changed) { s.tiles = b.tiles.slice(); s.props = b.props ? b.props.slice() : null; s.dpr = dpr; s.dirty = false; bake(b, s, dpr); }
     return s;
   }
@@ -87,7 +87,9 @@ XG.Gfx = (function () {
     for (y = 0; y < H; y++) for (x = 0; x < W; x++) {
       t = tileAt(b, x, y);
       if (t === WALL) sc.fillRect(x * TS + 9, y * TS + 9, TS, TS);
-      else if (t === HIGH) sc.fillRect(x * TS + 12, y * TS + 10, TS - 10, TS - 8);
+      else if ((t === HIGH || t === LOW) && XG.Tac.blocksFire(b, x, y)) sc.fillRect(x * TS + 12, y * TS + 10, TS - 10, TS - 8); // solid cover casts the long shadow
+      else if (t === HIGH) sc.fillRect(x * TS + 7, y * TS + 20, TS - 6, TS - 18); // fire-through (glass): a low one
+      else if (t === LOW && isWin(propAt(b, x, y))) sc.fillRect(x * TS + 9, y * TS + 9, TS, TS); // a window is part of the wall
       else if (t === LOW) sc.fillRect(x * TS + 7, y * TS + 20, TS - 6, TS - 18);
     }
     c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = B.cyber ? .5 : .42; c.drawImage(sh, 0, 0); c.restore();
@@ -98,14 +100,36 @@ XG.Gfx = (function () {
       if (pv && t !== PIT) propTile(c, B, b, x, y, pv, s.leds);
       else if (t === LOW) lowCover(c, B, b, x, y);
       else if (t === HIGH) highCover(c, B, b, x, y, s.leds);
-      if (pv !== 'barrel' && XG.Tac.objectAt(b, x, y)) breakMark(c, x, y); // barrels already look dangerous
+      if (pv !== 'barrel' && pv !== 'window' && XG.Tac.objectAt(b, x, y)) breakMark(c, x, y); // barrels already look dangerous; glass is glass
+      if ((t === HIGH || t === LOW) && XG.Tac.blocksFire(b, x, y)) { c.fillStyle = 'rgba(0,0,0,.55)'; c.fillRect(x * TS + 4, y * TS, TS - 8, 2); } // solid: a dark top edge
     }
     for (y = 0; y < H; y++) for (x = 0; x < W; x++) if (propAt(b, x, y) === 'fence' && tileAt(b, x, y) === PIT) fenceTile(c, B, b, x, y);
     for (y = 0; y < H; y++) for (x = 0; x < W; x++) if (tileAt(b, x, y) === WALL) wallTile(c, B, b, x, y, s.leds);
     for (y = 0; y < H; y++) for (x = 0; x < W; x++) if (tileAt(b, x, y) === FLOOR) doorTile(c, B, b, x, y);
   }
 
+  // Outside maps: the building's floor is laid in square tiles (four per map tile, grout lines, a warm sheen) so the interior reads
+  // apart from the yard's plated ground at a glance.
+  function indoorTile(c, B, b, x, y) {
+    var px = x * TS, py = y * TS, h = TS / 2, k, v;
+    if (B.cyber) {
+      c.fillStyle = 'rgb(6,20,34)'; c.fillRect(px, py, TS, TS);
+      c.strokeStyle = rgba(B.accent, .22); c.lineWidth = 1;
+      for (k = 0; k < 4; k++) c.strokeRect(px + (k % 2) * h + .5, py + (k >> 1) * h + .5, h - 1, h - 1);
+      if (hash(x, y, 140) < .15) { c.fillStyle = rgba(B.accent, .08); c.fillRect(px + 2, py + 2, TS - 4, TS - 4); }
+      return;
+    }
+    var base = B.indoor || [B.floor[0] + 30, B.floor[1] + 28, B.floor[2] + 22];
+    for (k = 0; k < 4; k++) {
+      v = ((x * 2 + (k % 2) + y * 2 + (k >> 1)) % 2 ? 6 : -4) + Math.round((hash(x * 2 + (k % 2), y * 2 + (k >> 1), 141) - .5) * 5);
+      c.fillStyle = shade(base, v); c.fillRect(px + (k % 2) * h, py + (k >> 1) * h, h, h);
+    }
+    c.fillStyle = 'rgba(0,0,0,.32)'; c.fillRect(px, py + h - .5, TS, 1); c.fillRect(px + h - .5, py, 1, TS); c.fillRect(px, py + TS - 1, TS, 1); c.fillRect(px + TS - 1, py, 1, TS);
+    c.fillStyle = 'rgba(255,255,255,.05)'; c.fillRect(px + 1, py + 1, h - 2, 1); c.fillRect(px + h + 1, py + h + 1, h - 2, 1);
+    if (hash(x, y, 142) < .06) { c.fillStyle = 'rgba(0,0,0,.18)'; c.beginPath(); c.ellipse(px + 20, py + 22, 12, 7, 0, 0, Math.PI * 2); c.fill(); } // scuff
+  }
   function floorTile(c, B, b, x, y) {
+    if (b.outside && XG.Tac.indoor(b, x, y)) return indoorTile(c, B, b, x, y);
     var px = x * TS, py = y * TS, zone = Math.floor(hash(x >> 2, y >> 2, 9) * 3) - 1, v = Math.round((hash(x, y, 1) - .5) * 6) + zone * 3;
     c.fillStyle = shade(B.floor, v); c.fillRect(px, py, TS, TS);
     var d = hash(x, y, 2);
@@ -528,12 +552,84 @@ XG.Gfx = (function () {
       c.restore();
     });
   }
+  function isWin(p) { return p === 'window' || p === 'frame'; }
+  // Window (outside maps): a slot in the building's outer wall. The tile is drawn as wall (the same roof colour, so the wall line runs
+  // on unbroken) with a recessed glass band across it: concrete sills on both faces, a dark frame, a blue pane with glints and a
+  // mullion. Glass panels stand free on the floor with silver rails, so the two never look alike. Shattered: the slot is empty
+  // (you see the floor through it) with jagged teeth in the frame and shards on the sills.
+  function windowTile(c, B, b, x, y, broken) {
+    var px = x * TS, py = y * TS, horiz = tileAt(b, x - 1, y) === WALL || tileAt(b, x + 1, y) === WALL || tileAt(b, x, y - 1) !== WALL;
+    var cy = B.cyber, tint = cy ? B.accent : B.veins ? B.window : '120,190,240', k;
+    c.save();
+    if (!horiz) { c.translate(px + TS / 2, py + TS / 2); c.rotate(Math.PI / 2); c.translate(-px - TS / 2, -py - TS / 2); }
+    var t0 = py + 13, t1 = py + TS - 13; // the glass band, across the wall's thickness
+    if (cy) { c.fillStyle = 'rgba(8,30,48,.92)'; c.fillRect(px, py, TS, t0 - 4 - py); c.fillRect(px, t1 + 4, TS, py + TS - t1 - 4); c.fillStyle = rgba(B.accent, .7); c.fillRect(px, py, TS, 1.2); c.fillRect(px, py + TS - 1.2, TS, 1.2); }
+    else {
+      var rg = c.createLinearGradient(px, py, px + TS, py + TS);
+      rg.addColorStop(0, shade(B.roof, 10)); rg.addColorStop(1, shade(B.roof, -4));
+      c.fillStyle = rg; c.fillRect(px, py, TS, t0 - 4 - py); c.fillRect(px, t1 + 4, TS, py + TS - t1 - 4);
+      c.fillStyle = B.roofEdge; c.fillRect(px, py, TS, 2); c.fillStyle = 'rgba(0,0,0,.35)'; c.fillRect(px, py + TS - 2, TS, 2);
+    }
+    c.fillStyle = cy ? rgba(B.accent, .55) : '#8d939b'; c.fillRect(px, t0 - 4, TS, 3); c.fillRect(px, t1 + 1, TS, 3); // sills
+    c.fillStyle = 'rgba(0,0,0,.5)'; c.fillRect(px, t0 - 1, TS, 1); c.fillRect(px, t1 + 4, TS, 1);
+    if (!broken) {
+      c.fillStyle = '#05080c'; c.fillRect(px, t0, TS, t1 - t0);
+      c.fillStyle = rgba(tint, cy ? .45 : .62); c.fillRect(px + 1, t0 + 2, TS - 2, t1 - t0 - 4);
+      c.fillStyle = 'rgba(255,255,255,.8)'; c.beginPath(); c.moveTo(px + 6, t1 - 2); c.lineTo(px + 10, t0 + 2); c.lineTo(px + 13, t0 + 2); c.lineTo(px + 9, t1 - 2); c.fill();
+      c.fillStyle = 'rgba(255,255,255,.4)'; c.beginPath(); c.moveTo(px + 25, t1 - 2); c.lineTo(px + 28, t0 + 2); c.lineTo(px + 29.5, t0 + 2); c.lineTo(px + 26.5, t1 - 2); c.fill();
+      c.fillStyle = cy ? rgba(B.accent, .9) : '#1a2028'; c.fillRect(px + TS / 2 - 1.5, t0, 3, t1 - t0); c.fillRect(px, t0, 2, t1 - t0); c.fillRect(px + TS - 2, t0, 2, t1 - t0); // mullion, posts
+    } else {
+      c.fillStyle = 'rgba(0,0,0,.25)'; c.fillRect(px, t0, TS, t1 - t0); // an empty slot: the floor shows through (it was drawn first)
+      c.fillStyle = rgba(tint, .6); // jagged teeth left in the frame
+      [[2, 1], [TS - 2, -1]].forEach(function (e) { var d = e[1]; c.beginPath(); c.moveTo(px + e[0], t0); c.lineTo(px + e[0] + d * 8, t0); c.lineTo(px + e[0] + d * 3, t0 + 6); c.lineTo(px + e[0] + d * 6, t1); c.lineTo(px + e[0], t1); c.fill(); });
+      c.fillStyle = cy ? rgba(B.accent, .6) : '#1a2028'; c.fillRect(px + TS / 2 - 1.5, t0, 3, 4); c.fillRect(px + TS / 2 - 1.5, t1 - 3, 3, 3); c.fillRect(px, t0, 2, t1 - t0); c.fillRect(px + TS - 2, t0, 2, t1 - t0);
+      for (k = 0; k < 8; k++) { c.fillStyle = 'rgba(' + tint + ',' + (.55 + hash(x, y + k, 150) * .4) + ')'; c.fillRect(px + 3 + hash(x + k, y, 151) * (TS - 8), (k % 2 ? t0 - 4 : t1 + 1) + hash(x, y, 152 + k) * 2, 3, 1.5); }
+    }
+    c.restore();
+  }
+  // Desk (outside maps, indoors): a tabletop with a monitor and keyboard; runs of desks join. Low cover.
+  function deskTile(c, B, b, x, y, leds) {
+    var px = x * TS, py = y * TS, jl = propAt(b, x - 1, y) === 'desk', jr = propAt(b, x + 1, y) === 'desk', ju = propAt(b, x, y - 1) === 'desk', jd = propAt(b, x, y + 1) === 'desk';
+    var x0 = px + (jl ? 0 : 4), x1 = px + TS - (jr ? 0 : 4), y0 = py + (ju ? 0 : 8), y1 = py + TS - (jd ? 0 : 6), cy = B.cyber;
+    var top = cy ? [8, 34, 52] : B.veins ? [70, 60, 92] : [120, 92, 62];
+    c.fillStyle = 'rgba(0,0,0,.35)'; c.fillRect(x0 + 3, y1, x1 - x0, 3);
+    c.fillStyle = shade(top, -28); c.fillRect(x0, y1 - 5, x1 - x0, 5); // front edge
+    c.fillStyle = shade(top, 0); c.fillRect(x0, y0, x1 - x0, y1 - y0 - 5);
+    c.fillStyle = 'rgba(255,255,255,.12)'; c.fillRect(x0, y0, x1 - x0, 1.5);
+    if (cy) { c.strokeStyle = rgba(B.accent, .8); c.lineWidth = 1; c.strokeRect(x0 + .5, y0 + .5, x1 - x0 - 1, y1 - y0 - 1); }
+    var mx = px + 10 + hash(x, y, 160) * 8;
+    c.fillStyle = '#11161c'; c.fillRect(mx, y0 + 2, 14, 9); // monitor
+    c.fillStyle = rgba(cy ? B.accent : B.veins ? B.accent : '120,200,255', .75); c.fillRect(mx + 1.5, y0 + 3.5, 11, 6);
+    c.fillStyle = '#11161c'; c.fillRect(mx + 5, y0 + 11, 4, 2);
+    c.fillStyle = 'rgba(0,0,0,.45)'; c.fillRect(mx - 1, y0 + 14, 16, 4); // keyboard
+    c.fillStyle = 'rgba(255,255,255,.18)'; for (var k = 0; k < 5; k++) c.fillRect(mx + k * 3, y0 + 15, 2, 1);
+    if (hash(x, y, 161) < .5) { c.fillStyle = 'rgba(240,240,240,.7)'; c.fillRect(px + 28 - (jr ? 0 : 3), y0 + 4, 6, 8); } // papers
+  }
+  // Rack (outside maps, indoors): a server cabinet seen from above, vented lid, a mesh door with two columns of status LEDs and an
+  // accent strip. Full cover.
+  function rackTile(c, B, b, x, y, leds) {
+    var px = x * TS, py = y * TS, x0 = px + 5, x1 = px + TS - 5, top = py + 2, frontY = py + 12, bot = py + TS - 3, cy = B.cyber, k;
+    var body = cy ? [4, 22, 36] : [24, 28, 36];
+    c.fillStyle = 'rgba(0,0,0,.4)'; c.fillRect(x0 + 3, bot, x1 - x0, 3);
+    c.fillStyle = shade(body, 26); c.fillRect(x0, top, x1 - x0, frontY - top); // lid
+    c.fillStyle = 'rgba(0,0,0,.5)'; for (k = 0; k < 4; k++) c.fillRect(x0 + 4 + k * 7, top + 3, 4, frontY - top - 6); // vents
+    c.fillStyle = shade(body, 0); c.fillRect(x0, frontY, x1 - x0, bot - frontY); // door
+    c.strokeStyle = 'rgba(255,255,255,.08)'; c.lineWidth = 1; c.beginPath();
+    for (k = frontY + 3; k < bot - 2; k += 3) { c.moveTo(x0 + 3, k + .5); c.lineTo(x1 - 8, k + .5); }
+    c.stroke();
+    c.fillStyle = rgba(B.accent, .85); c.fillRect(x1 - 3, frontY, 2, bot - frontY); // accent strip
+    c.fillStyle = '#9aa4b0'; c.fillRect(x1 - 7, frontY + 8, 2, 8); // handle
+    for (k = 0; k < 6; k++) leds.push({ x: x0 + 4 + (k % 2) * 6, y: frontY + 3 + Math.floor(k / 2) * 7, c: pick(B.leds), p: hash(x * 3 + k, y, 162) * 6, w: 3, h: 2 });
+  }
   function propTile(c, B, b, x, y, p, leds) {
     if (p === 'barrel') barrelTile(c, B, b, x, y, leds);
     else if (p === 'barrier') barrierTile(c, B, b, x, y);
     else if (p === 'pillar') pillarTile(c, B, b, x, y);
     else if (p === 'glass') glassTile(c, B, b, x, y);
     else if (p === 'fence') fenceTile(c, B, b, x, y);
+    else if (p === 'window' || p === 'frame') windowTile(c, B, b, x, y, p === 'frame');
+    else if (p === 'desk') deskTile(c, B, b, x, y, leds);
+    else if (p === 'rack') rackTile(c, B, b, x, y, leds);
     else if (XG.DATA.props[p] && XG.DATA.props[p].faces) faceObject(c, B, b, x, y, p);
   }
   function doorTile(c, B, b, x, y) {

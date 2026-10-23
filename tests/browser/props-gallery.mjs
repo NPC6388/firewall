@@ -1,4 +1,5 @@
-// Obstacle variants gallery: a bare map with all five types (barrel, barrier, pillar, glass, fence) in each biome, one shot per biome.
+// Obstacle variants gallery: a bare map with every prop type (barrel, barrier, pillar, glass, fence, mixed-side objects, and the outside-map
+// window, shattered frame, desk and rack) in each biome. Shots per biome: props-<biome>.png, -hover, -bunkers, -windows.
 // Run: node tests/browser/drive.mjs tests/browser/props-gallery.mjs   (shots land in tests/browser/shots/props-<biome>.png)
 export default async function ({ ev, shot, sleep, send }) {
   const zoom = async (name) => {
@@ -31,6 +32,10 @@ export default async function ({ ev, shot, sleep, send }) {
       var pf=function(x,y,t,k,m){ put(x,y,t,k); b.faces[y*W+x]=m; };
       pf(9,18,T.LOW,'stack',8); pf(10,18,T.LOW,'stack',0); pf(13,18,T.LOW,'vehicle',5); pf(14,18,T.LOW,'vehicle',5); pf(15,18,T.LOW,'vehicle',5);
       pf(18,17,T.HIGH,'vehicle',10); pf(18,18,T.HIGH,'vehicle',10); pf(21,18,T.LOW,'planter',1); pf(24,18,T.LOW,'plate',4); pf(25,18,T.LOW,'plate',4);
+      // row 5 (outside maps): a wall with a window and a shattered frame, a vertical wall with a window, a free glass panel to compare, desks and a rack
+      for (var wx=8; wx<=16; wx++) put(wx,22,T.WALL,0); put(10,22,T.LOW,'window'); put(14,22,T.LOW,'frame');
+      for (var wy=20; wy<=24; wy++) put(19,wy,T.WALL,0); put(19,22,T.LOW,'window');
+      put(22,21,T.HIGH,'glass'); put(22,23,T.LOW,'desk'); put(23,23,T.LOW,'desk'); put(25,23,T.HIGH,'rack');
       b.visible=b.visible.map(function(){return true;}); b.explored=b.visible.slice();
       var sq=b.units.filter(function(u){return u.side==='player';}); sq.forEach(function(u,k){u.x=10+k; u.y=8; });
       XG.TacUI.centerOn(15, 9);})()`);
@@ -48,5 +53,11 @@ export default async function ({ ev, shot, sleep, send }) {
     await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p2.x, y: p2.y }); await sleep(350);
     console.log(kind, 'bunker hover:', await ev(`(document.getElementById('tac-hover')||{}).innerText`));
     if (kind === 'purge') await shot('props-bunker-hover');
+    await ev(`XG.TacUI.centerOn(17, 22)`); await sleep(600); // windows, frame, glass panel, desks, rack
+    await zoom('props-' + kind + '-windows');
+    const p3 = await ev(`XG.TacUI.tileToClient(10, 22)`);
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p3.x - 200, y: p3.y - 200 }); await sleep(150);
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p3.x, y: p3.y }); await sleep(350);
+    console.log(kind, 'window hover:', await ev(`(document.getElementById('tac-hover')||{}).innerText`));
   }
 }

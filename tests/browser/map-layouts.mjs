@@ -1,4 +1,4 @@
-// One battle per map layout (cycling the biomes), each with at least one pit, fog lifted. Hovers a pit tile and
+// One battle per map layout (cycling the biomes; 'outside' is a node mission with the server in a building), each with at least one pit, fog lifted. Hovers a pit tile and
 // prints the panel, so the impassable-terrain text can be checked. Shots: layout-<name>-<biome>.png
 export default async function ({ ev, shot, sleep, send }) {
   const hover = async (x, y) => { const p = await ev(`XG.TacUI.tileToClient(${x},${y})`); // scrolls the camera to the tile first
@@ -10,12 +10,12 @@ export default async function ({ ev, shot, sleep, send }) {
   await ev(`document.querySelector('[data-action="deploy"]').click()`); await sleep(300);
   await ev(`document.getElementById('sq-go').click()`); await sleep(500);
   await ev(`(function(){var c=document.getElementById('coach'); if (c) c.classList.add('hidden');})()`);
-  const plan = [['compound', 'purge'], ['street', 'relay'], ['yard', 'uplink'], ['plaza', 'cyber'], ['blocks', 'purge']];
+  const plan = [['compound', 'purge'], ['street', 'relay'], ['yard', 'uplink'], ['plaza', 'cyber'], ['blocks', 'purge'], ['outside', 'purge']]; // outside: a node mission (server inside the building)
   for (const [layout, kind] of plan) {
     const info = JSON.parse(await ev(`(function(){var s=XG.TacUI.debug(), g=s.g, T=XG.Tac, squad=s.b.units.filter(function(u){return u.side==='player'}).map(function(u){return u.soldier}).filter(Boolean);
       var mk = '${kind}' === 'cyber' ? 'purge' : '${kind}';
       for (var seed = 1; seed < 5000; seed++) {
-        var b = T.create(g, { kind: mk, diff: 3, seed: seed * 104729, name: 'Layout test', city: 'Test' }, g.soldiers.slice(0, 4));
+        var out = '${layout}' === 'outside', b = T.create(g, { kind: mk, diff: 3, seed: seed * 104729, name: 'Layout test', city: 'Test', scenario: out ? 'node' : null, layout: out ? 'outside' : null }, g.soldiers.slice(0, 4));
         var pit = b.tiles.indexOf(T.PIT);
         if (b.layout === '${layout}' && pit >= 0) {
           if ('${kind}' === 'cyber') b.mission.lkind = 'breach';

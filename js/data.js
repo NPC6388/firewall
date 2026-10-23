@@ -40,21 +40,27 @@ XG.DATA = {
   rankBonus: { aim: 4, hp: 1 },
   // Lattice campaign: your machines deploy at the mark that matches the FIREWALL squad's level (Lat.earthLevel).
   latticeMarks: ['Mk I', 'Mk II', 'Mk III', 'Mk IV', 'Mk V', 'Mk VI'],
-  markBonus: { aim: 0, hp: 1 }, // +aim per mark pushed bot Lattice campaigns to 85% wins; HP alone evens the late battles
+  markBonus: { aim: 2, hp: 1 }, // per mark; half FIREWALL's +4 aim per rank (user call 2026-10-22: Lattice aim fell behind a 5-soldier squad)
   // Battle obstacle variants (b.props[tile] holds the key). base = the tile code the rules run on (2 LOW, 3 HIGH, 4 PIT);
   // names per biome (city / relay / uplink / cyber); rule = the short phrase the hover panel shows.
   props: {
     barrel:  { base: 2, rule: 'Explodes when destroyed', names: { city: 'Fuel barrel', relay: 'Coolant tank', uplink: 'Coolant tank', cyber: 'Unstable packet' } },
     barrier: { base: 2, rule: 'Blast-proof', names: { city: 'Concrete barrier', relay: 'Armored bulkhead', uplink: 'Armored bulkhead', cyber: 'Hardened block' } },
     pillar:  { base: 3, rule: 'Blast-proof', names: { city: 'Concrete pillar', relay: 'Support pillar', uplink: 'Support pillar', cyber: 'Anchored node' } },
-    glass:   { base: 3, rule: 'Shatters on a miss', names: { city: 'Glass panel', relay: 'Crystal panel', uplink: 'Armored glass', cyber: 'Soft firewall' } },
+    glass:   { base: 3, fireThrough: true, rule: 'Shatters on a miss', names: { city: 'Glass panel', relay: 'Crystal panel', uplink: 'Armored glass', cyber: 'Soft firewall' } },
     // faces: true = carries a b.faces mask (full or half cover per side, see Tac.coverTile); the rule text is built from the mask
     bunker:  { base: 3, faces: true, rule: 'Mixed cover by side', names: { city: 'Sandbag bunker', relay: 'Shielded emplacement', uplink: 'Shielded emplacement', cyber: 'Partial firewall' } },
     stack:   { base: 2, faces: true, rule: 'Mixed cover by side', names: { city: 'Crate stack', relay: 'Cargo stack', uplink: 'Cargo stack', cyber: 'Data stack' } },
     vehicle: { base: 2, faces: true, rule: 'Mixed cover by side', names: { city: 'Wrecked vehicle', relay: 'Hauler wreck', uplink: 'Hauler wreck', cyber: 'Dead process' } },
     planter: { base: 2, faces: true, rule: 'Mixed cover by side', names: { city: 'Planter', relay: 'Spore planter', uplink: 'Coolant planter', cyber: 'Cache node' } },
     plate:   { base: 2, faces: true, rule: 'Mixed cover by side', names: { city: 'Plated barrier', relay: 'Plated barrier', uplink: 'Plated barrier', cyber: 'Shielded block' } },
-    fence:   { base: 4, rule: 'Blocks movement only', names: { city: 'Chain-link fence', relay: 'Laser fence', uplink: 'Laser fence', cyber: 'Filter gate' } }
+    fence:   { base: 4, rule: 'Blocks movement only', names: { city: 'Chain-link fence', relay: 'Laser fence', uplink: 'Laser fence', cyber: 'Filter gate' } },
+    // outside maps: windows in the building's outer wall (base LOW: impassable, see-through, half cover in front; a stray miss or a blast
+    // shatters one into an empty frame, which stays impassable), and indoor furniture
+    window:  { base: 2, rule: 'Window: impassable, but you can see and shoot through it. Half cover right in front of it; stand beside it behind the wall for full cover and lean out through it. A stray miss or a blast shatters it', names: { city: 'Window', relay: 'Crystal window', uplink: 'Armored window', cyber: 'Port window' } },
+    frame:   { base: 2, rule: 'Shattered window: still impassable, see and shoot through it. Half cover right in front of it; stand beside it behind the wall for full cover and lean out through it', names: { city: 'Broken window', relay: 'Broken crystal window', uplink: 'Broken window', cyber: 'Open port' } },
+    desk:    { base: 2, rule: 'Furniture', names: { city: 'Office desk', relay: 'Console desk', uplink: 'Console desk', cyber: 'Process desk' } },
+    rack:    { base: 3, rule: 'Furniture', names: { city: 'Server rack', relay: 'Relay rack', uplink: 'Coolant rack', cyber: 'Memory bank' } }
   },
 
   abilities: {
@@ -591,6 +597,11 @@ XG.DATA = {
     nodeChance: 0.5,
     nodeCapture: 2,
     nodeTurns: { purge: 10, raid: 10, strike: 10 },
+    // Outside maps: the server sits in a building, the attackers start out in the yard. outsideChance: share of node missions on that
+    // layout, outsideChanceExt: share of exterminate missions (no server; the defenders hold the building). nodeTurnsOutside: their clock.
+    outsideChance: 0.4,
+    outsideChanceExt: 0.15,
+    nodeTurnsOutside: { purge: 14, raid: 14, strike: 14 }, // 12 left bot attackers short of time (FIREWALL 45%, Lattice strikes 46%); 14: 52% / 48%
     nodeRush: 5
   },
 

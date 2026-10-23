@@ -722,14 +722,17 @@ XG.TacUI = (function () {
       var ob = explored(h.x, h.y) && Tac.objectAt(b, h.x, h.y);
       if (ob) { // a destructible object: durability; odds only for explosives (the only ones you can aim at)
         html += '<div>Durability <b>' + ob.hp + '/' + ob.maxHp + '</b>' + (ob.prop === 'barrel' ? ' <span class="warn">· explodes when destroyed</span>' : '') + '</div>';
-        if (ob.prop !== 'barrel') html += '<div class="dim">Breakable: missed shots at someone behind it can chip it, and blasts destroy it.</div>';
+        if (ob.prop === 'window') { /* the rule line below explains it */ }
+        else if (ob.prop !== 'barrel') html += '<div class="dim">Breakable: missed shots at someone behind it can chip it, and blasts destroy it.</div>';
         else if (u && u.abilities.indexOf('shoot') >= 0 && canInput()) {
           var oh = Tac.hitInfo(b, u, ob);
           html += oh.ok ? '<div>' + (u.short || u.name) + ': <b>' + oh.chance + '%</b> to hit it · ' + oh.d.toFixed(1) + ' tiles</div>' + breakdown(oh) : '<div class="dim">No line of fire from ' + (u.short || u.name) + '.</div>';
         }
       }
-      if (pn) html += '<div class="' + (Tac.propOf(b, h.x, h.y) === 'barrel' ? 'warn' : 'dim') + '">' + XG.Gfx.propRule(b, h.x, h.y) + (XG.DATA.props[Tac.propOf(b, h.x, h.y)] && XG.DATA.props[Tac.propOf(b, h.x, h.y)].faces ? (t === Tac.HIGH ? '. Blocks sight; ' : '. See-through; ') + 'the face toward the attacker counts.' : t === Tac.PIT ? '. Impassable, gives no cover, does not block line of sight.' : t === Tac.LOW ? '. Half cover.' : '. Full cover.') + '</div>';
+      if (pn) html += '<div class="' + (Tac.propOf(b, h.x, h.y) === 'barrel' ? 'warn' : 'dim') + '">' + XG.Gfx.propRule(b, h.x, h.y) + (/^(window|frame)$/.test(Tac.propOf(b, h.x, h.y)) ? '.' : XG.DATA.props[Tac.propOf(b, h.x, h.y)] && XG.DATA.props[Tac.propOf(b, h.x, h.y)].faces ? '. The face toward the attacker counts.' : t === Tac.PIT ? '. Impassable, gives no cover, does not block line of sight.' : t === Tac.LOW ? '. Half cover.' : '. Full cover.') + '</div>';
       else if (t === Tac.PIT) html += '<div class="dim">Impassable. Gives no cover and does not block line of sight.</div>';
+      if (t === Tac.WALL || t === Tac.HIGH || t === Tac.LOW) html += '<div class="' + (Tac.blocksFire(b, h.x, h.y) ? 'warn' : 'dim') + '">' + (b.faces && b.faces[h.y * W + h.x] ? 'Solid from its full sides (blocks sight and fire), fire-through over its half sides.'
+        : Tac.blocksFire(b, h.x, h.y) ? 'Solid: blocks sight and fire. Shots past it need a lean round its end.' : 'Fire-through: ' + (t === Tac.HIGH ? 'full' : 'half') + ' cover, but it can be seen and shot over or through.') + '</div>';
       if (t === 0) {
         var cf = coverFacing(h.x, h.y), sides = SIDES.map(function (o) {
           var c = Tac.coverTile(b, h.x + o[0], h.y + o[1], o[0], o[1]), s = sideState(cf, o);

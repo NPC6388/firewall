@@ -213,13 +213,13 @@ XG.Lat = (function () {
         m.name = 'FIREWALL raid: ' + city; m.site = r.pick(D.sites); m.daysLeft = L.tuning.raidLife;
         m.scenario = XG.Strat.rollScenario(m.seed);
         m.brief = 'A FIREWALL squad is purging your cell in a ' + m.site + '. Your units start on overwatch. ' + (m.scenario === 'node'
-          ? 'Hold your server node for ' + D.tuning.nodeTurns.raid + ' turns: FIREWALL captures it by ending ' + D.tuning.nodeCapture + ' of its turns beside it with none of yours there. Wiping them also wins.'
+          ? 'Hold your server node for ' + XG.Strat.nodeTurnsFor(m, 'raid') + ' turns' + (XG.Strat.rollOutside(m.seed, m.scenario) ? ', from inside the building' : '') + ': FIREWALL captures it by ending ' + D.tuning.nodeCapture + ' of its turns beside it with none of yours there. Wiping them also wins.'
           : 'Exterminate: wipe them. No time limit, to the death.') + ' Ignore it and the region loses ' + L.tuning.raidIgnored.infection + '% infection.';
       } else if (kind === 'strike') {
         m.name = 'Strike: ' + city + ' safehouse'; m.site = 'FIREWALL safehouse'; m.daysLeft = L.tuning.strikeLife;
         m.scenario = XG.Strat.rollScenario(m.seed);
         m.brief = 'HALCYON\'s traffic leaks from a FIREWALL safehouse. You move first. ' + (m.scenario === 'node'
-          ? 'Capture its server node within ' + D.tuning.nodeTurns.strike + ' turns: end ' + D.tuning.nodeCapture + ' of your turns beside it with no FIREWALL unit there (or wipe the squad).'
+          ? 'Capture its server node' + (XG.Strat.rollOutside(m.seed, m.scenario) ? ' (inside a building: cross the yard first)' : '') + ' within ' + XG.Strat.nodeTurnsFor(m, 'strike') + ' turns: end ' + D.tuning.nodeCapture + ' of your turns beside it with no FIREWALL unit there (or wipe the squad).'
           : 'Exterminate: wipe the squad. No time limit.') + ' Win: Trace -8%, +15 substrate, and FIREWALL loses a step.';
       } else {
         m.name = 'Hold the Uplink'; m.city = 'Pacific cable landing station'; m.site = 'cable landing station'; m.daysLeft = 2;

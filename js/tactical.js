@@ -48,12 +48,23 @@ XG.Tac = (function () {
   // Obstacle variants: b.props[tile] is 0 (plain) or a key of DATA.props (barrel, barrier, pillar, glass, fence). The tile code
   // underneath (LOW/HIGH/PIT) still drives LOS, cover and pathing. Everything that destroys cover goes through clearTile.
   function propOf(b, x, y) { return b.props && inB(b, x, y) ? b.props[y * b.W + x] || 0 : 0; }
+  // Outside maps (b.layout 'outside'): b.outside = { edge, x, y, w, h, server: [x, y], doors: [[x, y]...] } is the one big building
+  // (its outer wall is the rectangle x..x+w-1, y..y+h-1). indoor: strictly inside that wall.
+  function indoor(b, x, y) { var o = b.outside; return !!o && x > o.x && y > o.y && x < o.x + o.w - 1 && y < o.y + o.h - 1; }
   // Remove destructible cover. cause: 'blast' (grenade, detonation, barrel), 'shot' (shot down: its object HP ran out) or
   // 'shatter' (a miss at glass cover). Returns true when the tile was cleared. Walls and fences never fall; barriers and pillars
   // shrug off blasts and shots alike.
   function clearTile(b, x, y, ev, cause) {
     var t = tile(b, x, y), p = propOf(b, x, y);
     if (t !== LOW && t !== HIGH) return false;
+    if (p === 'frame') return false; // an empty window frame is part of the wall
+    if (p === 'window') { // a window shatters into an empty frame: still impassable, see-through and half cover (the sill)
+      if (b.tileHp) delete b.tileHp[y * b.W + x];
+      b.props[y * b.W + x] = 'frame';
+      ev.push({ t: 'shatter', x: x, y: y });
+      log(b, ev, 'A window shatters.', '');
+      return true;
+    }
     if ((cause === 'blast' || cause === 'shot') && (p === 'barrier' || p === 'pillar')) return false;
     if (cause === 'shatter' && p !== 'glass') return false;
     if (b.tileHp) delete b.tileHp[y * b.W + x];
@@ -67,53 +78,89 @@ XG.Tac = (function () {
       b.units.filter(function (u) { return u.alive && cheb(u.x, u.y, x, y) <= 1; }).forEach(function (u) { damage(b, u, 2, ev, null, { ignoreArmor: true, cause: 'is caught in the blast' }); });
       for (var yy = y - 1; yy <= y + 1; yy++) for (var xx = x - 1; xx <= x + 1; xx++) {
         var q = propOf(b, xx, yy);
-        if (q === 'barrel' || q === 'glass') clearTile(b, xx, yy, ev, 'blast'); // chain reaction
+        if (q === 'barrel' || q === 'glass' || q === 'window') clearTile(b, xx, yy, ev, 'blast'); // chain reaction
       }
     }
     return true;
   }
 
-  // Bresenham; walls always block, tall cover blocks unless it's next to either end (peeking).
-  // Two tall-cover tiles back to back on the line (a double row) always block: only a corner peek gets around them.
+  // Solid vs fire-through cover. Solid cover blocks sight and fire: walls, tall cover (pillars, racks, bunkers, vehicles...) and the
+  // full (tall) face of a mixed-side object. Fire-through cover never blocks a line: low cover, windows, glass (DATA.props fireThrough),
+  // fences and pits. (dx, dy) points from the tile toward the viewer, which picks a mixed-side object's face; without it, solid.
+  function blocksFire(b, x, y, dx, dy) {
+    var t = tile(b, x, y);
+    if (t === WALL) return true;
+    if (t !== HIGH && t !== LOW) return false;
+    if (b.faces && b.faces[y * b.W + x]) return faceTile(b, x, y, dx, dy) === HIGH;
+    var P = D.props[propOf(b, x, y)];
+    return t === HIGH && !(P && P.fireThrough);
+  }
+  // Solid for a straight line crossing the tile along axis a (either way): a mixed-side object counts if either face on that axis is full.
+  function solidAcross(b, x, y, a) { return blocksFire(b, x, y, a[0], a[1]) || blocksFire(b, x, y, -a[0], -a[1]); }
+  // Bresenham; solid tiles always block (a shot past tall cover needs a real corner peek, see peekSpots). A mixed-side object blocks
+  // when the face toward either end of the line is full. A diagonal step never slips past a solid corner: the true ray between the
+  // tile centres is checked against the side tile it really crosses (a graze exactly through the corner point is blocked by either),
+  // so no line squeezes between a door jamb and the wall beside it.
   function lineClear(b, x0, y0, x1, y1) {
     var dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
-    var err = dx + dy, x = x0, y = y0, sx0 = x0, sy0 = y0, prevHigh = false;
+    var err = dx + dy, x = x0, y = y0, px, py;
+    var stops = function (tx, ty) {
+      var t = tile(b, tx, ty);
+      if (t === WALL) return true;
+      if (t !== HIGH && t !== LOW) return false;
+      if (b.faces && b.faces[ty * b.W + tx]) return blocksFire(b, tx, ty, x0 - tx, y0 - ty) || blocksFire(b, tx, ty, x1 - tx, y1 - ty);
+      return blocksFire(b, tx, ty);
+    };
     while (!(x === x1 && y === y1)) {
       var e2 = 2 * err;
+      px = x; py = y;
       if (e2 >= dy) { err += dy; x += sx; }
       if (e2 <= dx) { err += dx; y += sy; }
+      if (x !== px && y !== py) { // diagonal step: which side tile does the real ray cross?
+        var yb = y0 + (px + sx / 2 - x0) * (y1 - y0) / (x1 - x0), d = (yb - (py + sy / 2)) * sy;
+        if (d < -1e-9 ? stops(x, py) : d > 1e-9 ? stops(px, y) : stops(x, py) || stops(px, y)) return false;
+      }
       if (x === x1 && y === y1) break;
-      var t = tile(b, x, y);
-      if (t === WALL) return false;
-      if (t === HIGH && (prevHigh || cheb(x, y, sx0, sy0) > 1 && cheb(x, y, x1, y1) > 1)) return false;
-      prevHigh = t === HIGH;
+      if (stops(x, y)) return false;
     }
     return true;
   }
   function clearEither(b, ax, ay, bx, by) { return lineClear(b, ax, ay, bx, by) || lineClear(b, bx, by, ax, ay); }
-  // Peeking: a unit beside a wall or tall cover can lean one tile out to either side of it, so it can see and fire
-  // down a line it stands on the corner of. Works for both ends of the line (the target can be peeking too).
+  // Peeking: a unit beside solid cover can lean one tile out to either side of it, so it can see and fire down a line it stands
+  // on the corner of. Works for both ends of the line (the target can be peeking too). Each lean is [x, y, ox, oy, narrow]:
+  // - only at the END of the obstruction: the tile diagonally past it (D, at lean + o) must be open, or the unit is mid-wall;
+  // - never from a tile wedged between two solids (a doorway, a slot): there it sees by real lines only;
+  // - narrow when D is a one-tile gap in a solid line (a doorway or a window): the lean then sees only a narrow cone through the
+  //   gap (within about 18 degrees of the axis o), never along the far side of the wall.
   function peekSpots(b, x, y) {
     var out = [];
     [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (o) {
-      var t = tile(b, x + o[0], y + o[1]);
-      if (t !== WALL && t !== HIGH) return;
+      if (!solidAcross(b, x + o[0], y + o[1], o) || solidAcross(b, x - o[0], y - o[1], o)) return;
       [[o[1], o[0]], [-o[1], -o[0]]].forEach(function (q) {
-        var px = x + q[0], py = y + q[1], pt = inB(b, px, py) ? tile(b, px, py) : WALL;
-        // the lean only counts at the END of the obstruction: the tile diagonally past it must be open too, or the unit is mid-wall
-        var dt = tile(b, x + o[0] + q[0], y + o[1] + q[1]);
-        if (pt !== WALL && pt !== HIGH && dt !== WALL && dt !== HIGH && !out.some(function (p) { return p[0] === px && p[1] === py; })) out.push([px, py]);
+        var px = x + q[0], py = y + q[1], gx = x + o[0] + q[0], gy = y + o[1] + q[1];
+        if (!inB(b, px, py) || solidAcross(b, px, py, q) || solidAcross(b, gx, gy, o)) return;
+        var narrow = solidAcross(b, gx + q[0], gy + q[1], q), had = out.filter(function (p) { return p[0] === px && p[1] === py; })[0];
+        if (had) { if (!narrow) had[4] = false; }
+        else out.push([px, py, o[0], o[1], narrow]);
       });
     });
     return out;
   }
+  // A narrow lean (through a doorway or window) only reaches targets inside its cone.
+  function coneOk(p, tx, ty) {
+    if (!p[4]) return true;
+    var vx = tx - p[0], vy = ty - p[1], along = vx * p[2] + vy * p[3], across = Math.abs(vx * p[3] - vy * p[2]);
+    return along > 0 && across * 3 <= along;
+  }
   function los(b, ax, ay, bx, by) {
     if (clearEither(b, ax, ay, bx, by)) return true;
-    var A = peekSpots(b, ax, ay), i;
-    for (i = 0; i < A.length; i++) if (clearEither(b, A[i][0], A[i][1], bx, by)) return true;
+    var A = peekSpots(b, ax, ay), i, j;
+    for (i = 0; i < A.length; i++) if (coneOk(A[i], bx, by) && clearEither(b, A[i][0], A[i][1], bx, by)) return true;
     if (!unitAt(b, bx, by)) return false; // only a unit leans; an empty tile is seen or not from where you stand
     var B = peekSpots(b, bx, by);
-    for (i = 0; i < B.length; i++) if (clearEither(b, ax, ay, B[i][0], B[i][1])) return true;
+    for (i = 0; i < B.length; i++) if (coneOk(B[i], ax, ay) && clearEither(b, ax, ay, B[i][0], B[i][1])) return true;
+    for (i = 0; i < A.length; i++) for (j = 0; j < B.length; j++) // both lean out (two units behind tall cover facing each other)
+      if (coneOk(A[i], B[j][0], B[j][1]) && coneOk(B[j], A[i][0], A[i][1]) && clearEither(b, A[i][0], A[i][1], B[j][0], B[j][1])) return true;
     return false;
   }
 
@@ -194,15 +241,22 @@ XG.Tac = (function () {
     for (j = 0; j < W * H; j++) mark[j] = bestId > 0 && comp[j] === bestId;
     return { mark: mark, size: best, floors: floors };
   }
-  function genMap(b, rng) {
+  // force: a layout name (tests); otherwise raid scenarios may roll the 'outside' layout (Strat.rollOutside, seeded by the mission,
+  // on its own stream so the other layouts come out exactly as before).
+  function genMap(b, rng, force) {
     var W = b.W, H = b.H, A = (W * H) / (BASE_W * BASE_H), kx = W / BASE_W, ky = H / BASE_H;
     var inB = function (x, y) { return x >= 0 && y >= 0 && x < W && y < H; };
     var sc = function (lo, hi) { return rng.int(Math.round(lo * A), Math.round(hi * A)); }; // a count, scaled by area
+    var outRoll = !b.training && XG.Strat && XG.Strat.rollOutside(rng.s, b.mission.scenario);
     var layout = rng.pick(LAYOUTS);
+    if (force) layout = force; else if (outRoll) layout = 'outside';
+    delete b.outside;
     for (var attempt = 0; attempt < 40; attempt++) {
-      var t = new Array(W * H).fill(FLOOR), doors = {};
+      var t = new Array(W * H).fill(FLOOR), doors = {}, pre = {}, bld = null;
       var set = function (x, y, v) { if (inB(x, y)) t[y * W + x] = v; };
       var get = function (x, y) { return inB(x, y) ? t[y * W + x] : WALL; };
+      // outside layout: the building's rectangle plus a one-tile walkway round it (yard cover, pits and fences stay out of it)
+      var inBld = function (x, y) { return !!bld && x >= bld.x - 1 && y >= bld.y - 1 && x <= bld.x + bld.w && y <= bld.y + bld.h; };
       var nearDoor = function (x, y) { return doors[x + ',' + y] || doors[(x + 1) + ',' + y] || doors[(x - 1) + ',' + y] || doors[x + ',' + (y + 1)] || doors[x + ',' + (y - 1)]; };
       // a walled building with 1-3 doorways; margin 1 keeps a lane around it (0 lets it touch the map edge)
       var building = function (bx, by, bw, bh, margin) {
@@ -232,7 +286,7 @@ XG.Tac = (function () {
         if (kind === 'low') { len = rng.int(2, 3); for (var l = 0; l < len; l++) cells.push([cx + (horiz ? l : 0), cy + (horiz ? 0 : l), LOW]); }
         else if (kind === 'high') cells.push([cx, cy, HIGH]);
         else { len = kind === 'long' ? rng.int(2, 3) : 2; for (var l2 = 0; l2 < len; l2++) cells.push([cx + (horiz ? l2 : 0), cy + (horiz ? 0 : l2), HIGH]); }
-        cells.forEach(function (cc) { if (cc[0] >= 3 && get(cc[0], cc[1]) === FLOOR && !nearDoor(cc[0], cc[1])) set(cc[0], cc[1], cc[2]); });
+        cells.forEach(function (cc) { if (cc[0] >= 3 && get(cc[0], cc[1]) === FLOOR && !nearDoor(cc[0], cc[1]) && !inBld(cc[0], cc[1])) set(cc[0], cc[1], cc[2]); });
       };
       // true when a w x h box and a one-tile ring around it are all open floor (keeps vehicles from merging)
       var clear = function (cx, cy, w, h) {
@@ -245,9 +299,116 @@ XG.Tac = (function () {
           piece(rng.int(3, W - 1), rng.int(0, H - 1), kind, rng.next() < 0.5);
         }
       };
+      // Outside: one large building (30-45% of the map) holding the server, a yard round it. The attackers land on edge oe; the
+      // building's facing wall stands 40% of the longest side (+1) from that edge, so every entrance is at least that far from them.
+      // Inside: a corridor along the building's long axis (ends open onto two opposite sides), a row of rooms on one or both sides
+      // (cross walls, each room with a door to the corridor, some linked to the next), furniture cover (desks LOW, racks HIGH), and
+      // the server in an inner room away from every entrance. 0-2 more entrances lead into rooms; windows sit in the outer walls.
+      var outsideLayout = function () {
+        var oe = rng.pick(['W', 'E', 'N', 'S']), alongX = oe === 'W' || oe === 'E', Dl = alongX ? W : H, Ll = alongX ? H : W;
+        var gap = Math.ceil(0.4 * Math.max(W, H)) + 1, roomy = Dl - gap >= 20;
+        var f0 = gap + (roomy ? rng.int(0, 1) : 0), depth = Dl - f0 - (roomy ? rng.int(1, 2) : 1);
+        var l0 = rng.int(2, Ll < 30 ? 4 : 3), l1 = Ll - 1 - rng.int(2, Ll < 30 ? 4 : 3);
+        var toXY = function (d, l) { return oe === 'W' ? [d, l] : oe === 'E' ? [W - 1 - d, l] : oe === 'N' ? [l, d] : [l, H - 1 - d]; };
+        var c1 = toXY(f0, l0), c2 = toXY(f0 + depth - 1, l1);
+        var bx = Math.min(c1[0], c2[0]), by = Math.min(c1[1], c2[1]), bw = Math.abs(c1[0] - c2[0]) + 1, bh = Math.abs(c1[1] - c2[1]) + 1;
+        bld = { edge: oe, x: bx, y: by, w: bw, h: bh, server: null, doors: [] };
+        var longX = bw >= bh, La = (longX ? bw : bh) - 2, Lc = (longX ? bh : bw) - 2;
+        var P = function (a, c) { return longX ? [bx + 1 + a, by + 1 + c] : [bx + 1 + c, by + 1 + a]; };
+        var setP = function (a, c, v) { var p = P(a, c); set(p[0], p[1], v); return p; };
+        var door = function (a, c, outer) { var p = setP(a, c, FLOOR); doors[p[0] + ',' + p[1]] = 1; if (outer) bld.doors.push(p); return p; };
+        var xx, yy, a, c, i;
+        for (yy = by; yy < by + bh; yy++) for (xx = bx; xx < bx + bw; xx++) if (xx === bx || yy === by || xx === bx + bw - 1 || yy === by + bh - 1) set(xx, yy, WALL);
+        // corridor (2 wide) and the rows of rooms beside it: [c0, c1, corridor-wall c]
+        var rows, cA;
+        if (Lc >= 13) { var cm = (Lc - 2) >> 1; cA = cm; rows = [[0, cm - 2, cm - 1], [cm + 3, Lc - 1, cm + 2]]; }
+        else if (rng.next() < 0.5) { cA = 0; rows = [[3, Lc - 1, 2]]; }
+        else { cA = Lc - 2; rows = [[0, Lc - 4, Lc - 3]]; }
+        var rooms = [];
+        rows.forEach(function (rw, ri) {
+          for (a = 0; a < La; a++) setP(a, rw[2], WALL);
+          var pos = 0;
+          while (pos < La) {
+            var rem = La - pos, len = rem > 9 ? Math.min(rng.int(4, 7), rem - 5) : rem;
+            rooms.push({ a0: pos, a1: pos + len - 1, c0: rw[0], c1: rw[1], cw: rw[2], row: ri, doors: [], outer: false });
+            if (pos + len < La) { for (c = rw[0]; c <= rw[1]; c++) setP(pos + len, c, WALL); }
+            pos += len + 1;
+          }
+        });
+        rooms.forEach(function (rm, k) {
+          rm.doors.push(door(rng.int(rm.a0, rm.a1), rm.cw)); // into the corridor
+          var nx = rooms[k + 1];
+          if (nx && nx.row === rm.row && rng.next() < 0.4) { var dp = door(rm.a1 + 1, rng.int(rm.c0, rm.c1)); rm.doors.push(dp); nx.doors.push(dp); }
+        });
+        // outer entrances: both corridor ends, then 0-2 into rooms through the long walls
+        door(-1, cA + rng.int(0, 1), true); door(La, cA + rng.int(0, 1), true);
+        rng.shuffle(rooms.slice()).slice(0, rng.int(0, 2)).forEach(function (rm) {
+          var outC = rm.c0 === 0 ? -1 : rm.c1 === Lc - 1 ? Lc : null;
+          if (outC === null) return;
+          rm.doors.push(door(rng.int(rm.a0, rm.a1), outC, true)); rm.outer = true;
+        });
+        // the server: the deepest inner room (no outer entrance, not at the corridor ends if possible), on a tile 2+ from its doors
+        var depthOf = function (p) { return oe === 'W' ? p[0] : oe === 'E' ? W - 1 - p[0] : oe === 'N' ? p[1] : H - 1 - p[1]; };
+        var srvRooms = rooms.filter(function (rm) { return !rm.outer && rm.a1 - rm.a0 >= 2 && rm.c1 - rm.c0 >= 2; });
+        var inner = srvRooms.filter(function (rm) { return rm.a0 > 0 && rm.a1 < La - 1; });
+        if (inner.length) srvRooms = inner;
+        srvRooms.forEach(function (rm) { rm.score = depthOf(P((rm.a0 + rm.a1) >> 1, (rm.c0 + rm.c1) >> 1)) + rng.next() * 4; });
+        srvRooms.sort(function (p, q) { return q.score - p.score; });
+        var sroom = srvRooms[0];
+        if (!sroom) return;
+        var sbest = null, sbd = 1e9;
+        for (a = sroom.a0 + 1; a < sroom.a1; a++) for (c = sroom.c0 + 1; c < sroom.c1; c++) {
+          var sp = P(a, c), sd = Math.abs(a - (sroom.a0 + sroom.a1) / 2) + Math.abs(c - (sroom.c0 + sroom.c1) / 2);
+          if (sroom.doors.some(function (dp) { return cheb(dp[0], dp[1], sp[0], sp[1]) < 2; })) continue;
+          if (sd < sbd) { sbd = sd; sbest = sp; }
+        }
+        if (!sbest) return;
+        bld.server = sbest;
+        // furniture: desks (LOW) and racks (HIGH) on the room's inner tiles (its outer ring stays clear, so every room is walkable),
+        // a gap round each piece, never beside a door or in the server's zone. The server room is mostly racks.
+        var furn = function (x2, y2) {
+          if (get(x2, y2) !== FLOOR || cheb(x2, y2, sbest[0], sbest[1]) < 2) return false;
+          for (var dy = -1; dy <= 1; dy++) for (var dx = -1; dx <= 1; dx++) if (doors[(x2 + dx) + ',' + (y2 + dy)] || pre[(y2 + dy) * W + x2 + dx]) return false;
+          return true;
+        };
+        rooms.forEach(function (rm) {
+          var srv = rm === sroom, area = (rm.a1 - rm.a0 + 1) * (rm.c1 - rm.c0 + 1), n = srv ? rng.int(2, 3) : Math.max(1, Math.min(4, Math.round(area / 10)));
+          for (var tries = 0; n > 0 && tries < 30; tries++) {
+            if (rm.a1 - rm.a0 < 2 || rm.c1 - rm.c0 < 2) break;
+            var kind = srv ? (rng.next() < 0.8 ? 'rack' : 'desk') : (rng.next() < 0.65 ? 'desk' : 'rack'), len = rng.int(1, 2), alongA = rng.next() < 0.6;
+            var pa = rng.int(rm.a0 + 1, rm.a1 - 1), pc = rng.int(rm.c0 + 1, rm.c1 - 1), cells = [];
+            for (i = 0; i < len; i++) { var qa = pa + (alongA ? i : 0), qc = pc + (alongA ? 0 : i); if (qa > rm.a0 && qa < rm.a1 && qc > rm.c0 && qc < rm.c1) cells.push(P(qa, qc)); }
+            if (!cells.length || !cells.every(function (q) { return furn(q[0], q[1]); })) continue;
+            cells.forEach(function (q) { set(q[0], q[1], kind === 'rack' ? HIGH : LOW); pre[q[1] * W + q[0]] = kind; });
+            n--;
+          }
+        });
+        // windows in the outer walls: never at a corner, a junction or beside a door, always with solid wall on both sides
+        // (so a unit beside one has full cover from the wall and can lean out through it), at least two wall tiles apart.
+        var sides = [[bx + 1, by, 1, 0, 0, -1, bw - 2], [bx + 1, by + bh - 1, 1, 0, 0, 1, bw - 2], [bx, by + 1, 0, 1, -1, 0, bh - 2], [bx + bw - 1, by + 1, 0, 1, 1, 0, bh - 2]];
+        sides.forEach(function (sd2) {
+          var facing = depthOf([sd2[0] + sd2[4], sd2[1] + sd2[5]]) < depthOf([sd2[0], sd2[1]]);
+          for (var k = 1; k < sd2[6] - 1; k++) {
+            var wx = sd2[0] + sd2[2] * k, wy = sd2[1] + sd2[3] * k;
+            if (get(wx, wy) !== WALL || get(wx - sd2[2], wy - sd2[3]) !== WALL || get(wx + sd2[2], wy + sd2[3]) !== WALL) continue;
+            if (get(wx - sd2[4], wy - sd2[5]) !== FLOOR || get(wx + sd2[4], wy + sd2[5]) !== FLOOR || !inB(wx + sd2[4], wy + sd2[5])) continue;
+            if (doors[(wx - sd2[2] * 2) + ',' + (wy - sd2[3] * 2)] || doors[(wx + sd2[2] * 2) + ',' + (wy + sd2[3] * 2)]) continue;
+            if (rng.next() >= (facing ? 0.4 : 0.3)) continue;
+            set(wx, wy, LOW); pre[wy * W + wx] = 'window'; k += 2;
+          }
+        });
+        // the yard: scattered cover and a few vehicles, never in the building or its walkway
+        var yard = function () { for (var tr = 0; tr < 30; tr++) { var p = [rng.int(0, W - 1), rng.int(0, H - 1)]; if (!inBld(p[0], p[1])) return p; } return [0, 0]; };
+        for (k2 = sc(9, 13); k2 > 0; k2--) { var yp = yard(), kr = rng.next(); piece(yp[0], yp[1], kr < 0.55 ? 'low' : kr < 0.85 ? 'high' : 'pair', rng.next() < 0.5); }
+        for (k2 = sc(1, 2); k2 > 0; k2--) for (var vt = 0; vt < 20; vt++) {
+          var hz2 = rng.next() < 0.6, vp = yard();
+          if (clear(vp[0], vp[1], hz2 ? 3 : 1, hz2 ? 1 : 3)) { piece(vp[0], vp[1], rng.next() < 0.4 ? 'long' : 'low', hz2); break; }
+        }
+      };
       var k2, x, y;
 
-      if (layout === 'compound') { // a few large buildings in open ground
+      if (layout === 'outside') outsideLayout();
+      else if (layout === 'compound') { // a few large buildings in open ground
         for (k2 = 0, x = 0, y = sc(2, 4); k2 < 60 * A && x < y; k2++) {
           var bw = rng.int(5, 8), bh = rng.int(4, 6);
           if (building(rng.int(5, W - bw - 1), rng.int(1, H - bh - 1), bw, bh)) x++;
@@ -325,10 +486,10 @@ XG.Tac = (function () {
             cells.push([cx3, cy3]);
           }
         }
-        cells.forEach(function (cc) { if (cc[0] >= 5 && get(cc[0], cc[1]) === FLOOR && !nearDoor(cc[0], cc[1])) set(cc[0], cc[1], PIT); });
+        cells.forEach(function (cc) { if (cc[0] >= 5 && get(cc[0], cc[1]) === FLOOR && !nearDoor(cc[0], cc[1]) && !inBld(cc[0], cc[1])) set(cc[0], cc[1], PIT); });
       }
 
-      scatter(layout === 'compound' ? sc(16, 22) : layout === 'blocks' ? sc(6, 10) : layout === 'street' ? sc(4, 7) : layout === 'yard' ? sc(5, 8) : sc(8, 11),
+      if (layout !== 'outside') scatter(layout === 'compound' ? sc(16, 22) : layout === 'blocks' ? sc(6, 10) : layout === 'street' ? sc(4, 7) : layout === 'yard' ? sc(5, 8) : sc(8, 11),
         layout === 'yard' ? [0.8, 0.15] : layout === 'street' ? [0.7, 0.2] : [0.5, 0.3]);
 
       // (no deployment zone here: deploy() later finds an open 3x3 block on a random edge, so the map is the same on every restart)
@@ -337,6 +498,7 @@ XG.Tac = (function () {
       // seeded from the finished layout, so the layouts themselves are unchanged. Only loose cover away from walls, doors and the
       // deployment area is converted; fences are new impassable, see-through lines laid on open floor (connectivity is checked below).
       var pr = new Array(W * H).fill(0), fm = new Array(W * H).fill(0), pj = new XG.RNG(tilesKey({ tiles: t }) + W);
+      Object.keys(pre).forEach(function (k) { pr[+k] = pre[k]; }); // the outside layout's windows and furniture keep their props
       var near8 = function (x2, y2, test) {
         for (var dy = -1; dy <= 1; dy++) for (var dx = -1; dx <= 1; dx++) if ((dx || dy) && test(get(x2 + dx, y2 + dy))) return true;
         return false;
@@ -344,7 +506,7 @@ XG.Tac = (function () {
       var comps = [], mark = {};
       for (var ci0 = 0; ci0 < W * H; ci0++) {
         var cv = t[ci0];
-        if ((cv !== LOW && cv !== HIGH) || mark[ci0]) continue;
+        if ((cv !== LOW && cv !== HIGH) || mark[ci0] || pre[ci0]) continue;
         var comp = [], stack = [ci0], loose = true, ok = true; mark[ci0] = 1;
         while (stack.length) {
           var si = stack.pop(), sx2 = si % W, sy2 = (si - sx2) / W; comp.push(si);
@@ -352,7 +514,7 @@ XG.Tac = (function () {
           else if (near8(sx2, sy2, function (v) { return v === WALL; })) loose = false;
           [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (o) {
             var nx = sx2 + o[0], ny = sy2 + o[1], ni = ny * W + nx;
-            if (inB(nx, ny) && t[ni] === cv && !mark[ni]) { mark[ni] = 1; stack.push(ni); }
+            if (inB(nx, ny) && t[ni] === cv && !mark[ni] && !pre[ni]) { mark[ni] = 1; stack.push(ni); }
           });
         }
         if (ok) comps.push({ cells: comp, base: cv, loose: loose });
@@ -401,7 +563,7 @@ XG.Tac = (function () {
           var fh = pj.next() < 0.5, fl = pj.int(3, 5), fx0 = pj.int(6, W - 3), fy0 = pj.int(1, H - 2), fc = [], fok = true;
           for (var fi = 0; fi < fl && fok; fi++) {
             var ex = fx0 + (fh ? fi : 0), ey = fy0 + (fh ? 0 : fi);
-            if (!inB(ex, ey) || get(ex, ey) !== FLOOR || nearDoor(ex, ey) || near8(ex, ey, function (v) { return v === WALL || v === PIT; })) fok = false;
+            if (!inB(ex, ey) || get(ex, ey) !== FLOOR || nearDoor(ex, ey) || inBld(ex, ey) || near8(ex, ey, function (v) { return v === WALL || v === PIT; })) fok = false;
             fc.push([ex, ey]);
           }
           if (!fok) continue;
@@ -413,7 +575,7 @@ XG.Tac = (function () {
       // 1-3 extra free-standing bunkers (tall object, base HIGH) on open floor, each with a random face mask: 1, 2 or 3 full faces, rest half.
       for (var nbk = pj.int(1, 3), bkt = 0; nbk > 0 && bkt < 60; bkt++) {
         var kx0 = pj.int(7, W - 3), ky0 = pj.int(1, H - 2);
-        if (get(kx0, ky0) !== FLOOR || nearDoor(kx0, ky0) || near8(kx0, ky0, function (v) { return v !== FLOOR; }) || pr[ky0 * W + kx0]) continue;
+        if (get(kx0, ky0) !== FLOOR || nearDoor(kx0, ky0) || inBld(kx0, ky0) || near8(kx0, ky0, function (v) { return v !== FLOOR; }) || pr[ky0 * W + kx0]) continue;
         var nfull = pj.int(1, 3), mask = 0, fo = pj.shuffle([1, 2, 4, 8]);
         if (nfull === 2 && pj.next() < 0.7) { var rot = pj.int(0, 3); mask = (3 << rot | 3 >> (4 - rot)) & 15; } // an L: two adjacent full faces
         else for (var mi = 0; mi < nfull; mi++) mask |= fo[mi];
@@ -422,7 +584,11 @@ XG.Tac = (function () {
 
       // connectivity
       var rc = floorComponent(t, W, H);
-      if (rc.size >= rc.floors * 0.9) { b.tiles = t; b.props = pr; b.faces = fm; b.reachable = rc.mark; b.layout = layout; return; }
+      if (rc.size >= rc.floors * 0.9 && (!bld || bld.server && rc.mark[bld.server[1] * W + bld.server[0]])) {
+        b.tiles = t; b.props = pr; b.faces = fm; b.reachable = rc.mark; b.layout = layout;
+        if (bld) b.outside = bld;
+        return;
+      }
     }
     b.tiles = new Array(W * H).fill(FLOOR); b.props = new Array(W * H).fill(0); b.faces = new Array(W * H).fill(0); b.reachable = new Array(W * H).fill(true); b.layout = 'open';
   }
@@ -500,7 +666,8 @@ XG.Tac = (function () {
     var scen = mission.kind === 'purge' ? mission.scenario || null : null;
     b.mission.scenario = scen;
     if (scen === 'node') { b.turnLimit = nodeTurns('purge'); b.nodeAttacker = 'player'; b.server = { x: OFF, y: OFF, capture: 0 }; }
-    genMap(b, rng);
+    genMap(b, rng, mission.layout);
+    if (b.server && b.outside) b.turnLimit = nodeTurns('purge', true); // the attackers have to walk in first
     // Units are made off-map; deploy() places both sides (and can do it again with a new seed on Restart).
     squad.forEach(function (s) { makeSquadUnit(b, g, s, OFF, OFF); });
     var list = (COMPOSITION[mission.diff] || COMPOSITION[5]).slice();
@@ -528,7 +695,8 @@ XG.Tac = (function () {
       : ({ purge: 'Eliminate all hostiles.', relay: 'Destroy the Relay and all hostiles.', uplink: 'Destroy or Sever the Uplink Core.' })[b.mission.kind]), 'sys');
     return b;
   }
-  function nodeTurns(kind) { var T = D.tuning.nodeTurns || {}; return T[kind] || 10; }
+  // outside: the 'outside' layout (the server inside a building), which has its own, longer clock (tuning.nodeTurnsOutside)
+  function nodeTurns(kind, outside) { var T = (outside && D.tuning.nodeTurnsOutside) || D.tuning.nodeTurns || {}; return T[kind] || 10; }
   // Combat training range (tutorial): a fixed map, one trooper, a passive target drone behind a crate and a gunner
   // drone that only shoots back. The whole map is visible. Layout notes are in js/tutorial.js (the lessons use them).
   function createTraining(g, squad) {
@@ -590,7 +758,8 @@ XG.Tac = (function () {
     b.mission.scenario = scen;
     if (scen === 'exterminate') b.turnLimit = 0;
     else if (scen === 'node') { b.turnLimit = nodeTurns(mission.kind); b.nodeAttacker = mission.kind === 'raid' ? 'player' : 'enemy'; b.server = { x: OFF, y: OFF, capture: 0 }; }
-    genMap(b, rng);
+    genMap(b, rng, mission.layout);
+    if (b.server && b.outside) b.turnLimit = nodeTurns(mission.kind, true);
     var count = {}, strike = mission.kind === 'strike' || mission.kind === 'breach'; // you attack, you move first
     var addLat = function (type, p) {
       var e = makeEnemy(b, type, p[0], p[1]);
@@ -672,6 +841,7 @@ XG.Tac = (function () {
       while (k < pool.length - 1 && r >= len[pool[k]]) r -= len[pool[k++]];
       order.push(pool.splice(k, 1)[0]);
     }
+    if (b.outside) order = [b.outside.edge].concat(order.filter(function (e) { return e !== b.outside.edge; })); // outside: the approach edge
     var need = Math.min(n, 9);
     for (var oi = 0; oi < order.length; oi++) {
       var e = order[oi], all = [], l;
@@ -716,11 +886,12 @@ XG.Tac = (function () {
     return b.anchor;
   }
   // Free reachable tiles at least minD from the anchor (relaxed in steps until `need` exist).
-  function farTiles(b, A, minD, need) {
+  // only: optional tile filter (outside maps: indoor tiles for the side that holds the building).
+  function farTiles(b, A, minD, need, only) {
     var out = [];
     for (var d = minD; d >= 0; d -= 2) {
       out = [];
-      for (var y = 0; y < b.H; y++) for (var x = 0; x < b.W; x++) if (b.reachable[y * b.W + x] && free(b, x, y) && dist(x, y, A.x, A.y) >= d) out.push([x, y]);
+      for (var y = 0; y < b.H; y++) for (var x = 0; x < b.W; x++) if (b.reachable[y * b.W + x] && free(b, x, y) && dist(x, y, A.x, A.y) >= d && (!only || only(b, x, y))) out.push([x, y]);
       if (out.length >= need) break;
     }
     return out;
@@ -730,6 +901,7 @@ XG.Tac = (function () {
   var NODE_D = 0.45;
   function placeServer(b, dr, A, L) {
     var W = b.W, S = b.server, open = function (x, y) { return free(b, x, y) && b.reachable[y * W + x]; };
+    if (b.outside && b.outside.server) { S.x = b.outside.server[0]; S.y = b.outside.server[1]; return S; } // fixed by the map: its inner room
     var nb = function (x, y) { var n = 0; for (var dy = -1; dy <= 1; dy++) for (var dx = -1; dx <= 1; dx++) if ((dx || dy) && open(x + dx, y + dy)) n++; return n; };
     var tiers = [[0.5, 0.72, 5], [NODE_D, 0.8, 4], [NODE_D, 1.5, 3], [0, 9, 0]], before = floorComponent(b.tiles, W, b.H).size;
     for (var ti = 0; ti < tiers.length; ti++) {
@@ -761,11 +933,13 @@ XG.Tac = (function () {
     b.units.forEach(function (u) { if (!(u.isStatic && u.x !== OFF)) { u.x = OFF; u.y = OFF; } });
     var S = b.server, keepS = S && S.x !== OFF, fixed = b.units.filter(function (u) { return u.isStatic && u.x !== OFF; }).map(function (u) { return [u.x, u.y]; });
     if (keepS) fixed.push([S.x, S.y]);
-    var A = placeSquadA(b, dr, b.units.filter(function (u) { return u.side === info.aSide && !u.isStatic; }), fixed.length ? { pts: fixed, d: [Math.round(L * 0.55), Math.round(L * NODE_D)] } : null);
+    // outside maps: squad A always attacks from the yard (the approach edge, 40%+ of the longest side from every entrance) and the
+    // other side starts indoors; the server's spot belongs to the map, so no avoid list is needed
+    var A = placeSquadA(b, dr, b.units.filter(function (u) { return u.side === info.aSide && !u.isStatic; }), fixed.length && !b.outside ? { pts: fixed, d: [Math.round(L * 0.55), Math.round(L * NODE_D)] } : null);
     if (S) { if (!keepS) placeServer(b, dr, A, L); S.capture = 0; }
     var others = b.units.filter(function (u) { return u.side !== info.aSide || u.isStatic; }), statics = others.filter(function (u) { return u.isStatic && u.x === OFF; }),
       movers = others.filter(function (u) { return !u.isStatic; });
-    var minD = Math.round(L * dr.int(55, 60) / 100), farD = Math.round(L * 0.7), cand = farTiles(b, A, minD, 40);
+    var minD = Math.round(L * dr.int(55, 60) / 100), farD = Math.round(L * 0.7), cand = b.outside ? farTiles(b, A, Math.round(L * 0.4), 20, indoor) : farTiles(b, A, minD, 40);
     dr.shuffle(cand);
     statics.forEach(function (u) {
       var spot = null;
@@ -893,7 +1067,7 @@ XG.Tac = (function () {
       for (var x = Math.max(0, x0 - SIGHT); x <= Math.min(b.W - 1, x0 + SIGHT); x++) {
         if (dist(x0, y0, x, y) > SIGHT) continue;
         var ok = clearEither(b, x0, y0, x, y);
-        for (var i = 0; !ok && i < A.length; i++) ok = clearEither(b, A[i][0], A[i][1], x, y);
+        for (var i = 0; !ok && i < A.length; i++) ok = coneOk(A[i], x, y) && clearEither(b, A[i][0], A[i][1], x, y);
         if (ok) out.push(y * b.W + x);
       }
     cache.at[k] = out;
@@ -953,10 +1127,11 @@ XG.Tac = (function () {
   }
   // ---- shootable objects: any LOW/HIGH tile clearTile can destroy by fire. b.tileHp {tileIndex: hp} fills in lazily (undamaged = full).
   // Only explosives can be aimed at; other breakable cover wears down from misses at the unit behind it (STRAY) and blasts.
-  var OBJ_HP = { barrel: 1, glass: 1 }, OBJ_HP_LOW = 6, OBJ_HP_HIGH = 10, STRAY = 33; // STRAY: % of covered misses that hit the cover
+  // A window (1 HP) shatters into an empty frame on the first stray miss; the frame is part of the wall and cannot break.
+  var OBJ_HP = { barrel: 1, glass: 1, window: 1 }, OBJ_HP_LOW = 6, OBJ_HP_HIGH = 10, STRAY = 33; // STRAY: % of covered misses that hit the cover
   function explosive(b, x, y) { return propOf(b, x, y) === 'barrel'; }
   function objMax(b, x, y) { var p = propOf(b, x, y); return OBJ_HP[p] || (tile(b, x, y) === HIGH ? OBJ_HP_HIGH : OBJ_HP_LOW); }
-  function destructible(b, x, y) { var t = tile(b, x, y), p = propOf(b, x, y); return (t === LOW || t === HIGH) && p !== 'barrier' && p !== 'pillar'; }
+  function destructible(b, x, y) { var t = tile(b, x, y), p = propOf(b, x, y); return (t === LOW || t === HIGH) && p !== 'barrier' && p !== 'pillar' && p !== 'frame'; }
   // A pseudo-target for the shot code: { obj: true, id: 'o<tile index>', x, y, hp, maxHp, prop, base }, or null when the tile is not shootable.
   function objectAt(b, x, y) {
     if (!inB(b, x, y) || !destructible(b, x, y)) return null;
@@ -982,7 +1157,7 @@ XG.Tac = (function () {
     if (cheb(a.x, a.y, t.x, t.y) <= 1 || clearEither(b, a.x, a.y, t.x, t.y)) return false;
     for (var dy = -1; dy <= 1; dy++) for (var dx = -1; dx <= 1; dx++) {
       var bx = a.x + dx, by = a.y + dy, k = tile(b, bx, by);
-      if ((dx || dy) && (k === WALL || k === HIGH) && cheb(bx, by, t.x, t.y) <= 1) return true;
+      if ((dx || dy) && blocksFire(b, bx, by, -dx, -dy) && cheb(bx, by, t.x, t.y) <= 1) return true;
     }
     return false;
   }
@@ -1126,7 +1301,7 @@ XG.Tac = (function () {
       log(b, ev, tag + ' ' + dmg + ' (' + hp + '/' + o.maxHp + ' left).', cls || '');
     } else {
       log(b, ev, tag + ' ' + dmg + ', destroyed.', cls || '');
-      if (o.prop !== 'barrel' && o.prop !== 'glass') ev.push({ t: 'debris', x: o.x, y: o.y });
+      if (o.prop !== 'barrel' && o.prop !== 'glass' && o.prop !== 'window') ev.push({ t: 'debris', x: o.x, y: o.y });
       clearTile(b, o.x, o.y, ev, 'shot');
     }
   }
@@ -1615,7 +1790,12 @@ XG.Tac = (function () {
       var threshold = u.ap >= 2 ? 50 : 20;
       if (best && best.score >= threshold) { u.ap = 0; fire(b, u, best.t, ev); break; }
       var dest = bestTile(b, u, foes);
-      if (!dest) { if (best) { u.ap = 0; fire(b, u, best.t, ev); } else u.ap = 0; break; } // no better tile: shoot even at long odds, so two units in full cover at range cannot stall the battle
+      if (!dest) { // no better tile: shoot even at long odds, so two units in full cover at range cannot stall the battle
+        if (best) { u.ap = 0; fire(b, u, best.t, ev); }
+        else if (holdIn(b, u) && u.abilities.indexOf('overwatch') >= 0) { u.ap = 0; u.overwatch = true; log(b, ev, (u.short || u.name) + ' holds the building on overwatch.', ''); }
+        else u.ap = 0;
+        break;
+      }
       var mev = doMove(b, u, dest[0], dest[1]);
       if (!mev) { u.ap = 0; break; }
       Array.prototype.push.apply(ev, mev);
@@ -1649,10 +1829,13 @@ XG.Tac = (function () {
     u.x = ox; u.y = oy;
     return s + b.rng.next() * 3;
   }
+  // Outside maps: the side that starts in the building (not squad A) holds it: its AI never moves out into the yard.
+  function holdIn(b, u) { return !!b.outside && !!b.deployInfo && u.side !== b.deployInfo.aSide && indoor(b, u.x, u.y); }
   function bestTile(b, u, foes) {
-    var r = reach(b, u, u.mobility), best = null, bs = tileScore(b, u, foes, u.x, u.y) + 4;
+    var r = reach(b, u, u.mobility), best = null, bs = tileScore(b, u, foes, u.x, u.y) + 4, only = holdIn(b, u) ? indoor : null;
     for (var i = 0; i < r.d.length; i++) {
       if (r.d[i] <= 0) continue;
+      if (only && !only(b, i % b.W, (i - i % b.W) / b.W)) continue;
       var x = i % b.W, y = (i - x) / b.W, s = tileScore(b, u, foes, x, y);
       if (s > bs) { bs = s; best = [x, y]; }
     }
@@ -1680,24 +1863,41 @@ XG.Tac = (function () {
   }
   // Walk the real path to the nearest tile with a line of fire on the nearest foe (so walls get walked around
   // instead of hugged); fall back to the tile closest to it as the crow flies. Returns { step, goal } or null.
+  // Outside maps: building holders only march to indoor tiles; everyone else picks, among the tiles in reach that get about as far
+  // along the path, the one with the best cover against the target (crossing the yard from cover to cover).
   function march(b, u, foes) {
-    var far = reach(b, u, 60), tgt = foes[0], bd = 1e9, step = null;
+    var far = reach(b, u, 60), tgt = foes[0], bd = 1e9, step = null, only = holdIn(b, u) ? indoor : null;
     foes.forEach(function (f) { var d = dist(u.x, u.y, f.x, f.y); if (d < bd) { bd = d; tgt = f; } });
     var cb = 1e9, steps = 1e9;
     for (var j = 0; j < far.d.length; j++) {
       if (far.d[j] <= 0) continue;
       var jx = j % b.W, jy = (j - jx) / b.W;
+      if (only && !only(b, jx, jy)) continue;
       if (far.d[j] < steps && dist(jx, jy, tgt.x, tgt.y) <= u.range && los(b, jx, jy, tgt.x, tgt.y)) { steps = far.d[j]; step = [jx, jy]; }
     }
     if (!step) for (var k2 = 0; k2 < far.d.length; k2++) {
       if (far.d[k2] <= 0) continue;
       var kx = k2 % b.W, ky = (k2 - kx) / b.W, dd = dist(kx, ky, tgt.x, tgt.y);
+      if (only && !only(b, kx, ky)) continue;
       if (dd < cb) { cb = dd; step = [kx, ky]; }
     }
     if (!step) return null;
     var p = pathTo(far, step[0], step[1]);
     if (!p || !p.length) return null;
-    return { step: p[Math.min(p.length, u.mobility) - 1], goal: step };
+    var st = p[Math.min(p.length, u.mobility) - 1];
+    if (only && !only(b, st[0], st[1])) return null;
+    if (b.outside && !only) {
+      var alive = u.alive; u.alive = false; // the mover's own tile must not block the reverse search
+      var rev = reach(b, { x: step[0], y: step[1] }, 120);
+      u.alive = alive;
+      var near = reach(b, u, u.mobility), aim = rev.d[st[1] * b.W + st[0]], bs = -1e9;
+      for (var n = 0; aim >= 0 && n < near.d.length; n++) {
+        if (near.d[n] <= 0 || rev.d[n] < 0 || rev.d[n] > aim + 1) continue;
+        var nx = n % b.W, ny = (n - nx) / b.W, s = coverValue(b, nx, ny, tgt.x, tgt.y) - (rev.d[n] - aim) * 8 + b.rng.next();
+        if (s > bs) { bs = s; st = [nx, ny]; }
+      }
+    }
+    return { step: st, goal: step };
   }
 
   // Node AI (either side). Attackers head for the server once time is short (the last nodeRush turns) or they outnumber the
@@ -1777,6 +1977,6 @@ XG.Tac = (function () {
     endTurn: endTurn, aiStep: aiStep,
     reach: reach, pathTo: pathTo, moveRange: moveRange, hitInfo: hitInfo, targets: targets, tileOk: tileOk,
     abilityBlock: abilityBlock, coverValue: coverValue, coverDetail: coverDetail, los: los, isVisible: isVisible, unitAt: unitAt,
-    unitById: unitById, tile: tile, coverTile: coverTile, isServer: isServer, zoneState: zoneState, captureTick: captureTick, nodeTurns: nodeTurns, dist: dist, cheb: cheb, checkOutcome: checkOutcome, result: result, abort: abort
+    unitById: unitById, tile: tile, coverTile: coverTile, blocksFire: blocksFire, peekSpots: peekSpots, indoor: indoor, isServer: isServer, zoneState: zoneState, captureTick: captureTick, nodeTurns: nodeTurns, dist: dist, cheb: cheb, checkOutcome: checkOutcome, result: result, abort: abort
   };
 })();

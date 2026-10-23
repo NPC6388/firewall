@@ -31,7 +31,7 @@ function autoBattle(g, m, squad) {
         if (t && Tac.act.grenade(b, u, t.x, t.y)) return;
       }
       if (u.kind === 'hacker') {
-        var h = Tac.targets(b, u, 'hack')[0];
+        var h = Tac.targets(b, u, 'hack').filter(function (e) { return !e.stunned; })[0]; // never stun-lock a lone target (the battle would stall)
         if (h && Tac.act.hack(b, u, h)) return;
         var sv = Tac.targets(b, u, 'sever')[0];
         if (sv && Tac.act.sever(b, u, sv)) return;
@@ -257,7 +257,7 @@ function autoBattle(g, m, squad) {
   la.x = 9; la.y = 10; lb.x = 12; lb.y = 10;
   check(!Tac.los(bl, 9, 10, 12, 10), 'units hugging both sides of a double row of tall cover cannot see each other');
   bl.tiles[10 * bl.W + 11] = Tac.FLOOR; lb.x = 11;
-  check(Tac.los(bl, 9, 10, 11, 10), 'a single row of tall cover between two hugging units is still see-through');
+  check(!Tac.los(bl, 9, 10, 11, 10), 'a single row of tall cover between two hugging units blocks sight too (solid cover: only a corner peek gets past)');
   bl.tiles[10 * bl.W + 11] = Tac.HIGH; la.y = 15; lb.x = 12; lb.y = 15;
   check(Tac.los(bl, 9, 15, 12, 15), 'a corner peek at the end of a double row sees past it');
   // a pit: impassable, no cover, and you can see and shoot across it
@@ -300,14 +300,15 @@ function autoBattle(g, m, squad) {
       var lg = XG.Lat.newGame(70 + sd); lg.day = 10 + sd * 5;
       var lm = XG.Lat.spawnMission(lg, S.rng(lg), kd), bl = Tac.createLattice(lm, ['warden', 'drone', 'drone'], XG.Lat.earthSquad(lg, lm), {});
       if (bl.W !== 38 || bl.H !== 28) sizeOk = false;
-      lim[kd + (lm.scenario ? '-' + lm.scenario : '')] = bl.turnLimit;
+      lim[kd + (lm.scenario ? '-' + lm.scenario : '') + (bl.outside ? '-out' : '')] = bl.turnLimit;
       reachCheck(bl);
     }
   });
   var btr = Tac.createTraining(g, g.soldiers.slice(0, 1));
   check(btr.W === 22 && btr.H === 16 && btr.tiles.length === 22 * 16, 'combat training stays 22x16');
   check(sizeOk, 'mission and Lattice battle maps are 38x28');
-  check(lim['raid-node'] === D.tuning.nodeTurns.raid && lim['raid-exterminate'] === 0 && lim.uplink === 0 && lim['strike-node'] === D.tuning.nodeTurns.strike && lim['strike-exterminate'] === 0 && lim.breach === 25, 'turn limits per scenario (' + JSON.stringify(lim) + ')');
+  var limOk = Object.keys(lim).every(function (k) { var p = k.split('-'), v = lim[k]; return p[1] === 'node' ? v === Tac.nodeTurns(p[0], p[2] === 'out') : p[1] === 'exterminate' || p[0] === 'uplink' ? v === 0 : p[0] === 'breach' ? v === 25 : true; });
+  check(limOk && (lim['raid-node'] || lim['raid-node-out']) && (lim['strike-node'] || lim['strike-node-out']) && lim.breach === 25, 'turn limits per scenario and layout (' + JSON.stringify(lim) + ')');
   check(reachOk && worst >= 0.9, 'every generated map is connected and every unit starts on reachable floor (worst ' + Math.round(worst * 100) + '% of floor reachable)');
   // comms mood follows Convergence (and Trace pulls the Lattice campaign back a step); lines never break mood
   var Cm = XG.Comms;
@@ -720,11 +721,11 @@ function autoBattle(g, m, squad) {
   var bt = mk('node', 99); bt.turn = bt.turnLimit;
   bt.units.forEach(function (u) { if (u.side === 'player') { u.x = 0; u.y = u.id; } });
   Tac.endPlayerTurn(bt); var gt = 0; while (Tac.enemyStep(bt) !== null && gt++ < 100) { }
-  check(bt.outcome === 'timeout' && bt.turnLimit === T.nodeTurns.purge, 'node: the defender wins when turn ' + bt.turnLimit + ' ends without a capture (' + bt.outcome + ')');
+  check(bt.outcome === 'timeout' && bt.turnLimit === Tac.nodeTurns('purge', !!bt.outside), 'node: the defender wins when turn ' + bt.turnLimit + ' ends without a capture (' + bt.outcome + ')');
   // Lattice raid (you defend) and strike (you attack)
   var lraid = Lat.spawnMission(lg, S.rng(lg), 'raid'); lraid.scenario = 'node';
   var br = Tac.createLattice(lraid, ['warden', 'drone', 'drone'], Lat.earthSquad(lg, lraid), {});
-  check(!!br.server && br.nodeAttacker === 'player' && br.turnLimit === T.nodeTurns.raid, 'Lattice raid node: FIREWALL attacks the server, ' + br.turnLimit + '-turn limit');
+  check(!!br.server && br.nodeAttacker === 'player' && br.turnLimit === Tac.nodeTurns('raid', !!br.outside), 'Lattice raid node: FIREWALL attacks the server, ' + br.turnLimit + '-turn limit');
   var dd = br.units.filter(function (u) { return u.side === 'enemy'; }).map(function (u) { return Tac.dist(u.x, u.y, br.server.x, br.server.y); });
   check(dd.every(function (x) { return x <= 7; }), 'raid defenders dig in round the server (' + dd.map(function (x) { return x.toFixed(1); }).join(',') + ')');
   while (br.side !== br.human && !br.outcome) Tac.aiStep(br);
@@ -795,6 +796,178 @@ function autoBattle(g, m, squad) {
   check(farOk2, 'after a Restart the squad still lands far from the fixed statics');
 })();
 
+// Windows (outside maps): impassable, see-through, half cover in front, full cover beside (behind the wall) with a lean out
+// through the window; a stray miss or a blast shatters one into an empty frame, which stays impassable and see-through.
+(function () {
+  var g = S.newGame(23), r = S.rng(g), m = Strat.spawnMission(g, r, 'purge'); S.saveRng(g, r);
+  var b = Tac.create(g, Object.assign({}, m, { diff: 1, scenario: 'exterminate' }), g.soldiers.slice(0, 4)), W = b.W;
+  b.tiles.fill(Tac.FLOOR); b.props.fill(0); b.faces.fill(0); b.tileHp = {}; b.outcome = null; delete b.outside;
+  b.units.forEach(function (u) { if (u.side === 'enemy') u.alive = false; });
+  var sq = b.units.filter(function (u) { return u.side === 'player'; }), foe = b.units.filter(function (u) { return u.side === 'enemy'; })[0];
+  sq.forEach(function (u, i) { u.x = 0; u.y = 20 + i; u.hp = u.maxHp = 10; u.armor = 0; u.shield = 0; u.aim = 70; u.range = 14; });
+  foe.alive = true; foe.hp = foe.maxHp = 30; foe.armor = 0; foe.defense = 0; foe.range = 14;
+  for (var x = 8; x <= 18; x++) b.tiles[10 * W + x] = Tac.WALL;
+  b.tiles[10 * W + 13] = Tac.LOW; b.props[10 * W + 13] = 'window';
+  b.visible = b.visible.map(function () { return true; });
+  var front = sq[0], beside = sq[1], mid = sq[2];
+  front.x = 13; front.y = 11; beside.x = 12; beside.y = 11; mid.x = 10; mid.y = 11;
+  front.ap = beside.ap = 2;
+  check(Tac.reach(b, front, 4).d[10 * W + 13] < 0 && Tac.reach(b, front, 4).d[9 * W + 13] < 0, 'window: blocks movement (and the wall round it seals the room)');
+  foe.x = 13; foe.y = 5;
+  check(Tac.los(b, foe.x, foe.y, front.x, front.y) && Tac.hitInfo(b, foe, front).cover === 20, 'window: see and shoot through it; half cover for the unit right in front (' + Tac.hitInfo(b, foe, front).cover + ')');
+  foe.x = 13; foe.y = 9; front.x = 13; front.y = 15;
+  check(Tac.hitInfo(b, front, foe).cover === 20, 'window: half cover on the other side too, against fire through it');
+  front.x = 13; front.y = 11; foe.x = 12; foe.y = 5;
+  var hb = Tac.hitInfo(b, foe, beside), out = Tac.hitInfo(b, beside, foe);
+  check(hb.ok && hb.cover === 40 && out.ok, 'window: a unit beside it behind the wall has full cover and leans out through it (cover ' + hb.cover + ', fires back ' + out.ok + ')');
+  foe.x = 10; foe.y = 5;
+  check(!Tac.los(b, mid.x, mid.y, foe.x, foe.y), 'window: a unit mid-wall (no window beside it) cannot see out');
+  // a stray miss at the unit behind it shatters it (hit roll fails, then the STRAY roll lands in the window)
+  mid.x = 0; mid.y = 25; front.x = 13; front.y = 5; front.ap = 2; foe.x = 13; foe.y = 11; foe.hp = 30;
+  var real = b.rng.chance, seq = [false, true];
+  b.rng.chance = function () { return seq.length ? seq.shift() : false; };
+  var evs = Tac.act.shoot(b, front, foe);
+  b.rng.chance = real;
+  check(Tac.tile(b, 13, 10) === Tac.LOW && Tac.propOf(b, 13, 10) === 'frame' && foe.hp === 30, 'window: a stray miss shatters it into an empty frame (' + Tac.propOf(b, 13, 10) + ')');
+  front.x = 13; front.y = 11; foe.x = 13; foe.y = 5;
+  check(!!evs && evs.some(function (e) { return e.t === 'shatter'; }), 'window: shattering emits a shatter event');
+  check(Tac.reach(b, front, 4).d[10 * W + 13] < 0 && Tac.hitInfo(b, foe, front).cover === 20 && !Tac.objectAt(b, 13, 10), 'shattered window: still impassable, still half cover, cannot break further');
+  // a blast shatters a window too; the frame survives the next one
+  b.tiles[10 * W + 15] = Tac.LOW; b.props[10 * W + 15] = 'window';
+  var evb = [];
+  check(Tac.clearTile(b, 15, 10, evb, 'blast') && Tac.propOf(b, 15, 10) === 'frame' && Tac.tile(b, 15, 10) === Tac.LOW, 'window: a blast shatters it into a frame');
+  check(!Tac.clearTile(b, 15, 10, [], 'blast') && Tac.propOf(b, 15, 10) === 'frame', 'a window frame survives blasts');
+})();
+
+// Rooms are strong points: a walled room (x 10..18, y 5..13) with two doorways on its east wall, (18,8) and (18,11). A unit inside
+// can be seen or shot only along a real ray through a doorway (from where the shooter stands or leans); a unit in a doorway does
+// not lean; a lean beside a jamb sees only a narrow cone through the gap; fog shows exactly what LOS sees. Solid vs fire-through.
+(function () {
+  var g = S.newGame(25), r = S.rng(g), m = Strat.spawnMission(g, r, 'purge'); S.saveRng(g, r);
+  var b = Tac.create(g, Object.assign({}, m, { diff: 1, scenario: 'exterminate' }), g.soldiers.slice(0, 2)), W = b.W;
+  b.tiles.fill(Tac.FLOOR); b.props.fill(0); b.faces.fill(0); b.tileHp = {}; b.outcome = null; delete b.outside;
+  var sh = b.units[0], tg = b.units.filter(function (u) { return u.side === 'enemy'; })[0];
+  b.units = [sh, tg]; sh.alive = tg.alive = true;
+  var X0 = 10, X1 = 18, Y0 = 5, Y1 = 13, doors = [8, 11], inside = function (x, y) { return x > X0 && x < X1 && y > Y0 && y < Y1; };
+  for (var y = Y0; y <= Y1; y++) for (var x = X0; x <= X1; x++) if (x === X0 || x === X1 || y === Y0 || y === Y1) b.tiles[y * W + x] = Tac.WALL;
+  doors.forEach(function (dy) { b.tiles[dy * W + X1] = Tac.FLOOR; });
+  var cone = function (p, tx, ty) { if (!p[4]) return true; var vx = tx - p[0], vy = ty - p[1], al = vx * p[2] + vy * p[3], ac = Math.abs(vx * p[3] - vy * p[2]); return al > 0 && ac * 3 <= al; };
+  var rayDoor = function (a, c) { // does the straight ray between the two tile centres cross the east wall (x = 18) inside a doorway?
+    if ((a[0] - X1) * (c[0] - X1) >= 0) return a[0] === X1 && doors.indexOf(a[1]) >= 0 || c[0] === X1 && doors.indexOf(c[1]) >= 0;
+    var yy = a[1] + (X1 - a[0]) * (c[1] - a[1]) / (c[0] - a[0]);
+    return doors.some(function (dy) { return Math.abs(yy - dy) < 0.5; });
+  };
+  var leaks = [], seen = 0;
+  for (var sy = 0; sy < 22; sy++) for (var sx = 4; sx <= 32; sx++) {
+    if (inside(sx, sy) || b.tiles[sy * W + sx] !== Tac.FLOOR) continue;
+    sh.x = sx; sh.y = sy;
+    var SL = [[sx, sy, 0, 0, false]].concat(Tac.peekSpots(b, sx, sy));
+    for (var ty = Y0 + 1; ty < Y1; ty++) for (var tx = X0 + 1; tx < X1; tx++) {
+      if (Tac.dist(sx, sy, tx, ty) > 14) continue;
+      tg.x = tx; tg.y = ty;
+      if (!Tac.los(b, sx, sy, tx, ty)) continue;
+      seen++;
+      var TL = [[tx, ty, 0, 0, false]].concat(Tac.peekSpots(b, tx, ty));
+      var ok = SL.some(function (p) { return TL.some(function (q) { return cone(p, q[0], q[1]) && cone(q, p[0], p[1]) && rayDoor(p, q); }); });
+      if (!ok) leaks.push(sx + ',' + sy + '>' + tx + ',' + ty);
+    }
+  }
+  check(seen > 100 && !leaks.length, 'room: units inside are seen only along a real ray through a doorway (' + seen + ' sightings, leaks: ' + leaks.slice(0, 6).join(' ') + ')');
+  tg.x = 40; tg.y = 40;
+  check(Tac.peekSpots(b, X1, 8).length === 0, 'room: a unit standing in a doorway does not lean (it sees by real lines only)');
+  sh.x = 19; sh.y = 7;
+  var deep = [[17, 6], [17, 10], [17, 12], [16, 6], [11, 12]].filter(function (p) { return Tac.los(b, 19, 7, p[0], p[1]); });
+  check(!deep.length && Tac.los(b, 19, 7, 14, 8), 'room: a lean beside a door jamb sees straight through the gap, not along the inside of the wall (' + JSON.stringify(deep) + ')');
+  tg.x = 17; tg.y = 7; var fan = [], wide = 0;
+  for (var fy = 0; fy < 22; fy++) for (var fx = 19; fx <= 32; fx++) { sh.x = fx; sh.y = fy; if (Tac.los(b, fx, fy, 17, 7)) { fan.push([fx, fy]); if (Math.abs(fx - X1) > 1 && Math.abs(fy - 8) * 3 > fx - 17 && Math.abs(fy - 11) > 1) wide++; } }
+  check(fan.length > 0 && !wide && Tac.hitInfo(b, { x: 25, y: 8, range: 14, aim: 70, close: 10, side: 'player' }, tg).cover === 40, 'room: a defender beside a doorway is seen only from a narrow arc in front of it, in full cover (' + fan.length + ' tiles, ' + wide + ' outside the arc)');
+  // fog shows exactly what line of sight sees: the room stays dark except along the rays through its doorways
+  sh.x = 21; sh.y = 6; tg.x = 40; tg.y = 40; b.visible = null; b.explored = null; Tac.refreshVis(b);
+  var fogOk = true;
+  for (var vy = Y0 + 1; vy < Y1; vy++) for (var vx = X0 + 1; vx < X1; vx++) if (!!b.visible[vy * W + vx] !== (Tac.dist(21, 6, vx, vy) <= Tac.SIGHT && Tac.los(b, 21, 6, vx, vy))) fogOk = false;
+  check(fogOk && !b.visible[12 * W + 11], 'room: fog reveals inside only what line of sight through the doorways reaches');
+  // solid vs fire-through: a run of tall cover blocks sight and fire (only its ends can be leaned round); low cover and glass do not
+  b.tiles.fill(Tac.FLOOR);
+  for (var k = 14; k <= 16; k++) b.tiles[20 * W + k] = Tac.HIGH;
+  tg.x = 15; tg.y = 21; sh.x = 15; sh.y = 14;
+  check(Tac.blocksFire(b, 15, 20) && !Tac.los(b, 15, 14, 15, 21), 'solid: a unit mid-way behind a run of tall cover cannot be seen or shot from straight ahead');
+  tg.x = 16; tg.y = 21;
+  check(Tac.los(b, 15, 14, 16, 21) && Tac.hitInfo(b, { x: 15, y: 14, range: 14, aim: 70, close: 10, side: 'player' }, tg).cover === 40, 'solid: a unit at the end leans round it, still in full cover');
+  b.tiles[20 * W + 15] = Tac.LOW; tg.x = 15; tg.y = 21;
+  check(!Tac.blocksFire(b, 15, 20) && Tac.los(b, 15, 14, 15, 21), 'fire-through: low cover can be shot over');
+  b.tiles[20 * W + 15] = Tac.HIGH; b.props[20 * W + 15] = 'glass';
+  check(!Tac.blocksFire(b, 15, 20) && Tac.los(b, 15, 14, 15, 21) && Tac.hitInfo(b, { x: 15, y: 14, range: 14, aim: 70, close: 10, side: 'player' }, tg).cover === 40, 'fire-through: glass is full cover you can see and shoot through');
+  b.props[20 * W + 15] = 'pillar';
+  check(Tac.blocksFire(b, 15, 20), 'solid: a pillar blocks sight and fire');
+})();
+
+// Outside maps: one building holds the server (node) or the defenders (exterminate); the attackers land in the yard.
+(function () {
+  var Lat = XG.Lat, g = S.newGame(24), L = Math.max(Tac.MAP_W, Tac.MAP_H), lg = Lat.newGame(77); lg.day = 30;
+  var nn = 0, ne = 0;
+  for (var s = 1; s <= 2000; s++) { if (Strat.rollOutside(s * 7919, 'node')) nn++; if (Strat.rollOutside(s * 7919, 'exterminate')) ne++; }
+  check(nn > 700 && nn < 900 && ne > 220 && ne < 380 && !Strat.rollOutside(5, null), 'outside layout rolls ~40% of node and ~15% of exterminate missions, never legacy ones (' + nn + ', ' + ne + ' of 2000)');
+  var cases = [];
+  for (var sd = 1; sd <= 12; sd++) {
+    cases.push(Tac.create(g, { kind: 'purge', diff: 3, name: 't', city: 't', site: 'x', seed: 400 + sd * 97, scenario: 'node', layout: 'outside' }, g.soldiers.slice(0, 4)));
+    if (sd <= 4) cases.push(Tac.create(g, { kind: 'purge', diff: 3, name: 't', city: 't', site: 'x', seed: 900 + sd * 97, scenario: 'exterminate', layout: 'outside' }, g.soldiers.slice(0, 4)));
+    if (sd <= 4) ['raid', 'strike'].forEach(function (kd) {
+      var lm = Lat.spawnMission(lg, S.rng(lg), kd); lm.seed = 500 + sd * 31; lm.scenario = sd % 2 ? 'node' : 'exterminate'; lm.layout = 'outside';
+      cases.push(Tac.createLattice(lm, ['warden', 'drone', 'drone', 'harmonic'], Lat.earthSquad(lg, lm), {}));
+    });
+  }
+  var layOk = true, srvOk = true, entOk = true, spawnOk = true, winOk = true, furnOk = true, limOk = true, sameOk = true, moveOk = 0, why = '';
+  var zoneReach = function (b, doors, keep) { // the server zone (or, without a server, the building) reached from squad A's anchor using only door `keep`
+    var t = b.tiles.slice(); doors.forEach(function (d, i) { if (i !== keep) t[d[1] * b.W + d[0]] = Tac.WALL; });
+    var bb = { W: b.W, H: b.H, tiles: t, units: [], server: b.server }, rr = Tac.reach(bb, { x: b.anchor.x, y: b.anchor.y }, 400);
+    var S2 = b.server || { x: b.outside.server[0], y: b.outside.server[1] };
+    for (var dy = -1; dy <= 1; dy++) for (var dx = -1; dx <= 1; dx++) if ((dx || dy) && rr.d[(S2.y + dy) * b.W + S2.x + dx] > 0) return true;
+    return false;
+  };
+  cases.forEach(function (b) {
+    var o = b.outside, aSide = b.deployInfo.aSide;
+    if (b.layout !== 'outside' || !o) { layOk = false; return; }
+    var area = o.w * o.h / (b.W * b.H);
+    if (area < 0.28 || area > 0.47 || o.doors.length < 2 || o.doors.length > 4) { layOk = false; why += ' area/doors ' + area.toFixed(2) + '/' + o.doors.length; }
+    if (b.server && (b.server.x !== o.server[0] || b.server.y !== o.server[1] || !Tac.indoor(b, b.server.x, b.server.y))) srvOk = false;
+    if (b.server && o.doors.some(function (d) { return Tac.cheb(d[0], d[1], b.server.x, b.server.y) < 3; })) srvOk = false;
+    if (o.doors.filter(function (d, i) { return zoneReach(b, o.doors, i); }).length < 2) entOk = false;
+    if (b.mission.scenario === 'node' && b.turnLimit !== Tac.nodeTurns(b.mission.lkind || 'purge', true)) limOk = false;
+    var check1 = function (bb) {
+      bb.units.forEach(function (u) { if (!u.alive || u.isStatic) return; var inside = Tac.indoor(bb, u.x, u.y); if ((u.side === aSide) === inside) spawnOk = false; });
+      if (o.doors.some(function (d) { return Tac.dist(d[0], d[1], bb.anchor.x, bb.anchor.y) < L * 0.4; }) || bb.anchor.edge !== o.edge) spawnOk = false;
+    };
+    check1(b);
+    var wins = 0;
+    b.props.forEach(function (p, i) {
+      var x = i % b.W, y = (i - x) / b.W;
+      if (p === 'window') {
+        wins++;
+        var h = Tac.tile(b, x - 1, y) === Tac.WALL && Tac.tile(b, x + 1, y) === Tac.WALL, v = Tac.tile(b, x, y - 1) === Tac.WALL && Tac.tile(b, x, y + 1) === Tac.WALL;
+        if (!(h || v) || Tac.tile(b, x, y) !== Tac.LOW) winOk = false;
+      }
+      if ((p === 'desk' || p === 'rack') && !Tac.indoor(b, x, y)) furnOk = false;
+    });
+    if (wins < 3) winOk = false;
+    var snap = JSON.stringify(b);
+    [11, 12].forEach(function (rs) {
+      var b1 = JSON.parse(snap); b1.rng = Object.assign(new XG.RNG(1), b1.rng); Tac.redeploy(b1, rs * 131);
+      if (JSON.stringify(b1.base) !== JSON.stringify(b.base) || JSON.stringify(b1.tiles) !== JSON.stringify(b.tiles) || JSON.stringify(b1.props) !== JSON.stringify(b.props) || JSON.stringify(b1.outside) !== JSON.stringify(o) || JSON.stringify(b1.server) !== JSON.stringify(b.server)) sameOk = false;
+      check1(b1);
+      if (JSON.stringify(b1.units.map(function (u) { return [u.x, u.y]; })) !== JSON.stringify(b.units.map(function (u) { return [u.x, u.y]; }))) moveOk++;
+    });
+  });
+  check(layOk, 'outside: one building of 28-47% of the map with 2-4 entrances' + why);
+  check(srvOk, 'outside: the server sits in the building, 3+ tiles from every entrance');
+  check(entOk, 'outside: the server zone can be reached through at least 2 different entrances');
+  check(spawnOk, 'outside: the attackers land in the yard on the approach edge, 40%+ of the map from every entrance; the defenders start inside (also after Restart)');
+  check(winOk, 'outside: 3+ windows, each set in the outer wall between two wall tiles');
+  check(furnOk, 'outside: desks and racks only inside the building');
+  check(limOk, 'outside: node battles use tuning.nodeTurnsOutside');
+  check(sameOk, 'outside: Restart keeps the building, windows, server and every tile identical');
+  check(moveOk >= cases.length, 'outside: Restart moves the squads (' + moveOk + '/' + cases.length * 2 + ')');
+})();
+
 // ---------------------------------------------------------------- battles
 var nb = +process.argv[2] || 60, tally = {};
 for (var i = 0; i < nb; i++) {
@@ -805,7 +978,7 @@ for (var i = 0; i < nb; i++) {
   if (i % 3 === 0) { g.research.done.push('lattice_grammar', 'halcyon'); g.flags.emp = true; }
   var squad = g.soldiers.slice(0, 4);
   var b = autoBattle(g, m, squad);
-  var sk = m.scenario ? '-' + (m.scenario === 'node' ? 'node' : 'ext') : '';
+  var sk = (m.scenario ? '-' + (m.scenario === 'node' ? 'node' : 'ext') : '') + (b.layout === 'outside' ? '-out' : '');
   if (!b.outcome) stalled.fw++;
   [kind + sk + ' d' + m.diff, kind + sk + ' ALL'].forEach(function (key) {
     tally[key] = tally[key] || { win: 0, loss: 0, timeout: 0, none: 0, cap: 0, turns: 0, n: 0 };
@@ -914,7 +1087,7 @@ function autoLattice(g, m, types) {
   // raid time limit
   var mr = Lat.spawnMission(g, r, 'raid'); mr.scenario = 'node';
   var br = Tac.createLattice(mr, ['warden'], Lat.earthSquad(g, mr), {});
-  check(br.side === 'player' && br.turnLimit === D.tuning.nodeTurns.raid, 'raid: FIREWALL moves first, ' + br.turnLimit + '-turn limit');
+  check(br.side === 'player' && br.turnLimit === Tac.nodeTurns('raid', !!br.outside), 'raid: FIREWALL moves first, ' + br.turnLimit + '-turn limit');
   br.units.forEach(function (u) { if (u.side === 'player') { u.x = 0; u.y = u.id; } }); // keep FIREWALL off the server
   while (br.side !== br.human && !br.outcome) Tac.aiStep(br);
   br.turn = br.turnLimit; Tac.endTurn(br);
@@ -950,7 +1123,7 @@ for (var li = 0; li < (+process.argv[4] || 30); li++) {
   lg.day = 1 + (li % 5) * 12; lg.forces = { drone: 4, warden: 2, harmonic: 1 };
   var lm = Lat.spawnMission(lg, rng0(lg), lk);
   var lb = autoLattice(lg, lm, ['warden', 'harmonic', 'drone', 'drone', 'warden']);
-  var sc2 = lm.scenario ? '-' + (lm.scenario === 'node' ? 'node' : 'ext') : '', won2 = Lat.latticeWon(lk, lb.outcome, lm.scenario);
+  var sc2 = (lm.scenario ? '-' + (lm.scenario === 'node' ? 'node' : 'ext') : '') + (lb.layout === 'outside' ? '-out' : ''), won2 = Lat.latticeWon(lk, lb.outcome, lm.scenario);
   [lk + sc2 + ' day' + lg.day, lk + sc2 + ' ALL'].forEach(function (key2) {
     lt[key2] = lt[key2] || { win: 0, loss: 0, stalled: 0, cap: 0, timeout: 0 }; lt[key2][!lb.outcome ? 'stalled' : won2 ? 'win' : 'loss']++;
     if (lb.captured) lt[key2].cap++; if (lb.outcome === 'timeout') lt[key2].timeout++;

@@ -9,6 +9,23 @@ The in-game **Help → Patch notes** tab shows everything from the first `##` he
 ## Unreleased
 
 ### 2026-10-22
+- **Lattice:** your machines now gain +2 aim per mark as well as +1 HP (half of a FIREWALL soldier's +4 aim per rank), so
+  they keep up with veteran five-soldier squads.
+- **Maps:** new *outside* map. One large building stands in a yard; the server sits in an inner room. The defenders start
+  inside, dug in near the server; the attackers start out in the yard, well away from every entrance, and must cross it and
+  break in through one of 2-4 doorways. Inside: rooms, corridors, desks and server racks. About 40% of NODE missions (and
+  15% of EXTERMINATE missions, where the defenders hold the building) use it, in both campaigns, with a 14-turn clock.
+- **Windows:** the building's outer walls have windows. You cannot climb through, but you can see and shoot through them.
+  Right in front of one is half cover; beside it, behind the wall, is full cover and you can lean out through it. A stray
+  miss or a blast shatters it into an empty frame that still blocks movement. The building's floor is tiled, so you can
+  tell inside from outside at a glance.
+- **Line of sight:** cover is now either solid or fire-through. Solid cover (walls, tall cover, racks, bunkers, the tall
+  sides of mixed cover) blocks sight and fire: nobody sees or shoots straight past it, only by leaning round its end.
+  Fire-through cover (crates, low walls, windows, glass panels, fences) never blocks a shot. The hover panel says which,
+  and solid cover casts a long shadow with a dark top edge.
+- **Rooms are strong points:** units inside a walled room can only be seen and shot along real lines through its doorways
+  and windows. A unit in a doorway no longer leans into the room, leaning past a door jamb or a window only looks straight
+  through the gap, and lines no longer slip diagonally past a wall corner. The room stays dark until someone can see in.
 - **Rewards:** fast wins pay more. Every won battle pays at least its base reward, rising to triple for a win in 4 turns or
   fewer (double at 9 turns, base at 14 or more): salvage and credits for FIREWALL, compute and substrate for the Lattice.
   The Lattice now earns at least 10 compute and 6 substrate from every battle it wins, as FIREWALL always earns credits.
