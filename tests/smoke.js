@@ -515,7 +515,7 @@ function autoBattle(g, m, squad) {
     var c0 = lg.compute, s0 = lg.substrate;
     var lo = Lat.resolveMission(lg, lm.id, { outcome: 'loss', lattice: [], humansKilled: 0, turns: 4 });
     var mw = XG.DATA.lattice.tuning.minWin;
-    check(lo.won && lg.compute - c0 === 10 * 3 && lg.substrate - s0 === mw.substrate * 3, 'a 4-turn Lattice breach win pays x3 of max(base, minWin) (compute +' + (lg.compute - c0) + ', substrate +' + (lg.substrate - s0) + ')');
+    check(lo.won && lg.compute - c0 === Math.max(10, mw.compute) * 3 && lg.substrate - s0 === mw.substrate * 3, 'a 4-turn Lattice breach win pays x3 of max(base, minWin) (compute +' + (lg.compute - c0) + ', substrate +' + (lg.substrate - s0) + ')');
     lm = Lat.spawnMission(lg, lr, 'strike'); c0 = lg.compute; s0 = lg.substrate;
     lo = Lat.resolveMission(lg, lm.id, { outcome: 'loss', lattice: [], humansKilled: 0, turns: 20 });
     check(lg.compute - c0 === mw.compute && lg.substrate - s0 === mw.substrate && lo.choice && lg.pendingReward, 'a slow Lattice strike win pays the minimum and leaves the strike choice pending');
@@ -529,8 +529,11 @@ function autoBattle(g, m, squad) {
   g.array[1] = { type: 'core', daysLeft: 0 };
   var m = Lat.spawnMission(g, r, 'raid'); S.saveRng(g, r); m.daysLeft = 1;
   var reg = Lat.region(g, m.region); reg.infection = 50; g.trace = 30;
-  check(/^Ignoring this costs/.test('Ignoring this costs: ' + Lat.ignoreText(m)) && Lat.ignoreText(m).indexOf('Trace +' + RI.trace + '%') > 0 && Lat.ignoreText({ kind: 'strike' }) === '',
-    'raid briefs say what ignoring costs; strikes have no ignore line');
+  check(/^Ignoring this costs/.test('Ignoring this costs: ' + Lat.ignoreText(m)) && Lat.ignoreText(m).indexOf('Trace +' + RI.trace + '%') > 0 && Lat.ignoreText({ kind: 'breach' }) === '' && Lat.ignoreText({ kind: 'strike' }).indexOf('Trace +' + LT.strikeIgnored.trace + '%') === 0,
+    'raid and strike briefs say what ignoring costs; breaches have no ignore line');
+  var gs = Lat.newGame(46), rs = S.rng(gs); gs.phase = 'war'; gs.nextRaidIn = 99; gs.nextStrikeIn = 99; gs.trace = 20;
+  var ms = Lat.spawnMission(gs, rs, 'strike'); S.saveRng(gs, rs); ms.daysLeft = 1; Lat.advanceDay(gs);
+  check(gs.trace >= 20 + LT.strikeIgnored.trace && !gs.missions.length, 'an ignored strike feeds Trace +' + LT.strikeIgnored.trace);
   Lat.advanceDay(g);
   check(reg.infection <= 50 - RI.infection + 1 && g.trace >= 30 + RI.trace && g.stats.ignored === 1, 'an ignored raid costs ' + RI.infection + '% infection and +' + RI.trace + ' Trace (inf ' + reg.infection.toFixed(1) + ', trace ' + g.trace.toFixed(1) + ')');
   check(g.array[1].offline === RI.offlineDays && Lat.built(g, 'core') === 0 && Lat.researchRate(g) === LT.researchBase, 'an ignored raid knocks an Array node offline (its bonus is gone)');

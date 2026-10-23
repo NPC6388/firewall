@@ -212,6 +212,8 @@ XG.Lat = (function () {
     // ----------------------------------------------------------- missions
     // the one-line "Ignoring this costs: ..." for a mission brief, or '' when walking away is free
     ignoreText: function (m) {
+      var SI = L.tuning.strikeIgnored || {};
+      if (m.kind === 'strike') return SI.trace ? 'Trace +' + SI.trace + '% (the safehouse finishes its traffic analysis).' : '';
       if (m.kind !== 'raid') return '';
       var T = L.tuning.raidIgnored;
       return Lat.regionData(m.region).name + ' infection -' + T.infection + '%, Trace +' + T.trace + '%, and one Array node offline for ' + T.offlineDays + ' days.';
@@ -317,7 +319,9 @@ XG.Lat = (function () {
         } else if (m.kind === 'breach') {
           log(g, 'The ' + m.city + ' systems patched themselves before you breached them.');
         } else if (m.kind === 'strike') {
-          log(g, 'The ' + m.city + ' safehouse went dark before you struck.');
+          var SI = T.strikeIgnored || {};
+          if (SI.trace) g.trace = Math.min(100, g.trace + SI.trace);
+          log(g, 'The ' + m.city + ' safehouse went dark before you struck.' + (SI.trace ? ' Its traffic analysis reached FIREWALL: Trace +' + SI.trace + '%.' : ''));
         } else if (!g.over) {
           g.over = 'defeat'; g.storyQueue.push('l_defeat');
           log(g, 'The Uplink fell undefended.');
