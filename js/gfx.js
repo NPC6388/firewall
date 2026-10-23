@@ -710,6 +710,28 @@ XG.Gfx = (function () {
     badges(c, u, cx, cy, o);
     c.restore();
   }
+  // The node server with its capture zone and ring. z: Tac.zoneState(b) ({ att, def, capture, need, attacker }); o: { now }.
+  // Zone outline: who stands in it (attacker colour, defender colour, yellow when contested). Ring: capture progress, filled in
+  // the attacker's colour, in a track coloured by whoever holds the zone right now.
+  function server(c, z, cx, cy, o) {
+    var P = pal(), now = o.now, col = function (sd) { return sd === 'player' ? P.fw : P.lat; };
+    var defSide = z.attacker === 'player' ? 'enemy' : 'player', hold = z.att && z.def ? '255,209,102' : z.att ? col(z.attacker) : z.def ? col(defSide) : '125,227,255';
+    var pulse = REDUCED ? .8 : .6 + .4 * Math.sin(now / 380), h = TS * 1.5;
+    c.save();
+    c.fillStyle = rgba(hold, .06 + .05 * pulse); c.fillRect(cx - h, cy - h, h * 2, h * 2);
+    c.strokeStyle = rgba(hold, .55); c.lineWidth = 1.5; c.setLineDash([6, 5]); c.lineDashOffset = REDUCED ? 0 : -now / 90;
+    c.strokeRect(cx - h + 1, cy - h + 1, h * 2 - 2, h * 2 - 2); c.setLineDash([]);
+    c.fillStyle = 'rgba(0,0,0,.45)'; c.beginPath(); c.ellipse(cx + 2, cy + 8, 13, 6, 0, 0, Math.PI * 2); c.fill();
+    c.translate(cx, cy); SPRITES.server(c, '#7de3ff', 0, now); c.translate(-cx, -cy);
+    var R = 18;
+    c.strokeStyle = rgba(hold, .35); c.lineWidth = 3.5; circle(c, cx, cy, R); c.stroke();
+    if (z.capture > 0) { c.strokeStyle = rgba(col(z.attacker), .95); c.beginPath(); c.arc(cx, cy, R, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, z.capture / z.need)); c.stroke(); }
+    for (var k = 0; k < z.need; k++) { var a = -Math.PI / 2 + Math.PI * 2 * k / z.need; c.fillStyle = '#070d16'; c.fillRect(cx + Math.cos(a) * R - 1.5, cy + Math.sin(a) * R - 1.5, 3, 3); }
+    c.font = 'bold 10px "Share Tech Mono", monospace'; c.textAlign = 'center';
+    var label = z.capture + '/' + z.need;
+    c.lineWidth = 3; c.strokeStyle = 'rgba(0,0,0,.85)'; c.strokeText(label, cx, cy + R + 11); c.fillStyle = z.capture ? rgba(col(z.attacker), 1) : '#cfdbe9'; c.fillText(label, cx, cy + R + 11);
+    c.restore();
+  }
   // A unit's sprite alone, facing up, drawn into a small canvas (squad cards, pickers).
   function icon(cv, u) {
     var dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1, w = cv.clientWidth || cv.width, h = cv.clientHeight || cv.height;
@@ -898,6 +920,20 @@ XG.Gfx = (function () {
         c.strokeStyle = rgba(rgb, .35 + .45 * (d + 1) / 2); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(bb[0], bb[1]); c.stroke();
       });
       c.fillStyle = '#fff'; circle(c, 0, 0, 2.2 * p + 1); c.fill();
+    },
+    server: function (c, col, f, now) { // node-scenario server: a rack of blades with blinking status lights in a soft halo
+      var rgb = rgbOf(col || '#7de3ff'), p = REDUCED ? .8 : .65 + .35 * Math.sin(now / 420);
+      c.globalCompositeOperation = 'lighter'; glow(c, rgb, 24, .3 * p); c.globalCompositeOperation = 'source-over';
+      c.fillStyle = '#0b1622'; c.strokeStyle = rgba(rgb, .9); c.lineWidth = 1.6;
+      c.beginPath(); if (c.roundRect) c.roundRect(-10, -13, 20, 26, 3); else c.rect(-10, -13, 20, 26); c.fill(); c.stroke();
+      for (var k = 0; k < 4; k++) {
+        var y = -10 + k * 6;
+        c.fillStyle = '#16283a'; c.fillRect(-7.5, y, 15, 4.2);
+        var on = REDUCED ? (k % 2 === 0) : hash(Math.floor(now / 140), k, 91) < .55;
+        c.fillStyle = on ? rgba(rgb, .95) : rgba(rgb, .25); c.fillRect(3.5, y + 1.2, 2.2, 1.8);
+        c.fillStyle = hash(Math.floor(now / 230), k, 92) < .2 ? '#ffd166' : 'rgba(125,255,155,.75)'; c.fillRect(-6, y + 1.2, 1.6, 1.8);
+        c.fillStyle = rgba(rgb, .35); c.fillRect(-3.5, y + 1.8, 5.5, .8);
+      }
     },
     firewall_sw: function (c, col, f, now) { // perimeter firewall: a hex of glowing bricks with a rotating ward ring
       var rgb = rgbOf(col);
@@ -1141,6 +1177,6 @@ XG.Gfx = (function () {
       return P ? P.rule : null;
     },
     terrain: terrain, damaged: damaged, decal: decal, ambient: ambient, motes: motes, fog: fog, lights: lights, vignette: vignette,
-    unit: unit, icon: icon, portrait: portrait, pal: pal, emit: emit, particles: particles, FX: FX, bolt: bolt, tracer: tracer, banner: banner, sweep: sweep
+    unit: unit, server: server, icon: icon, portrait: portrait, pal: pal, emit: emit, particles: particles, FX: FX, bolt: bolt, tracer: tracer, banner: banner, sweep: sweep
   };
 })();

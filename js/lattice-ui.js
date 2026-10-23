@@ -68,7 +68,8 @@ XG.LUI = (function () {
     var cls = m.kind === 'raid' || m.kind === 'breach' ? '' : m.kind === 'strike' ? 'story' : 'final';
     var ready = Lat.forceCount(g), es = Lat.earthSquad(g, m);
     var who = es.software ? 'Defenders: ' + es.squad.length + ' security programs' : 'FIREWALL rank ' + D.ranks[es.level].name;
-    return '<div class="mission ' + cls + '"><div class="mh"><span class="mn">' + m.name + '</span><span class="' + (m.daysLeft <= 1 ? 'bad' : 'dim') + '">' + m.daysLeft + 'd left</span></div>' +
+    var tag = XG.Strat.scenarioTag(m);
+    return '<div class="mission ' + cls + '"><div class="mh"><span class="mn">' + m.name + (tag ? ' <span class="scen-tag ' + m.scenario + '">' + tag + '</span>' : '') + '</span><span class="' + (m.daysLeft <= 1 ? 'bad' : 'dim') + '">' + m.daysLeft + 'd left</span></div>' +
       '<div class="dim">' + m.city + ', ' + Lat.regionData(m.region).name + ' · ' + who + '</div>' +
       '<p>' + m.brief + '</p>' +
       '<button class="primary" data-action="l-deploy" data-arg="' + m.id + '"' + (ready ? '' : ' disabled title="No units compiled"') + '>Deploy forces ▸</button></div>';

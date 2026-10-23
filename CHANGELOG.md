@@ -9,13 +9,21 @@ The in-game **Help → Patch notes** tab shows everything from the first `##` he
 ## Unreleased
 
 ### 2026-10-22
+- **Missions:** two raid scenarios. Ordinary missions in both campaigns (FIREWALL purges, Lattice raids and strikes) are now
+  either **Node defense** or **Extermination**, shown as a NODE or EXTERMINATE tag on the mission card and in the briefing.
+  Node defense puts a server near the defenders: the attacker scores a capture point at the end of each turn it has a unit
+  beside the server and the defender has none there, and two points take it. The defender wins by holding out to the turn
+  limit (10 turns). The server cannot be shot or destroyed, gives no cover,
+  and a ring on it shows the capture and who holds the zone. Extermination has no time limit: it ends when one side is gone.
+- **Battle:** Restart mission now changes only where both sides spawn and where patrols walk. The map, the enemies, the Relay,
+  the Uplink Core and the server stay exactly where they were.
 - **Battle:** pressing Tab to switch operatives now centres the camera on the one you switched to.
 - **Battle:** fixed garbled dashes, arrows and degree signs in the battle log and hit-chance breakdown.
 - **Battle:** random spawn points. Both sides now start somewhere new on every mission: your squad lands on a random map edge (north, south, east or west) and the enemy starts well away from it. Restart mission keeps the same map, squads and HP but reshuffles where everyone spawns.
 - **Audio:** new soundtrack moods. Dark ambient and darksynth tracks join the score, and the music shifts with the state of
   the war and of each battle: quiet while you sneak, driving once you make contact, frantic when you are losing.
-- **Battle:** cover wears down. Half the shots that miss someone in breakable cover tear into the cover instead: crates fall
-  after about two such misses, tall cover after three or four, glass shatters on the first. Grenades and other blasts still
+- **Battle:** cover wears down. A third of the shots that miss someone in breakable cover tear into the cover instead: crates fall
+  after about two such misses, tall cover after three or four, glass shatters on any miss. Grenades and other blasts still
   flatten it. Breakable cover carries a faint hairline crack so you can tell it from blast-proof barriers and pillars.
 - **Battle:** fuel barrels can be shot. With Shoot armed, Tab cycles to any barrel in reach after the enemy units (or click
   one: aim, then click again). One hit sets it off. The AI will shoot a barrel that catches two of your units.

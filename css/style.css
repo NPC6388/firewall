@@ -98,6 +98,9 @@ body.modal-open .worldmap .pulse, body.modal-open .glitch { animation-play-state
 .mission.final { border-color: var(--red); box-shadow: inset 3px 0 0 var(--red), 0 0 16px rgba(255,42,85,.15); }
 .mission .mh { display: flex; justify-content: space-between; gap: 8px; }
 .mission .mn { color: #fff; font-weight: bold; }
+.scen-tag { display: inline-block; font-size: 10px; letter-spacing: .12em; padding: 1px 5px; margin-left: 6px; border: 1px solid; vertical-align: 1px; font-weight: normal; }
+.scen-tag.node { color: #7de3ff; border-color: rgba(125,227,255,.55); }
+.scen-tag.exterminate { color: #ff8a5c; border-color: rgba(255,138,92,.55); }
 .mission p { margin: 6px 0 8px; color: var(--dim); font-size: 13px; }
 .feed { max-height: 280px; overflow-y: auto; font-size: 12.5px; }
 .feed div { padding: 3px 0; border-bottom: 1px dashed #15202f; }

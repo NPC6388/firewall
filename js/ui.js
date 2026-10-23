@@ -163,7 +163,8 @@ XG.UI = (function () {
     var cls = m.kind === 'relay' ? 'story' : m.kind === 'uplink' ? 'final' : '';
     var rew = m.kind === 'uplink' ? 'Ends the war.' : 'Reward: ' + m.reward.salvage + ' salvage' + ', §' + St.missionCredits(m) + ', region infection -' + m.reward.infection + '%';
     var ready = g.soldiers.filter(function (s) { return S.available(g, s); }).length;
-    return '<div class="mission ' + cls + '"><div class="mh"><span class="mn">' + m.name + '</span><span class="' + (m.daysLeft !== null && m.daysLeft <= 1 ? 'bad' : 'dim') + '">' +
+    var tag = St.scenarioTag(m);
+    return '<div class="mission ' + cls + '"><div class="mh"><span class="mn">' + m.name + (tag ? ' <span class="scen-tag ' + m.scenario + '">' + tag + '</span>' : '') + '</span><span class="' + (m.daysLeft !== null && m.daysLeft <= 1 ? 'bad' : 'dim') + '">' +
       (m.daysLeft === null ? 'story' : m.daysLeft + 'd left') + '</span></div>' +
       '<div class="dim">' + m.city + ', ' + St.regionData(m.region).name + ' · threat ' + '▮'.repeat(m.diff) + '▯'.repeat(5 - m.diff) + '</div>' +
       '<p>' + m.brief + '<br>' + rew + '</p>' +

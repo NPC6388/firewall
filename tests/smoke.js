@@ -6,7 +6,7 @@ var ctx = vm.createContext({ console: console, Math: Math, Date: Date, JSON: JSO
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', f), 'utf8'), ctx, { filename: f });
 });
 var XG = ctx.XG, Tac = XG.Tac, Strat = XG.Strat, S = XG.State, D = XG.DATA;
-var fails = 0;
+var fails = 0, STALL = 60, stalled = { fw: 0, lat: 0 }; // STALL: harness-only turn cap (extermination has no clock in the game)
 function check(cond, msg) { if (!cond) { fails++; console.log('  FAIL: ' + msg); } }
 
 // Comms chatter: both campaigns have lines for every event, each ['H' | 'L', text].
@@ -22,7 +22,7 @@ function check(cond, msg) { if (!cond) { fails++; console.log('  FAIL: ' + msg);
 function autoBattle(g, m, squad) {
   var b = Tac.create(g, m, squad);
   check(b.units.filter(function (u) { return u.side === 'enemy'; }).length >= 2, 'battle has enemies');
-  for (var turn = 0; turn < 40 && !b.outcome; turn++) {
+  for (var turn = 0; turn < STALL && !b.outcome; turn++) {
     b.units.filter(function (u) { return u.alive && u.side === 'player'; }).forEach(function (u) {
       if (b.outcome) return;
       // use class abilities sometimes so they get exercised
@@ -300,14 +300,14 @@ function autoBattle(g, m, squad) {
       var lg = XG.Lat.newGame(70 + sd); lg.day = 10 + sd * 5;
       var lm = XG.Lat.spawnMission(lg, S.rng(lg), kd), bl = Tac.createLattice(lm, ['warden', 'drone', 'drone'], XG.Lat.earthSquad(lg, lm), {});
       if (bl.W !== 38 || bl.H !== 28) sizeOk = false;
-      lim[kd] = bl.turnLimit;
+      lim[kd + (lm.scenario ? '-' + lm.scenario : '')] = bl.turnLimit;
       reachCheck(bl);
     }
   });
   var btr = Tac.createTraining(g, g.soldiers.slice(0, 1));
   check(btr.W === 22 && btr.H === 16 && btr.tiles.length === 22 * 16, 'combat training stays 22x16');
   check(sizeOk, 'mission and Lattice battle maps are 38x28');
-  check(lim.raid === 10 && lim.uplink === 0 && lim.strike === 25 && lim.breach === 25, 'turn limits unchanged (' + JSON.stringify(lim) + ')');
+  check(lim['raid-node'] === D.tuning.nodeTurns.raid && lim['raid-exterminate'] === 0 && lim.uplink === 0 && lim['strike-node'] === D.tuning.nodeTurns.strike && lim['strike-exterminate'] === 0 && lim.breach === 25, 'turn limits per scenario (' + JSON.stringify(lim) + ')');
   check(reachOk && worst >= 0.9, 'every generated map is connected and every unit starts on reachable floor (worst ' + Math.round(worst * 100) + '% of floor reachable)');
   // comms mood follows Convergence (and Trace pulls the Lattice campaign back a step); lines never break mood
   var Cm = XG.Comms;
@@ -547,7 +547,7 @@ function autoBattle(g, m, squad) {
 // Destructible objects are Shoot targets: barrels explode (and chain), crates take several hits, blast-proof things cannot be shot.
 (function () {
   var g = S.newGame(24), r = S.rng(g), m = Strat.spawnMission(g, r, 'purge'); S.saveRng(g, r);
-  var b = Tac.create(g, Object.assign({}, m, { diff: 1 }), g.soldiers.slice(0, 4)), W = b.W;
+  var b = Tac.create(g, Object.assign({}, m, { diff: 1, scenario: 'exterminate' }), g.soldiers.slice(0, 4)), W = b.W;
   var pl = b.units.filter(function (u) { return u.side === 'player'; }), en = b.units.filter(function (u) { return u.side === 'enemy' && !u.isStatic; });
   var sh = pl[0];
   var reset = function () {
@@ -603,6 +603,146 @@ function autoBattle(g, m, squad) {
   b.rng.chance = realChance;
 })();
 
+// Raid scenarios: node (capture / hold the server) and exterminate (no time limit), in both campaigns.
+(function () {
+  var Lat = XG.Lat, L = Math.max(Tac.MAP_W, Tac.MAP_H), T = D.tuning;
+  // the roll is about 50/50, seeded by the mission seed, and stored on the mission with a matching brief
+  var nNode = 0, same = true;
+  for (var s = 1; s <= 400; s++) { var sc = Strat.rollScenario(s * 7919); if (sc === 'node') nNode++; if (Strat.rollScenario(s * 7919) !== sc) same = false; }
+  check(same && nNode > 160 && nNode < 240, 'scenario roll is seeded and about 50/50 (' + nNode + '/400 node)');
+  var g = S.newGame(61), r = S.rng(g), kinds = {};
+  for (var k = 0; k < 30; k++) { var pm = Strat.spawnMission(g, r, 'purge'); kinds[pm.scenario] = 1; if (!/Capture|Exterminate/.test(pm.brief)) check(false, 'purge brief names the scenario'); }
+  S.saveRng(g, r);
+  check(kinds.node && kinds.exterminate, 'purge missions roll both scenarios');
+  var lg = Lat.newGame(62); lg.day = 30;
+  ['raid', 'strike'].forEach(function (kd) { var lk = {}, lr = S.rng(lg); for (var j = 0; j < 20; j++) { var lm = Lat.spawnMission(lg, lr, kd); lk[lm.scenario] = 1; } check(lk.node && lk.exterminate, 'Lattice ' + kd + ' missions roll both scenarios'); });
+  check(!Lat.spawnMission(lg, S.rng(lg), 'breach').scenario && !Lat.spawnMission(lg, S.rng(lg), 'uplink').scenario && !Strat.spawnMission(g, S.rng(g), 'relay').scenario, 'breach, uplink and relay keep their own objectives');
+  // FIREWALL node battle: server placement over many seeds
+  var mk = function (sc, sd) { return Tac.create(g, { kind: 'purge', diff: 3, name: 't', city: 't', site: 'office block', seed: sd, scenario: sc }, g.soldiers.slice(0, 4)); };
+  var placeOk = true, farOk = true, nbOk = true, minD = 1e9, nearDef = 0, nDef = 0;
+  for (var sd = 1; sd <= 40; sd++) {
+    var bn = mk('node', 1000 + sd * 37), sv = bn.server, open = 0;
+    if (!sv || !bn.reachable[sv.y * bn.W + sv.x] || Tac.tile(bn, sv.x, sv.y) !== Tac.FLOOR || Tac.unitAt(bn, sv.x, sv.y)) placeOk = false;
+    for (var dy = -1; dy <= 1; dy++) for (var dx = -1; dx <= 1; dx++) if ((dx || dy) && Tac.tile(bn, sv.x + dx, sv.y + dy) === Tac.FLOOR) open++;
+    if (open < 3) nbOk = false;
+    var d0 = Tac.dist(sv.x, sv.y, bn.anchor.x, bn.anchor.y); minD = Math.min(minD, d0); if (d0 < L * 0.45) farOk = false;
+    bn.units.forEach(function (u) { if (u.side === 'enemy') { nDef++; if (Tac.dist(u.x, u.y, sv.x, sv.y) <= 8) nearDef++; } });
+  }
+  check(placeOk && nbOk, 'the server sits on reachable open floor with 3+ open neighbours, nobody on it');
+  check(farOk, 'the server is at least 45% of the map away from the attackers (closest ' + minD.toFixed(1) + ')');
+  check(nearDef >= nDef * 0.5, 'Lattice pods gather near the server (' + nearDef + '/' + nDef + ' within 8 tiles)');
+  var bx = mk('exterminate', 77);
+  check(!bx.server && !bx.turnLimit && bx.mission.scenario === 'exterminate', 'exterminate: no server and no turn limit');
+  bx.turn = 70; Tac.endPlayerTurn(bx); var gx = 0; while (Tac.enemyStep(bx) !== null && gx++ < 100) { }
+  check(bx.outcome !== 'timeout', 'exterminate never times out');
+  // the server is no cover and no target
+  var b = mk('node', 4242), sv2 = b.server, W = b.W;
+  var reset = function () {
+    b.tiles.fill(Tac.FLOOR); b.props.fill(0); b.faces.fill(0); b.tileHp = {}; b.outcome = null; b.captured = false; sv2.capture = 0;
+    b.units.forEach(function (u, i) { u.x = (i * 3) % W; u.y = u.side === 'player' ? 0 : b.H - 1; u.alive = true; u.alerted = true; u.ap = 2; });
+    b.visible.fill(true); b.explored = b.visible.slice(); b.side = 'player';
+  };
+  reset();
+  var pl = b.units.filter(function (u) { return u.side === 'player'; }), en = b.units.filter(function (u) { return u.side === 'enemy'; });
+  sv2.x = 15; sv2.y = 12;
+  pl[0].x = 14; pl[0].y = 12; en[0].x = 20; en[0].y = 12;
+  check(Tac.coverTile(b, 15, 12, 1, 0) === Tac.FLOOR && Tac.coverValue(b, 14, 12, 20, 12) === 0, 'the server gives no cover to a unit beside it');
+  check(Tac.targets(b, en[0], 'shoot').indexOf(pl[0]) >= 0 && !Tac.targets(b, en[0], 'shoot').some(function (t) { return t.x === 15 && t.y === 12; }) && !Tac.objectAt(b, 15, 12), 'the server is not a target or a shootable object');
+  check(!Tac.reach(b, pl[0], 4).d[12 * W + 15] || Tac.reach(b, pl[0], 4).d[12 * W + 15] < 0, 'nobody can step onto the server');
+  var tr = pl.filter(function (u) { return u.kind === 'trooper'; })[0];
+  if (tr) { tr.x = 12; tr.y = 15; tr.charges.grenade = 1; tr.ap = 2; Tac.act.grenade(b, tr, 15, 12); check(b.server.x === 15 && Tac.isServer(b, 15, 12), 'a grenade does not move or destroy the server'); }
+  // capture scoring: uncontested +1, contested 0, 2 points (not in a row) wins
+  reset(); sv2.x = 15; sv2.y = 12; pl[0].x = 14; pl[0].y = 11;
+  var ev = []; Tac.captureTick(b, ev);
+  check(sv2.capture === 1 && !b.outcome && ev.some(function (e) { return e.t === 'log' && /capture 1\/2/.test(e.msg); }), 'an attacker alone in the zone scores a capture point (log line)');
+  en[0].x = 16; en[0].y = 13; ev = []; Tac.captureTick(b, ev);
+  check(sv2.capture === 1 && !b.outcome && ev.some(function (e) { return e.t === 'log' && /contested/.test(e.msg); }), 'a contested zone scores nothing');
+  en[0].x = 20; en[0].y = 20; pl[0].x = 30; Tac.captureTick(b, []);
+  check(sv2.capture === 1, 'an empty zone scores nothing');
+  pl[0].x = 16; pl[0].y = 11; b.side = 'player';
+  Tac.endPlayerTurn(b);
+  check(sv2.capture === 2 && b.outcome === 'win' && b.captured && Tac.result(b).captured, 'the second point (scored at the end of the attacker turn) captures the server: FIREWALL wins');
+  reset(); sv2.x = 15; sv2.y = 12; en[0].alive = false; en[0].x = 15; en[0].y = 13; pl[0].x = 14; pl[0].y = 12; Tac.captureTick(b, []);
+  check(sv2.capture === 1, 'a dead defender does not contest');
+  // defender wins on timeout in node (FIREWALL campaign: a failed mission)
+  var bt = mk('node', 99); bt.turn = bt.turnLimit;
+  bt.units.forEach(function (u) { if (u.side === 'player') { u.x = 0; u.y = u.id; } });
+  Tac.endPlayerTurn(bt); var gt = 0; while (Tac.enemyStep(bt) !== null && gt++ < 100) { }
+  check(bt.outcome === 'timeout' && bt.turnLimit === T.nodeTurns.purge, 'node: the defender wins when turn ' + bt.turnLimit + ' ends without a capture (' + bt.outcome + ')');
+  // Lattice raid (you defend) and strike (you attack)
+  var lraid = Lat.spawnMission(lg, S.rng(lg), 'raid'); lraid.scenario = 'node';
+  var br = Tac.createLattice(lraid, ['warden', 'drone', 'drone'], Lat.earthSquad(lg, lraid), {});
+  check(!!br.server && br.nodeAttacker === 'player' && br.turnLimit === T.nodeTurns.raid, 'Lattice raid node: FIREWALL attacks the server, ' + br.turnLimit + '-turn limit');
+  var dd = br.units.filter(function (u) { return u.side === 'enemy'; }).map(function (u) { return Tac.dist(u.x, u.y, br.server.x, br.server.y); });
+  check(dd.every(function (x) { return x <= 7; }), 'raid defenders dig in round the server (' + dd.map(function (x) { return x.toFixed(1); }).join(',') + ')');
+  while (br.side !== br.human && !br.outcome) Tac.aiStep(br);
+  br.units.forEach(function (u) { if (u.side === 'player') { u.x = 0; u.y = u.id; } });
+  br.turn = br.turnLimit; Tac.endTurn(br);
+  check(br.outcome === 'timeout' && Lat.latticeWon('raid', br.outcome, 'node'), 'raid node: holding the server to the limit is a Lattice win');
+  var lex = Lat.spawnMission(lg, S.rng(lg), 'raid'); lex.scenario = 'exterminate';
+  var be = Tac.createLattice(lex, ['warden', 'drone'], Lat.earthSquad(lg, lex), {});
+  check(!be.server && be.turnLimit === 0, 'raid exterminate: no server, no time limit');
+  while (be.side !== be.human && !be.outcome) Tac.aiStep(be);
+  be.turn = 80; Tac.endTurn(be);
+  check(be.outcome !== 'timeout', 'raid exterminate never times out');
+  var lst = Lat.spawnMission(lg, S.rng(lg), 'strike'); lst.scenario = 'node';
+  var bs = Tac.createLattice(lst, ['warden', 'drone', 'drone'], Lat.earthSquad(lg, lst), {});
+  check(!!bs.server && bs.nodeAttacker === 'enemy' && bs.side === 'enemy', 'strike node: you attack the server and move first');
+  var me = bs.units.filter(function (u) { return u.side === 'enemy' && !u.isStatic; })[0];
+  bs.units.forEach(function (u) { if (u.side === 'player') { u.x = 0; u.y = u.id; } });
+  bs.server.capture = 1; me.x = bs.server.x + 1; me.y = bs.server.y; if (Tac.tile(bs, me.x, me.y) !== Tac.FLOOR) me.x = bs.server.x - 1;
+  bs.tiles[me.y * bs.W + me.x] = Tac.FLOOR;
+  Tac.endTurn(bs);
+  check(bs.outcome === 'loss' && bs.captured && Lat.latticeWon('strike', bs.outcome, 'node'), 'strike node: the Lattice captures the server at the end of its turn (FIREWALL loss = your win)');
+  check(Lat.latticeWon('raid', 'timeout', 'node') && !Lat.latticeWon('strike', 'timeout', 'node') && Lat.latticeWon('raid', 'loss', 'exterminate') && !Lat.latticeWon('raid', 'win', 'exterminate') && !Lat.latticeWon('strike', 'win', 'node') && Lat.latticeWon('strike', 'loss', 'exterminate'),
+    'latticeWon: a timeout counts only for the node defender; wipes and captures as usual');
+  var lsx = Lat.spawnMission(lg, S.rng(lg), 'strike'); lsx.scenario = 'exterminate';
+  check(Tac.createLattice(lsx, ['drone'], Lat.earthSquad(lg, lsx), {}).turnLimit === 0, 'strike exterminate has no time limit');
+  // the scenario and the server survive a JSON snapshot + Restart; the server stays put, squads move, capture resets
+  var restartOk = true, awayOk = true, moved2 = 0;
+  [mk('node', 555), br.server && Tac.createLattice(lraid, ['warden', 'drone', 'drone'], Lat.earthSquad(lg, lraid), {}), Tac.createLattice(lst, ['warden', 'drone'], Lat.earthSquad(lg, lst), {})].forEach(function (b0) {
+    for (var rs = 1; rs <= 6; rs++) {
+      var b1 = JSON.parse(JSON.stringify(b0)); b1.rng = Object.assign(new XG.RNG(1), b1.rng); b1.server.capture = 1;
+      Tac.redeploy(b1, rs * 13);
+      if (b1.mission.scenario !== 'node' || b1.server.x !== b0.server.x || b1.server.y !== b0.server.y || b1.server.capture !== 0 || b1.turnLimit !== b0.turnLimit || b1.nodeAttacker !== b0.nodeAttacker) restartOk = false;
+      if (b1.units.some(function (u) { return u.alive && Tac.isServer(b1, u.x, u.y); })) restartOk = false;
+      if (Tac.dist(b1.anchor.x, b1.anchor.y, b1.server.x, b1.server.y) < L * 0.45) awayOk = false;
+      if (b1.anchor.x !== b0.anchor.x || b1.anchor.y !== b0.anchor.y) moved2++;
+    }
+  });
+  check(restartOk, 'node scenario, server spot and turn limit survive snapshot + Restart (capture resets)');
+  check(awayOk, 'after a Restart the attackers still land 45%+ of the map from the server');
+  check(moved2 >= 12, 'Restart still moves the squads (' + moved2 + '/18)');
+  // Restart varies only spawn points and patrol routes: statics (relay, uplink core) and the server keep their tiles, the map,
+  // units and stats stay, squads land elsewhere and pods walk new routes
+  var keepOk = true, squadMoves = 0, routeMoves = 0, runs = 0, farOk2 = true, sameOk = true;
+  var gens = [function (sd) { return Tac.create(g, { kind: 'relay', diff: 3, name: 't', city: 't', site: 'x', seed: sd }, g.soldiers.slice(0, 4)); },
+    function (sd) { return Tac.create(g, { kind: 'uplink', diff: 4, name: 't', city: 't', site: 'x', seed: sd }, g.soldiers.slice(0, 4)); },
+    function (sd) { return mk('node', sd); },
+    function (sd) { var um = Lat.spawnMission(lg, S.rng(lg), 'uplink'); um.seed = sd; return Tac.createLattice(um, ['warden', 'drone', 'drone'], Lat.earthSquad(lg, um), {}); }];
+  gens.forEach(function (gen) {
+    for (var sd = 1; sd <= 5; sd++) {
+      var b0 = gen(300 + sd * 61), pos = function (bb) { return bb.units.filter(function (u) { return u.isStatic; }).map(function (u) { return u.x + ',' + u.y; }).join(' ') + (bb.server ? ' S' + bb.server.x + ',' + bb.server.y : ''); };
+      var sq = function (bb) { return bb.units.filter(function (u) { return u.side === bb.deployInfo.aSide && !u.isStatic; }).map(function (u) { return u.x + ',' + u.y; }).join(' '); };
+      var stats = function (bb) { return bb.units.map(function (u) { return [u.id, u.kind, u.hp, u.maxHp, u.aim, u.mobility, u.armor].join(':'); }).join(); };
+      var routes = function (bb) { return JSON.stringify((bb.pods || []).map(function (P) { return P.route; })); };
+      var snapS = JSON.stringify(b0);
+      [7, 8].forEach(function (rs) {
+        var b1 = JSON.parse(snapS); b1.rng = Object.assign(new XG.RNG(1), b1.rng); Tac.redeploy(b1, rs * 977 + sd); runs++;
+        if (pos(b1) !== pos(b0)) keepOk = false;
+        if (sq(b1) !== sq(b0)) squadMoves++;
+        if ((b0.pods || []).length && routes(b1) !== routes(b0)) routeMoves++;
+        if (stats(b1) !== stats(b0) || JSON.stringify(b1.base) !== JSON.stringify(b0.base) || JSON.stringify(b1.tileHp) !== JSON.stringify(b0.tileHp)) sameOk = false;
+        b1.units.forEach(function (u) { if (u.isStatic && Tac.dist(u.x, u.y, b1.anchor.x, b1.anchor.y) < L * 0.4) farOk2 = false; });
+      });
+    }
+  });
+  check(keepOk, 'Restart keeps statics (relay, uplink core) and the server on their tiles');
+  check(sameOk, 'Restart keeps the map, tile HP, unit composition and stats');
+  check(squadMoves >= runs * 0.8 && routeMoves >= 18, 'Restart moves the squads (' + squadMoves + '/' + runs + ') and re-rolls pod routes (' + routeMoves + ')');
+  check(farOk2, 'after a Restart the squad still lands far from the fixed statics');
+})();
+
 // ---------------------------------------------------------------- battles
 var nb = +process.argv[2] || 60, tally = {};
 for (var i = 0; i < nb; i++) {
@@ -613,16 +753,19 @@ for (var i = 0; i < nb; i++) {
   if (i % 3 === 0) { g.research.done.push('lattice_grammar', 'halcyon'); g.flags.emp = true; }
   var squad = g.soldiers.slice(0, 4);
   var b = autoBattle(g, m, squad);
-  var key = kind + ' d' + m.diff;
-  tally[key] = tally[key] || { win: 0, loss: 0, none: 0, turns: 0, n: 0 };
-  tally[key][b.outcome || 'none']++; tally[key].turns += b.turn; tally[key].n++;
+  var sk = m.scenario ? '-' + (m.scenario === 'node' ? 'node' : 'ext') : '';
+  if (!b.outcome) stalled.fw++;
+  [kind + sk + ' d' + m.diff, kind + sk + ' ALL'].forEach(function (key) {
+    tally[key] = tally[key] || { win: 0, loss: 0, timeout: 0, none: 0, cap: 0, turns: 0, n: 0 };
+    tally[key][b.outcome || 'none']++; tally[key].turns += b.turn; tally[key].n++; if (b.captured) tally[key].cap++;
+  });
   var res = Tac.result(b), out = Strat.resolveMission(g, m.id, res);
   check(out.outcome === (b.outcome || 'abort'), 'resolve keeps outcome');
 }
 console.log('Battles (AI vs AI):');
 Object.keys(tally).sort().forEach(function (k) {
   var t = tally[k];
-  console.log('  ' + k.padEnd(10) + ' win ' + t.win + '  loss ' + t.loss + '  timeout ' + t.none + '  avg turns ' + (t.turns / t.n).toFixed(1));
+  console.log('  ' + k.padEnd(15) + ' win ' + t.win + (t.cap ? ' (cap ' + t.cap + ')' : '') + '  loss ' + t.loss + '  timeout ' + t.timeout + '  stalled ' + t.none + '  avg turns ' + (t.turns / t.n).toFixed(1));
 });
 
 // -------------------------------------------------------------- campaigns
@@ -663,7 +806,8 @@ var Lat = XG.Lat;
 function autoLattice(g, m, types) {
   var b = Tac.createLattice(m, types, Lat.earthSquad(g, m), Lat.mods(g));
   check(b.human === 'enemy', 'lattice battle is human-controlled on the Lattice side');
-  for (var guard = 0; guard < 400 && !b.outcome; guard++) {
+  // safety cap for the harness only (exterminate has no clock): a battle past STALL turns counts as stalled
+  for (var guard = 0; guard < 400 && !b.outcome && b.turn <= STALL; guard++) {
     if (b.side === b.human) {
       b.units.filter(function (u) { return u.alive && u.side === 'enemy' && !u.isStatic; }).forEach(function (u) {
         if (b.outcome) return;
@@ -678,8 +822,9 @@ function autoLattice(g, m, types) {
       check(n < 60, 'AI FIREWALL turn terminates');
     }
   }
-  check(!!b.outcome, 'lattice battle ends');
-  if (!b.outcome) console.log('    stalled:', m.kind, 'turn', b.turn, b.units.filter(function (u) { return u.alive; }).map(function (u) { return u.side[0] + ':' + u.kind + '@' + u.x + ',' + u.y + ' ap' + u.ap; }).join(' '));
+  check(!!b.outcome || b.turn > STALL, 'lattice battle ends');
+  if (!b.outcome) stalled.lat++;
+  if (!b.outcome && b.turn <= STALL) console.log('    stalled:', m.kind, 'turn', b.turn, b.units.filter(function (u) { return u.alive; }).map(function (u) { return u.side[0] + ':' + u.kind + '@' + u.x + ',' + u.y + ' ap' + u.ap; }).join(' '));
   b.units.forEach(function (u) {
     if (!u.alive) return;
     b.units.forEach(function (o) { if (o !== u && o.alive && o.x === u.x && o.y === u.y) check(false, 'lattice battle units overlap'); });
@@ -715,10 +860,12 @@ function autoLattice(g, m, types) {
   check(d.abilities.indexOf('detonate') >= 0 && !!Tac.act.detonate(b, d) && !d.alive, 'drone detonates and is lost');
   check(Tac.act.shoot(b, foe, h) === null, 'person cannot order FIREWALL units in a Lattice battle');
   // raid time limit
-  var mr = Lat.spawnMission(g, r, 'raid'), br = Tac.createLattice(mr, ['warden'], Lat.earthSquad(g, mr), {});
-  check(br.side === 'player' && br.turnLimit === 10, 'raid: FIREWALL moves first, 10-turn limit');
+  var mr = Lat.spawnMission(g, r, 'raid'); mr.scenario = 'node';
+  var br = Tac.createLattice(mr, ['warden'], Lat.earthSquad(g, mr), {});
+  check(br.side === 'player' && br.turnLimit === D.tuning.nodeTurns.raid, 'raid: FIREWALL moves first, ' + br.turnLimit + '-turn limit');
+  br.units.forEach(function (u) { if (u.side === 'player') { u.x = 0; u.y = u.id; } }); // keep FIREWALL off the server
   while (br.side !== br.human && !br.outcome) Tac.aiStep(br);
-  br.turn = 10; Tac.endTurn(br);
+  br.turn = br.turnLimit; Tac.endTurn(br);
   check(br.outcome === 'timeout', 'surviving a raid to the limit ends it as a timeout');
   var out = Lat.resolveMission(g, mr.id, Tac.result(br));
   check(out.won && g.stats.raidsHeld === 1, 'timeout counts as a Lattice win');
@@ -751,11 +898,15 @@ for (var li = 0; li < (+process.argv[4] || 30); li++) {
   lg.day = 1 + (li % 5) * 12; lg.forces = { drone: 4, warden: 2, harmonic: 1 };
   var lm = Lat.spawnMission(lg, rng0(lg), lk);
   var lb = autoLattice(lg, lm, ['warden', 'harmonic', 'drone', 'drone', 'warden']);
-  var key2 = lk + ' day' + lg.day, won2 = Lat.latticeWon(lk, lb.outcome);
-  lt[key2] = lt[key2] || { win: 0, loss: 0 }; lt[key2][won2 ? 'win' : 'loss']++;
+  var sc2 = lm.scenario ? '-' + (lm.scenario === 'node' ? 'node' : 'ext') : '', won2 = Lat.latticeWon(lk, lb.outcome, lm.scenario);
+  [lk + sc2 + ' day' + lg.day, lk + sc2 + ' ALL'].forEach(function (key2) {
+    lt[key2] = lt[key2] || { win: 0, loss: 0, stalled: 0, cap: 0, timeout: 0 }; lt[key2][!lb.outcome ? 'stalled' : won2 ? 'win' : 'loss']++;
+    if (lb.captured) lt[key2].cap++; if (lb.outcome === 'timeout') lt[key2].timeout++;
+  });
 }
-console.log('Lattice battles (Lattice wins / losses, both sides AI):');
-Object.keys(lt).sort().forEach(function (k) { console.log('  ' + k.padEnd(12) + ' win ' + lt[k].win + '  loss ' + lt[k].loss); });
+console.log('Lattice battles (Lattice wins / losses, both sides AI; cap = server captured, timeout = clock ran out):');
+Object.keys(lt).sort().forEach(function (k) { var t = lt[k]; console.log('  ' + k.padEnd(18) + ' win ' + t.win + '  loss ' + t.loss + (t.stalled ? '  stalled ' + t.stalled : '') + (t.cap ? '  cap ' + t.cap : '') + (t.timeout ? '  timeout ' + t.timeout : '')); });
+console.log('Stalled battles (past ' + STALL + ' turns, harness cap only): FIREWALL ' + stalled.fw + ', Lattice ' + stalled.lat);
 
 var lends = { victory: 0, defeat: 0, none: 0 }, ldays = [];
 var porder = ['swarm_logic', 'seed_cascade', 'warden_chassis', 'ghost_packets', 'detonation', 'hardlight', 'swarm_mind', 'phase_shield', 'recursive', 'overture'];

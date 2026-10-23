@@ -40,7 +40,10 @@ XG.Tac = (function () {
     if ((t === HIGH || t === LOW) && b.faces && b.faces[y * b.W + x]) return faceTile(b, x, y, dx, dy);
     return t === FLOOR && (u = unitAt(b, x, y)) && u.kind === 'sentinel' ? LOW : t;
   }
-  function free(b, x, y) { return inB(b, x, y) && tile(b, x, y) === FLOOR && !unitAt(b, x, y); }
+  function free(b, x, y) { return inB(b, x, y) && tile(b, x, y) === FLOOR && !unitAt(b, x, y) && !isServer(b, x, y); }
+  // Node scenario: b.server = { x, y, capture } is the objective. It is not a unit (it cannot be shot, hacked or hurt) and its
+  // tile stays FLOOR (so it is never cover), but nobody can stand on it.
+  function isServer(b, x, y) { var s = b.server; return !!s && s.x === x && s.y === y; }
 
   // Obstacle variants: b.props[tile] is 0 (plain) or a key of DATA.props (barrel, barrier, pillar, glass, fence). The tile code
   // underneath (LOW/HIGH/PIT) still drives LOS, cover and pathing. Everything that destroys cover goes through clearTile.
@@ -493,6 +496,10 @@ XG.Tac = (function () {
       overclock: XG.Strat.overclockCharges(g), visible: null, scans: [], sever: 0, outcome: null, salvage: 0, log: [],
       enemyQueue: []
     };
+    // raid scenario (purge only): 'node' = capture the server within nodeTurns, 'exterminate' = no time limit; null = legacy
+    var scen = mission.kind === 'purge' ? mission.scenario || null : null;
+    b.mission.scenario = scen;
+    if (scen === 'node') { b.turnLimit = nodeTurns('purge'); b.nodeAttacker = 'player'; b.server = { x: OFF, y: OFF, capture: 0 }; }
     genMap(b, rng);
     // Units are made off-map; deploy() places both sides (and can do it again with a new seed on Restart).
     squad.forEach(function (s) { makeSquadUnit(b, g, s, OFF, OFF); });
@@ -516,9 +523,12 @@ XG.Tac = (function () {
     });
     b.deployInfo = { aSide: 'player', mode: 'pods' };
     deploy(b, deploySeed(mission.seed || 12345));
-    log(b, [], 'Deployed: ' + b.mission.name + ' — ' + b.mission.city + '. ' + ({ purge: 'Eliminate all hostiles.', relay: 'Destroy the Relay and all hostiles.', uplink: 'Destroy or Sever the Uplink Core.' })[b.mission.kind], 'sys');
+    log(b, [], 'Deployed: ' + b.mission.name + ' — ' + b.mission.city + '. ' + (scen === 'node' ? 'Capture the server: hold its zone at the end of ' + D.tuning.nodeCapture + ' turns, within ' + b.turnLimit + ' turns.'
+      : scen === 'exterminate' ? 'Exterminate: eliminate all hostiles, no time limit.'
+      : ({ purge: 'Eliminate all hostiles.', relay: 'Destroy the Relay and all hostiles.', uplink: 'Destroy or Sever the Uplink Core.' })[b.mission.kind]), 'sys');
     return b;
   }
+  function nodeTurns(kind) { var T = D.tuning.nodeTurns || {}; return T[kind] || 10; }
   // Combat training range (tutorial): a fixed map, one trooper, a passive target drone behind a crate and a gunner
   // drone that only shoots back. The whole map is visible. Layout notes are in js/tutorial.js (the lessons use them).
   function createTraining(g, squad) {
@@ -574,6 +584,12 @@ XG.Tac = (function () {
       grammar: false, emp: !!earth.g.flags.emp, overclock: 0, visible: null, scans: [], sever: 0, outcome: null, salvage: 0, log: [],
       enemyQueue: [], aiQueue: [], mark: Math.min(D.latticeMarks.length - 1, earth.level || 0), turnLimit: mission.kind === 'raid' ? 10 : mission.kind === 'uplink' ? 0 : 25, spikeBonus: mods.spikeBonus || 0
     };
+    // raid scenario (raid and strike only): 'node' = the attacker captures the server or the defender holds it nodeTurns;
+    // 'exterminate' = to the death, no time limit. Raid: FIREWALL attacks, you defend. Strike: you attack.
+    var scen = mission.kind === 'raid' || mission.kind === 'strike' ? mission.scenario || null : null;
+    b.mission.scenario = scen;
+    if (scen === 'exterminate') b.turnLimit = 0;
+    else if (scen === 'node') { b.turnLimit = nodeTurns(mission.kind); b.nodeAttacker = mission.kind === 'raid' ? 'player' : 'enemy'; b.server = { x: OFF, y: OFF, capture: 0 }; }
     genMap(b, rng);
     var count = {}, strike = mission.kind === 'strike' || mission.kind === 'breach'; // you attack, you move first
     var addLat = function (type, p) {
@@ -604,12 +620,16 @@ XG.Tac = (function () {
       b.units.forEach(function (u) { if (u.side === 'enemy') u.ap = u.isStatic ? 0 : 2; });
     } else b.aiQueue = b.units.filter(function (u) { return u.side === 'player'; }).map(function (u) { return u.id; });
     refreshVis(b);
-    log(b, [], 'Deployed: ' + b.mission.name + ' — ' + b.mission.city + '. ' + ({
+    log(b, [], 'Deployed: ' + b.mission.name + ' — ' + b.mission.city + '. ' + (scen === 'node' ? (mission.kind === 'raid'
+      ? 'Hold the server until turn ' + b.turnLimit + ' ends, or wipe the FIREWALL squad.'
+      : 'Capture the server: hold its zone at the end of ' + D.tuning.nodeCapture + ' of your turns, within ' + b.turnLimit + ' turns.')
+      : scen === 'exterminate' ? (mission.kind === 'raid' ? 'Exterminate: wipe the FIREWALL squad. No time limit.' : 'Exterminate: destroy the FIREWALL squad. No time limit.')
+      : ({
       raid: 'Wipe the FIREWALL squad, or hold out until turn 10 ends.',
       strike: 'Destroy the FIREWALL squad.',
       breach: 'Purge the security software.',
       uplink: 'Protect the Uplink Core. Wipe the squad to break the assault.'
-    })[mission.kind], 'sys');
+    })[mission.kind]), 'sys');
     return b;
   }
   // -------------------------------------------------------------- deployment
@@ -634,7 +654,18 @@ XG.Tac = (function () {
   }
   // Squad A's block: a random edge (long edges more likely), a random spot along it. Prefers a fully open 3x3, then one that
   // holds all n units, then one that needs a few LOW tiles cleared. Returns { e, l, cells, clear } or null.
-  function pickBlock(b, dr, n) {
+  // avoid: { pts: [[x, y]...], d: [d1, d2...] } (statics and the node server on a Restart, which keep their tiles): a block whose
+  // centre is at least d1 from every point, else d2..., else the plain pick.
+  function pickBlock(b, dr, n, avoid) {
+    if (avoid && avoid.pts.length) {
+      var s0 = dr.s, far = function (bl, d) { var c = edgeXY(b, bl.e, 1, bl.l); return avoid.pts.every(function (p) { return dist(c[0], c[1], p[0], p[1]) >= d; }); };
+      for (var di = 0; di < avoid.d.length; di++) {
+        dr.s = s0;
+        for (var tries = 0; tries < 30; tries++) { var got = pickBlock(b, dr, n, null); if (!got) break; if (far(got, avoid.d[di])) return got; }
+      }
+      dr.s = s0; // nothing far enough: fall back to the plain pick
+      return pickBlock(b, dr, n, null);
+    }
     var len = { W: b.H, E: b.H, N: b.W, S: b.W }, pool = ['W', 'E', 'N', 'S'], order = [];
     while (pool.length) {
       var tot = pool.reduce(function (s, e) { return s + len[e]; }, 0), r = dr.next() * tot, k = 0;
@@ -655,8 +686,8 @@ XG.Tac = (function () {
     return null;
   }
   // Put squad A in its block (clearing LOW tiles if the block is short), add a little starting cover behind it, return the anchor.
-  function placeSquadA(b, dr, squad) {
-    var n = squad.length, blk = pickBlock(b, dr, n), W = b.W, H = b.H, i;
+  function placeSquadA(b, dr, squad, avoid) {
+    var n = squad.length, blk = pickBlock(b, dr, n, avoid), W = b.W, H = b.H, i;
     if (!blk) { // no open block anywhere: the open floor nearest a random edge point
       var e0 = dr.pick(['W', 'E', 'N', 'S']), ep = edgeXY(b, e0, 1, e0 === 'W' || e0 === 'E' ? H >> 1 : W >> 1), fl = [];
       for (i = 0; i < W * H; i++) if (b.tiles[i] === FLOOR && b.reachable[i]) fl.push([i % W, Math.floor(i / W)]);
@@ -666,7 +697,8 @@ XG.Tac = (function () {
       blk.clear.slice(0, n - blk.cells.length).forEach(function (p) { var ti = p[1] * W + p[0]; b.tiles[ti] = FLOOR; b.props[ti] = 0; b.faces[ti] = 0; blk.cells.push(p); });
       b.reachable = floorComponent(b.tiles, W, H).mark;
     }
-    var spots = blk.cells.slice(0, n);
+    var spots = blk.cells.filter(function (p) { return !unitAt(b, p[0], p[1]) && !isServer(b, p[0], p[1]); }).slice(0, n); // statics kept on a Restart
+    if (!spots.length) spots = [nearestFree(b, blk.cells[0][0], blk.cells[0][1], 6) || blk.cells[0]];
     squad.forEach(function (u, k) { var p = spots[k] || nearestFree(b, spots[0][0], spots[0][1], 4) || spots[0]; u.x = p[0]; u.y = p[1]; });
     // a little starting cover just beyond the block, either side of the middle (kept only if the floor stays connected)
     if (blk.l >= 0) [-2, 2].forEach(function (side) {
@@ -692,6 +724,30 @@ XG.Tac = (function () {
     }
     return out;
   }
+  // Node server: a reachable open tile on the defender's side, 50-72% of the longest side from squad A (relaxed to NODE_D), with
+  // 5+ open neighbours if possible (3 at least), and never a chokepoint (the open floor stays connected without its tile).
+  var NODE_D = 0.45;
+  function placeServer(b, dr, A, L) {
+    var W = b.W, S = b.server, open = function (x, y) { return free(b, x, y) && b.reachable[y * W + x]; };
+    var nb = function (x, y) { var n = 0; for (var dy = -1; dy <= 1; dy++) for (var dx = -1; dx <= 1; dx++) if ((dx || dy) && open(x + dx, y + dy)) n++; return n; };
+    var tiers = [[0.5, 0.72, 5], [NODE_D, 0.8, 4], [NODE_D, 1.5, 3], [0, 9, 0]], before = floorComponent(b.tiles, W, b.H).size;
+    for (var ti = 0; ti < tiers.length; ti++) {
+      var T = tiers[ti], list = [];
+      for (var y = 1; y < b.H - 1; y++) for (var x = 1; x < W - 1; x++) {
+        var d = dist(x, y, A.x, A.y), k;
+        if (!open(x, y) || d < L * T[0] || d > L * T[1] || (k = nb(x, y)) < T[2]) continue;
+        list.push([x, y, Math.min(k, 7) + dr.next() * 3]);
+      }
+      list.sort(function (p, q) { return q[2] - p[2]; });
+      for (var i = 0; i < list.length && i < 12; i++) {
+        var p = list[i], ix = p[1] * W + p[0];
+        b.tiles[ix] = WALL; var after = floorComponent(b.tiles, W, b.H).size; b.tiles[ix] = FLOOR;
+        if (after >= before - 1) { S.x = p[0]; S.y = p[1]; return S; }
+      }
+    }
+    S.x = A.x; S.y = A.y; // unreachable in practice
+    return S;
+  }
   // (Re)place every unit on the finished map. b.deployInfo = { aSide, mode: 'pods' | 'dug' | 'strike' }.
   function deploy(b, seed) {
     var info = b.deployInfo, W = b.W, H = b.H, L = Math.max(W, H), kx = W / BASE_W, dr = new XG.RNG(seed), keep = b.rng;
@@ -699,9 +755,14 @@ XG.Tac = (function () {
     b.tiles = b.base.tiles.slice(); b.props = b.base.props.slice(); b.faces = b.base.faces.slice(); b.tileHp = {};
     b.reachable = floorComponent(b.tiles, W, H).mark;
     b.rng = dr; // placement jitter uses the deploy stream, so the battle's own RNG is untouched
-    b.units.forEach(function (u) { u.x = OFF; u.y = OFF; });
-    var A = placeSquadA(b, dr, b.units.filter(function (u) { return u.side === info.aSide && !u.isStatic; }));
-    var others = b.units.filter(function (u) { return u.side !== info.aSide || u.isStatic; }), statics = others.filter(function (u) { return u.isStatic; }),
+    // Static objectives (relay, uplink core) and the node server are placed on the first deploy only; a Restart keeps their tiles
+    // and instead lands squad A far enough from them (55% of the longest side, else 45%). Everything else moves.
+    b.units.forEach(function (u) { if (!(u.isStatic && u.x !== OFF)) { u.x = OFF; u.y = OFF; } });
+    var S = b.server, keepS = S && S.x !== OFF, fixed = b.units.filter(function (u) { return u.isStatic && u.x !== OFF; }).map(function (u) { return [u.x, u.y]; });
+    if (keepS) fixed.push([S.x, S.y]);
+    var A = placeSquadA(b, dr, b.units.filter(function (u) { return u.side === info.aSide && !u.isStatic; }), fixed.length ? { pts: fixed, d: [Math.round(L * 0.55), Math.round(L * NODE_D)] } : null);
+    if (S) { if (!keepS) placeServer(b, dr, A, L); S.capture = 0; }
+    var others = b.units.filter(function (u) { return u.side !== info.aSide || u.isStatic; }), statics = others.filter(function (u) { return u.isStatic && u.x === OFF; }),
       movers = others.filter(function (u) { return !u.isStatic; });
     var minD = Math.round(L * dr.int(55, 60) / 100), farD = Math.round(L * 0.7), cand = farTiles(b, A, minD, 40);
     dr.shuffle(cand);
@@ -714,24 +775,25 @@ XG.Tac = (function () {
       u.x = spot[0]; u.y = spot[1];
     });
     if (info.mode === 'pods') {
-      var centers = [], sp = Math.round(5 * kx);
-      b.pods.forEach(function (P) {
+      // node: pods gather round the server (nearest candidates first, packed closer); the first one guards it and never patrols
+      var centers = [], sp = Math.round((S ? 3 : 5) * kx), pc = S ? cand.slice().sort(function (p, q) { return dist(p[0], p[1], S.x, S.y) - dist(q[0], q[1], S.x, S.y); }) : cand;
+      b.pods.forEach(function (P, pi) {
         var c = null;
-        for (var i = 0; i < cand.length && !c; i++) {
-          var p = cand[i];
+        for (var i = 0; i < pc.length && !c; i++) {
+          var p = pc[i];
           if (free(b, p[0], p[1]) && centers.every(function (o) { return dist(o[0], o[1], p[0], p[1]) >= sp; })) c = p;
         }
-        c = c || cand.filter(function (p) { return free(b, p[0], p[1]); })[0];
+        c = c || pc.filter(function (p) { return free(b, p[0], p[1]); })[0];
         centers.push(c);
-        P.route = patrolRoute(b, dr, c, cand); P.wp = 1;
+        P.route = S && pi === 0 ? [[c[0], c[1]]] : patrolRoute(b, dr, c, cand); P.wp = 1;
         P.members.forEach(function (id) {
           var e = unitById(b, id), spot = nearestFree(b, c[0], c[1], 3);
           if (spot) { e.x = spot[0]; e.y = spot[1]; }
         });
       });
     } else {
-      var spots, core = statics[0];
-      if (info.mode === 'dug') {
+      var spots, core = S || others.filter(function (u) { return u.isStatic; })[0];
+      if (info.mode === 'dug' || S) { // node defenders (either side) dig in round the server too
         // dug in: one tight 3x3 block on tiles with cover toward the FIREWALL landing point, well back from it
         var dug = function (x, y) { return coverValue(b, x, y, A.x, A.y) > 0; };
         var dcand = cand.filter(function (p) { return dug(p[0], p[1]); }).concat(cand.filter(function (p) { return !dug(p[0], p[1]); }));
@@ -889,7 +951,7 @@ XG.Tac = (function () {
   }
   // ---- shootable objects: any LOW/HIGH tile clearTile can destroy by fire. b.tileHp {tileIndex: hp} fills in lazily (undamaged = full).
   // Only explosives can be aimed at; other breakable cover wears down from misses at the unit behind it (STRAY) and blasts.
-  var OBJ_HP = { barrel: 1, glass: 1 }, OBJ_HP_LOW = 6, OBJ_HP_HIGH = 10, STRAY = 50; // STRAY: % of covered misses that hit the cover
+  var OBJ_HP = { barrel: 1, glass: 1 }, OBJ_HP_LOW = 6, OBJ_HP_HIGH = 10, STRAY = 33; // STRAY: % of covered misses that hit the cover
   function explosive(b, x, y) { return propOf(b, x, y) === 'barrel'; }
   function objMax(b, x, y) { var p = propOf(b, x, y); return OBJ_HP[p] || (tile(b, x, y) === HIGH ? OBJ_HP_HIGH : OBJ_HP_LOW); }
   function destructible(b, x, y) { var t = tile(b, x, y), p = propOf(b, x, y); return (t === LOW || t === HIGH) && p !== 'barrier' && p !== 'pillar'; }
@@ -1320,6 +1382,7 @@ XG.Tac = (function () {
   function endPlayerTurn(b) {
     if (b.side !== 'player' || b.outcome) return [];
     var ev = [];
+    if (b.nodeAttacker === 'player') { captureTick(b, ev); if (b.outcome) return after(b, ev); }
     b.units.forEach(function (u) {
       if (!u.alive || !u.override) return;
       if (--u.override <= 0) { u.side = 'enemy'; kill(b, u, ev, null, 'is purged by the Lattice'); }
@@ -1357,7 +1420,9 @@ XG.Tac = (function () {
     return null;
   }
 
-  function startPlayerTurn(b) {
+  function startPlayerTurn(b, ev) {
+    ev = ev || [];
+    if (b.nodeAttacker === 'enemy' && !b.outcome) { captureTick(b, ev); if (b.outcome) { refreshVis(b); return; } }
     b.side = 'player'; b.turn++;
     b.units.forEach(function (u) {
       if (!u.alive) return;
@@ -1370,9 +1435,41 @@ XG.Tac = (function () {
     log(b, [], '— Turn ' + b.turn + ' —', 'sys');
     if (b.turnLimit && b.turn > b.turnLimit && !b.outcome) {
       b.outcome = 'timeout';
-      log(b, [], b.mission.lkind === 'raid' ? 'FIREWALL runs out of time and pulls its squad out.' : 'Time is up. The attack has stalled.', 'sys');
+      log(b, ev, b.server ? 'Turn ' + b.turnLimit + ' is over and the server holds. ' + (b.nodeAttacker === 'player' ? 'FIREWALL' : 'The Lattice') + ' falls back.'
+        : b.mission.lkind === 'raid' ? 'FIREWALL runs out of time and pulls its squad out.' : 'Time is up. The attack has stalled.', 'sys');
     }
     refreshVis(b);
+  }
+
+  // ------------------------------------------------------------ node scenario
+  // Who stands in the server zone (within 1 tile, Chebyshev): living mobile units of the attacking side and of the defenders.
+  function zoneState(b) {
+    var s = b.server;
+    if (!s || s.x < 0) return null;
+    var A = b.nodeAttacker, att = 0, def = 0;
+    b.units.forEach(function (u) {
+      if (!u.alive || u.isStatic || cheb(u.x, u.y, s.x, s.y) > 1) return;
+      if (u.side === A) att++; else def++;
+    });
+    return { att: att, def: def, capture: s.capture, need: D.tuning.nodeCapture, attacker: A, x: s.x, y: s.y };
+  }
+  // End of the attacker's turn: attackers in the zone and no defender there score a capture point; nodeCapture points win.
+  function captureTick(b, ev) {
+    var z = zoneState(b);
+    if (!z || b.outcome) return;
+    var s = b.server, who = z.attacker === 'player' ? 'FIREWALL' : 'The Lattice', mine = z.attacker === b.human;
+    if (z.att && !z.def) {
+      s.capture++;
+      ev.push({ t: 'text', x: s.x, y: s.y, text: 'CAPTURE ' + s.capture + '/' + z.need, color: mine ? '#7dff9b' : '#ff4d6d' });
+      log(b, ev, who + ' holds the server zone: capture ' + s.capture + '/' + z.need + '.', mine ? 'good' : 'bad');
+      if (s.capture >= z.need) {
+        b.captured = true; b.outcome = z.attacker === 'player' ? 'win' : 'loss';
+        log(b, ev, 'SERVER CAPTURED.', mine ? 'good' : 'bad');
+      }
+    } else if (z.att) {
+      ev.push({ t: 'text', x: s.x, y: s.y, text: 'CONTESTED', color: '#ffd166' });
+      log(b, ev, 'The server zone is contested: no capture point this turn.', '');
+    }
   }
 
   // Side-agnostic turn API. endTurn: the person ends their turn. aiStep: the AI side takes one action;
@@ -1380,9 +1477,10 @@ XG.Tac = (function () {
   function endTurn(b) {
     if (b.outcome || b.side !== b.human) return [];
     if (b.human === 'player') return endPlayerTurn(b);
-    startPlayerTurn(b);
+    var ev = [];
+    startPlayerTurn(b, ev);
     b.aiQueue = b.units.filter(function (u) { return u.alive && u.side === 'player'; }).map(function (u) { return u.id; });
-    return after(b, []);
+    return after(b, ev);
   }
   function aiStep(b) {
     if (b.outcome || b.side === b.human) return [];
@@ -1460,6 +1558,23 @@ XG.Tac = (function () {
           log(b, ev, u.name + ' fires a Data Spike at ' + (st.short || st.name) + ' (ignores cover).', 'bad');
           damage(b, st, 3 + (b.spikeBonus || 0), ev, u, {});
           break;
+        }
+      }
+      if (b.server && nodeGoal(b, u)) { // node: get into the server zone (or stay in it), then shoot from there or watch it
+        var sv = b.server;
+        if (cheb(u.x, u.y, sv.x, sv.y) <= 1) {
+          var zs = bestShot(b, u, foes);
+          if (zs && zs.score >= 20) { u.ap = 0; fire(b, u, zs.t, ev); }
+          else if (u.abilities.indexOf('overwatch') >= 0) { u.ap = 0; u.overwatch = true; log(b, ev, (u.short || u.name) + ' watches the server zone.', ''); }
+          else u.ap = 0;
+          break;
+        }
+        var zt = zoneStep(b, u, foes);
+        if (zt) {
+          var zev = doMove(b, u, zt[0], zt[1]);
+          if (!zev) { u.ap = 0; break; }
+          Array.prototype.push.apply(ev, zev);
+          continue;
         }
       }
       var bar = !u.dummy && bestBarrelShot(b, u, foes);
@@ -1553,6 +1668,42 @@ XG.Tac = (function () {
     return { step: p[Math.min(p.length, u.mobility) - 1], goal: step };
   }
 
+  // Node AI (either side). Attackers head for the server once time is short (the last nodeRush turns) or they outnumber the
+  // defenders; defenders keep their nearest unit in the zone and step back in to contest when attackers stand there alone.
+  function nodeGoal(b, u) {
+    var z = zoneState(b);
+    if (!z || u.isStatic) return false;
+    var mob = function (sd) { return b.units.filter(function (o) { return o.alive && !o.isStatic && (o.side === z.attacker) === sd; }).length; };
+    if (u.side === z.attacker) return (b.turnLimit && b.turn >= b.turnLimit - (D.tuning.nodeRush || 5)) || mob(true) > mob(false);
+    if (cheb(u.x, u.y, z.x, z.y) <= 1) return z.def <= 1 || z.att > 0; // the last guard (or anyone, under attack) stays put
+    if (z.att && !z.def) return true;
+    if (z.def) return false;
+    var near = b.units.filter(function (o) { return o.alive && !o.isStatic && o.side !== z.attacker; })
+      .sort(function (p, q) { return dist(p.x, p.y, z.x, z.y) - dist(q.x, q.y, z.x, z.y) || p.id - q.id; })[0];
+    return near === u;
+  }
+  // Where to move for the zone: the best-covered zone tile in reach this action (a one-AP move scores higher), else the next
+  // leg of the real path to the nearest zone tile. Null when every zone tile is taken or out of reach.
+  function zoneStep(b, u, foes) {
+    var s = b.server, r = reach(b, u, moveRange(u)), best = null, bs = -1e9;
+    var nf = foes.filter(function (f) { return !f.isStatic; }).sort(function (p, q) { return dist(u.x, u.y, p.x, p.y) - dist(u.x, u.y, q.x, q.y); })[0];
+    for (var dy = -1; dy <= 1; dy++) for (var dx = -1; dx <= 1; dx++) {
+      var x = s.x + dx, y = s.y + dy;
+      if (!inB(b, x, y) || r.d[y * b.W + x] <= 0) continue;
+      var sc = (nf ? coverValue(b, x, y, nf.x, nf.y) : 0) + (r.d[y * b.W + x] <= u.mobility ? 15 : 0) + b.rng.next() * 3;
+      if (sc > bs) { bs = sc; best = [x, y]; }
+    }
+    if (best) return best;
+    var far = reach(b, u, 80), bd = 1e9, goal = null;
+    for (var dy2 = -1; dy2 <= 1; dy2++) for (var dx2 = -1; dx2 <= 1; dx2++) {
+      var gx = s.x + dx2, gy = s.y + dy2, gd = inB(b, gx, gy) ? far.d[gy * b.W + gx] : -1;
+      if (gd > 0 && gd < bd) { bd = gd; goal = [gx, gy]; }
+    }
+    if (!goal) return null;
+    var p = pathTo(far, goal[0], goal[1]);
+    return p && p.length ? p[Math.min(p.length, u.mobility) - 1] : null;
+  }
+
   function spawnTick(b, u, ev) {
     var sp = u.spawn;
     if (!sp || (!u.alerted && u.kind !== 'core')) return ev;
@@ -1575,6 +1726,7 @@ XG.Tac = (function () {
   function result(b) {
     return {
       outcome: b.outcome || 'abort',
+      scenario: b.mission.scenario || null, captured: !!b.captured,
       salvage: b.outcome === 'win' ? b.salvage : 0,
       lattice: b.units.filter(function (u) { return u.deployed; }).map(function (u) { return { kind: u.kind, alive: u.alive }; }),
       humansKilled: b.units.filter(function (u) { return u.sid && !u.alive; }).length,
@@ -1591,6 +1743,6 @@ XG.Tac = (function () {
     endTurn: endTurn, aiStep: aiStep,
     reach: reach, pathTo: pathTo, moveRange: moveRange, hitInfo: hitInfo, targets: targets, tileOk: tileOk,
     abilityBlock: abilityBlock, coverValue: coverValue, coverDetail: coverDetail, los: los, isVisible: isVisible, unitAt: unitAt,
-    unitById: unitById, tile: tile, coverTile: coverTile, dist: dist, cheb: cheb, checkOutcome: checkOutcome, result: result, abort: abort
+    unitById: unitById, tile: tile, coverTile: coverTile, isServer: isServer, zoneState: zoneState, captureTick: captureTick, nodeTurns: nodeTurns, dist: dist, cheb: cheb, checkOutcome: checkOutcome, result: result, abort: abort
   };
 })();

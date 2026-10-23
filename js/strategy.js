@@ -172,6 +172,13 @@ XG.Strat = (function () {
     },
 
     // ----------------------------------------------------------- missions
+    // Raid scenario for an ordinary mission: 'node' (capture / hold the server) or 'exterminate' (no time limit), seeded by the
+    // mission seed so it never touches the campaign RNG. Used by both campaigns (Lattice raids and strikes too).
+    rollScenario: function (seed) {
+      var r = new XG.RNG((Math.imul((seed >>> 0) || 1, 2246822519) ^ 0x27D4EB2F) >>> 0);
+      return r.next() < D.tuning.nodeChance ? 'node' : 'exterminate';
+    },
+    scenarioTag: function (m) { return m.scenario === 'node' ? 'NODE' : m.scenario === 'exterminate' ? 'EXTERMINATE' : ''; },
     difficulty: function (g) { return Math.min(5, 1 + Math.floor((g.day - 1) / 18)); },
 
     spawnMission: function (g, r, kind) {
@@ -193,7 +200,10 @@ XG.Strat = (function () {
         m.name = 'Operation ' + r.pick(OP_A) + ' ' + r.pick(OP_B);
         m.daysLeft = r.int(D.tuning.missionLife[0], D.tuning.missionLife[1]) + (built(g, 'array') ? 2 : 0);
         m.reward = { salvage: r.int(8, 14) + diff * 3, credits: r.int(0, 2) * 10, infection: r.int(12, 20) };
-        m.brief = 'Lattice cell entrenched in a ' + m.site + '. Eliminate all hostiles.';
+        m.scenario = Strat.rollScenario(m.seed);
+        m.brief = m.scenario === 'node'
+          ? 'Lattice cell guarding a server node in a ' + m.site + '. Capture it: end ' + D.tuning.nodeCapture + ' of your turns with an operative beside the server and no hostile there, within ' + D.tuning.nodeTurns.purge + ' turns. Wiping them out also works.'
+          : 'Lattice cell entrenched in a ' + m.site + '. Exterminate: eliminate all hostiles. No time limit.';
       } else if (kind === 'relay') {
         m.name = 'Relay Trace'; m.diff = Math.max(2, diff);
         m.reward = { salvage: 25, credits: 30, infection: 20 };

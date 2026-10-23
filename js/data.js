@@ -406,7 +406,16 @@ XG.DATA = {
     minMissionCredits: 15,     // every won mission pays at least this
     missionEvery: [3, 5],
     missionLife: [4, 6],
-    veteranDrone: 3            // one extra drone once the squad's average rank reaches this (3 = Sergeant)
+    veteranDrone: 3,           // one extra drone once the squad's average rank reaches this (3 = Sergeant)
+    // Raid scenarios for ordinary missions (FIREWALL purge, Lattice raid and strike): 'node' (capture / hold a server) or
+    // 'exterminate' (no time limit). nodeChance: share of those missions that roll 'node' (seeded by mission.seed).
+    // Capture: at the end of the attacker's turn, an attacker within 1 tile of the server and no defender there scores a point;
+    // nodeCapture points (need not be in a row) take it. nodeTurns: the defender holds out that many turns, per mission kind.
+    // nodeRush: from this many turns before the end, attacking AI heads for the server whatever the odds.
+    nodeChance: 0.5,
+    nodeCapture: 2,
+    nodeTurns: { purge: 10, raid: 10, strike: 10 },
+    nodeRush: 5
   },
 
   // ---------------------------------------------------- the Lattice campaign

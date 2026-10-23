@@ -23,8 +23,10 @@ XG.Lat = (function () {
   var Lat = {
     SAVE_KEY: 'firewall-lattice-save-v1',
     has: has, built: built, region: region, regionData: regionData, costText: costText,
-    latticeWon: function (kind, outcome) { return outcome === 'loss' || (outcome === 'timeout' && kind === 'raid'); },
-
+    // FIREWALL's 'loss' (wiped, or the Lattice captured the server in a strike) is your win. A timeout only counts for the side
+    // that defends: you, in a raid (legacy hold-out or node scenario). Strikes and breaches that run out the clock are lost, and
+    // an exterminate battle has no clock. scenario is optional (the rule does not depend on it).
+    latticeWon: function (kind, outcome, scenario) { return outcome === 'loss' || (outcome === 'timeout' && kind === 'raid' && scenario !== 'exterminate'); },
     newGame: function (seed) {
       seed = seed || (Date.now() & 0x7fffffff);
       var r = new XG.RNG(seed);
@@ -209,10 +211,16 @@ XG.Lat = (function () {
         m.brief = 'Earth\'s security software guards a ' + m.site + ': firewalls, antivirus, intrusion detection. You move first; 25-turn limit. Purge it: region infection +8%, +10 compute, Detection +2% (+4% if you fail).';
       } else if (kind === 'raid') {
         m.name = 'FIREWALL raid: ' + city; m.site = r.pick(D.sites); m.daysLeft = L.tuning.raidLife;
-        m.brief = 'A FIREWALL squad is purging your cell in a ' + m.site + '. Your units start on overwatch. Wipe them, or hold out for 10 turns. Ignore it and the region loses ' + L.tuning.raidIgnored.infection + '% infection.';
+        m.scenario = XG.Strat.rollScenario(m.seed);
+        m.brief = 'A FIREWALL squad is purging your cell in a ' + m.site + '. Your units start on overwatch. ' + (m.scenario === 'node'
+          ? 'Hold your server node for ' + D.tuning.nodeTurns.raid + ' turns: FIREWALL captures it by ending ' + D.tuning.nodeCapture + ' of its turns beside it with none of yours there. Wiping them also wins.'
+          : 'Exterminate: wipe them. No time limit, to the death.') + ' Ignore it and the region loses ' + L.tuning.raidIgnored.infection + '% infection.';
       } else if (kind === 'strike') {
         m.name = 'Strike: ' + city + ' safehouse'; m.site = 'FIREWALL safehouse'; m.daysLeft = L.tuning.strikeLife;
-        m.brief = 'HALCYON\'s traffic leaks from a FIREWALL safehouse. You move first. Wipe the squad within 25 turns: Trace -8%, +15 substrate, and FIREWALL loses a step.';
+        m.scenario = XG.Strat.rollScenario(m.seed);
+        m.brief = 'HALCYON\'s traffic leaks from a FIREWALL safehouse. You move first. ' + (m.scenario === 'node'
+          ? 'Capture its server node within ' + D.tuning.nodeTurns.strike + ' turns: end ' + D.tuning.nodeCapture + ' of your turns beside it with no FIREWALL unit there (or wipe the squad).'
+          : 'Exterminate: wipe the squad. No time limit.') + ' Win: Trace -8%, +15 substrate, and FIREWALL loses a step.';
       } else {
         m.name = 'Hold the Uplink'; m.city = 'Pacific cable landing station'; m.site = 'cable landing station'; m.daysLeft = 2;
         m.brief = 'FIREWALL\'s best squad assaults the Uplink Core. Keep the core alive: wipe the squad. Your units start on overwatch, and the core compiles drones every other turn.';
@@ -328,7 +336,7 @@ XG.Lat = (function () {
     // clock ('timeout') is a win only when you were defending (raid). An attack that stalls has failed.
     resolveMission: function (g, missionId, result) {
       var m = g.missions.filter(function (x) { return x.id === missionId; })[0];
-      var won = Lat.latticeWon(m.kind, result.outcome);
+      var won = Lat.latticeWon(m.kind, result.outcome, result.scenario);
       var out = { mission: m, won: won, lost: {}, humansKilled: result.humansKilled, substrate: 0, notes: [] };
       result.lattice.forEach(function (u) {
         if (u.alive || !(u.kind in g.forces)) return;

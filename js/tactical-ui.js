@@ -108,7 +108,7 @@ XG.TacUI = (function () {
     $('tac-abort').onclick = function () {
       if (!canInput()) return;
       // Restart: start over from turn 1, same map, squad and enemies; nothing from this attempt counts
-      var RS = st.snap ? '<button id="ab-restart" title="Start over from turn 1: same map, squad and enemies, but both sides land on new spawn points. Nothing from this attempt counts.">Restart mission</button>' : '';
+      var RS = st.snap ? '<button id="ab-restart" title="Start over from turn 1: same map, squad, enemies and objectives, but both sides land on new spawn points and patrols take new routes. Nothing from this attempt counts.">Restart mission</button>' : '';
       XG.UI.modal(st.b.training ? '<h1>Leave the range?</h1><p>Training ends; nothing is lost.</p><div class="modal-actions"><button id="ab-no">Stay</button><button class="danger" id="ab-yes">Leave</button></div>' : lat() ? '<h1>Withdraw?</h1><p>Your units pull back into the network. The mission counts as lost.</p>' +
         '<div class="modal-actions"><button id="ab-no">Keep fighting</button>' + RS + '<button class="danger" id="ab-yes">Withdraw</button></div>' :
         '<h1>Abort mission?</h1><p>The squad extracts. The mission counts as a failure: regional infection rises and Convergence +2%.' +
@@ -531,15 +531,19 @@ XG.TacUI = (function () {
     st.finished = true;
     syncLog(); hud();
     var b = st.b, o = b.outcome;
-    var won = lat() ? XG.Lat.latticeWon(b.mission.lkind, o) : o === 'win';
+    var won = lat() ? XG.Lat.latticeWon(b.mission.lkind, o, b.mission.scenario) : o === 'win';
     XG.Audio.play(won ? 'victory' : 'defeat');
     if (XG.Comms) XG.Comms.battle(st.g, b, won ? 'win' : 'lose');
     setTimeout(function () {
-      var head = b.training ? '<h1 class="good">TRAINING COMPLETE</h1>' : lat()
-        ? (XG.Lat.latticeWon(b.mission.lkind, o) ? '<h1 class="good">' + (b.mission.lkind === 'breach' ? 'SYSTEM BREACHED' : b.mission.lkind === 'strike' ? 'SAFEHOUSE HARMONIZED' : b.mission.lkind === 'uplink' ? 'UPLINK HOLDS' : 'CELL HOLDS') + '</h1>'
+      // node scenario: the headline names what happened to the server (captured, held), or the wipe that ended it
+      var node = b.server && o !== 'abort', mineAtt = b.nodeAttacker === b.human;
+      var head = b.training ? '<h1 class="good">TRAINING COMPLETE</h1>' : node && b.captured ? '<h1 class="' + (mineAtt ? 'good' : 'bad') + '">SERVER CAPTURED</h1>'
+        : node && o === 'timeout' ? '<h1 class="' + (mineAtt ? 'bad' : 'good') + '">' + (mineAtt ? 'SERVER HELD: OUT OF TIME' : 'SERVER HELD') + '</h1>'
+        : lat()
+        ? (won ? '<h1 class="good">' + (b.mission.lkind === 'breach' ? 'SYSTEM BREACHED' : b.mission.lkind === 'strike' ? 'SAFEHOUSE HARMONIZED' : b.mission.lkind === 'uplink' ? 'UPLINK HOLDS' : b.mission.scenario === 'exterminate' ? 'SQUAD EXTERMINATED' : 'CELL HOLDS') + '</h1>'
           : o === 'abort' ? '<h1 class="warn">WITHDRAWN</h1>' : '<h1 class="bad">FORCES LOST</h1>')
-        : o === 'win' ? '<h1 class="good">OBJECTIVE COMPLETE</h1>' : o === 'abort' ? '<h1 class="warn">EXTRACTION</h1>' : '<h1 class="bad">SQUAD LOST</h1>';
-      XG.UI.modal(head + '<p>' + b.mission.name + ' · turn ' + b.turn + '</p><div class="modal-actions">' + (st.snap ? '<button id="tac-again">Restart mission</button>' : '') + '<button class="primary" id="tac-done">Debrief ▸</button></div>');
+        : o === 'win' ? '<h1 class="good">' + (b.mission.scenario === 'exterminate' || node ? 'HOSTILES EXTERMINATED' : 'OBJECTIVE COMPLETE') + '</h1>' : o === 'abort' ? '<h1 class="warn">EXTRACTION</h1>' : '<h1 class="bad">SQUAD WIPED</h1>';
+      XG.UI.modal(head + '<p>' + b.mission.name + ' · turn ' + b.turn + '</p><div class="modal-actions">' + (st.snap ? '<button id="tac-again" title="Start over from turn 1: same map, squad, enemies and objectives, but both sides land on new spawn points and patrols take new routes. Nothing from this attempt counts.">Restart mission</button>' : '') + '<button class="primary" id="tac-done">Debrief ▸</button></div>');
       if ($('tac-again')) $('tac-again').onclick = restart;
       $('tac-done').onclick = function () { XG.UI.closeModal(); var cb = st.onDone, res = Tac.result(b); st = null; cb(res); };
     }, 650);
@@ -558,7 +562,10 @@ XG.TacUI = (function () {
   function hud() {
     if (!st) return;
     var b = st.b, u = selUnit();
-    var obj = lat()
+    var scen = b.mission.scenario, z = Tac.zoneState(b), tl = ' · turn ' + b.turn + '/' + b.turnLimit;
+    var obj = z ? (z.attacker === b.human ? 'Capture the server: ' + z.capture + '/' + z.need + tl : 'Hold the server' + (z.capture ? ' (lost ' + z.capture + '/' + z.need + ')' : '') + tl)
+      : scen === 'exterminate' ? 'Exterminate: no time limit'
+      : lat()
       ? { raid: 'Wipe the squad or hold until turn ' + b.turnLimit + ' ends', strike: 'Destroy the FIREWALL squad', breach: 'Purge the security software', uplink: 'Keep the Uplink Core alive' }[b.mission.lkind]
       : { purge: 'Eliminate all hostiles', relay: 'Destroy the Relay and all hostiles', uplink: 'Destroy the Uplink Core or Sever it (' + b.sever + '/3)' }[b.mission.kind];
     var left = b.units.filter(function (x) { return x.alive && x.side !== HS() && visibleUnit(x); }).length;
@@ -570,7 +577,7 @@ XG.TacUI = (function () {
     XG.Audio.mood(left && up * 2 <= side.length ? 'critical' : left ? 'contact' : 'stealth');
     if (XG.Tutorial) XG.Tutorial.battleUpdate(b, u, st.mode, st.aim);
     $('tac-top').innerHTML = '<b>' + b.mission.name + '</b><span class="dim">' + b.mission.city + '</span><span class="obj">◎ ' + obj + '</span>' +
-      '<span class="dim">Turn ' + b.turn + (b.turnLimit ? '/' + b.turnLimit : '') + ' · ' + left + ' hostile(s) in sight</span>' +
+      '<span class="dim">' + (z ? '' : 'Turn ' + b.turn + (b.turnLimit ? '/' + b.turnLimit : '') + ' · ') + left + ' hostile(s) in sight</span>' +
       '<span class="turn-banner ' + (mine ? 'player' : 'enemy') + '">' + (b.outcome ? 'BATTLE OVER' : mine ? 'YOUR TURN' : lat() ? 'FIREWALL TURN' : 'LATTICE TURN') + '</span>';
 
     $('tac-squad').innerHTML = squadUnits().map(function (x) {
@@ -684,6 +691,12 @@ XG.TacUI = (function () {
           if (focus.kind === 'core' && u.hackSkill) html += '<div class="good">Sever chance ' + Math.min(90, u.hackSkill + 10) + '% when adjacent</div>';
         }
       }
+    } else if (h && Tac.isServer(b, h.x, h.y)) {
+      var zh = Tac.zoneState(b), att = zh.attacker === b.human;
+      html = '<b style="color:#7de3ff">Server node</b><div>Capture <b>' + zh.capture + '/' + zh.need + '</b> · turn ' + b.turn + '/' + b.turnLimit + '</div>' +
+        '<div class="dim">' + (att ? 'End your turn with a unit within 1 tile of it and no hostile there to score a point.' : 'The attackers score a point when they end their turn beside it with none of yours there. Keep a unit in the zone.') +
+        ' Cannot be shot or destroyed, gives no cover, and nobody can stand on it.</div>' +
+        '<div>In the zone now: ' + (lat() ? 'Lattice ' + (zh.attacker === 'enemy' ? zh.att : zh.def) + ', FIREWALL ' + (zh.attacker === 'player' ? zh.att : zh.def) : 'squad ' + zh.att + ', Lattice ' + zh.def) + '</div>';
     } else if (h && h.x >= 0 && h.x < W && h.y >= 0 && h.y < H && !explored(h.x, h.y)) {
       html = '<b>Unexplored</b><div class="dim">Nobody has seen this ground yet.</div>';
     } else if (h && h.x >= 0 && h.x < W && h.y >= 0 && h.y < H) {
@@ -825,7 +838,9 @@ XG.TacUI = (function () {
     // ability target previews
     if (u && st.mode && idle) drawModePreview(u, now);
 
-    // units
+    // the node server (always drawn: both sides know where the objective is), then the units
+    var zs = Tac.zoneState(b);
+    if (zs) { var scn = center(zs.x, zs.y); G.server(ctx, zs, scn[0], scn[1], { now: now }); }
     b.units.forEach(function (x) {
       if (st.hidden[x.id]) return;
       if (!x.alive && !st.dying[x.id] && !(st.cur && st.cur.e.t === 'death' && st.cur.e.id === x.id)) return;
