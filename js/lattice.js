@@ -348,17 +348,26 @@ XG.Lat = (function () {
       var reg = region(g, m.region);
       if (m.kind === 'breach') {
         // every breach gets noticed by something: Detection rises either way
-        if (won) { g.stats.breaches++; reg.infection = Math.min(100, reg.infection + 8); g.compute += 10; g.trace = Math.min(100, g.trace + 2); out.notes.push(Lat.regionData(m.region).name + ' infection +8%, +10 compute. Detection +2%.'); }
+        if (won) { g.stats.breaches++; reg.infection = Math.min(100, reg.infection + 8); g.trace = Math.min(100, g.trace + 2); out.notes.push(Lat.regionData(m.region).name + ' infection +8%. Detection +2%.'); }
         else { reg.infection = Math.max(0, reg.infection - 5); g.trace = Math.min(100, g.trace + 4); out.notes.push('The breach was quarantined. Infection -5%, Detection +4%.'); }
       } else if (m.kind === 'raid') {
-        if (won) { g.stats.raidsHeld++; reg.infection = Math.min(100, reg.infection + 8); g.compute += 10; out.notes.push(Lat.regionData(m.region).name + ' infection +8%, +10 compute.'); }
+        if (won) { g.stats.raidsHeld++; reg.infection = Math.min(100, reg.infection + 8); out.notes.push(Lat.regionData(m.region).name + ' infection +8%.'); }
         else { g.stats.raidsLost++; reg.infection = Math.max(0, reg.infection - 15); g.trace = Math.min(100, g.trace + 4); out.notes.push(Lat.regionData(m.region).name + ' purged: infection -15%, Trace +4%.'); }
       } else if (m.kind === 'strike') {
-        if (won) { g.stats.strikesWon++; g.trace = Math.max(0, g.trace - 8); g.substrate += 15; out.substrate += 15; g.earth.setbacks++; out.notes.push('Trace -8%. FIREWALL loses a step.'); }
+        if (won) { g.stats.strikesWon++; g.trace = Math.max(0, g.trace - 8); g.earth.setbacks++; out.notes.push('Trace -8%. FIREWALL loses a step.'); }
         else { g.stats.strikesLost++; g.trace = Math.min(100, g.trace + 3); out.notes.push('The strike failed. Trace +3%.'); }
       } else {
         if (won) { g.trace = 55; g.earth.setbacks++; g.storyQueue.push('l_repelled'); out.notes.push('Trace falls to 55%.'); }
         else { g.over = 'defeat'; g.storyQueue.push('l_defeat'); }
+      }
+      // battle reward: the kind's base (breach/raid +10 compute, strike +15 substrate), at least minWin, times the speed bonus
+      if (won) {
+        var mw = L.tuning.minWin || {}, base = { compute: m.kind === 'breach' || m.kind === 'raid' ? 10 : 0, substrate: m.kind === 'strike' ? 15 : 0 };
+        out.mult = XG.Strat.speedMult(result.turns);
+        out.compute = Math.round(Math.max(base.compute, mw.compute || 0) * out.mult);
+        var sub = Math.round(Math.max(base.substrate, mw.substrate || 0) * out.mult);
+        g.compute += out.compute; g.substrate += sub; out.substrate += sub;
+        out.notes.push('+' + out.compute + ' compute, +' + sub + ' substrate' + (out.mult > 1 ? ' (x' + out.mult + ' for a ' + result.turns + '-turn win)' : '') + '.');
       }
       if (m.kind !== 'uplink' || won) g.missions.splice(g.missions.indexOf(m), 1);
       log(g, m.name + ': ' + (won ? 'held' : 'lost') + '. ' + out.notes.join(' '));

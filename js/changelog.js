@@ -7,6 +7,8 @@ XG.CHANGELOG = [
    {
     "name": "2026-10-22",
     "items": [
+     "<b>Rewards:</b> fast wins pay more. Every won battle pays at least its base reward, rising to triple for a win in 4 turns or fewer (double at 9 turns, base at 14 or more): salvage and credits for FIREWALL, compute and substrate for the Lattice. The Lattice now earns at least 10 compute and 6 substrate from every battle it wins, as FIREWALL always earns credits.",
+     "<b>Battle:</b> a restart now changes only where the squads land and how enemies patrol. The map, the objectives and the enemy forces stay exactly the same; squads land next to cover the map already has.",
      "<b>Performance:</b> the world map is much lighter on your graphics card. Its moving parts (the scan sweep, data packets, the satellite and the pulsing mission rings) now animate on their own layer, so the browser no longer redraws the whole map many times a second. This should stop video in another window stuttering or pausing while you play.",
      "<b>Comms:</b> HALCYON and the Lattice have a sense of humour now. HALCYON is dry when things go well and gets nervous, over-precise and a bit too honest as Convergence climbs; the Lattice is smug when it is winning and touchy and sarcastic when it is not. About 170 new lines across every event, in both campaigns.",
      "<b>Comms:</b> the voices remember your campaign. They now mention what really happened in earlier battles (which side the enemy keeps flanking from, hit rates, the deadliest enemy, units lost, overwatch kills, win streaks, servers taken) and never claim a pattern your battles have not shown.",

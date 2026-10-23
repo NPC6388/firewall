@@ -578,6 +578,8 @@ XG.DATA = {
     fundingPerRegion: 32,      // credits per month at 0% infection
     hireCost: 30,
     minMissionCredits: 15,     // every won mission pays at least this
+    // Speed bonus on battle rewards (both campaigns): x3 for a win in rewardFast turns or fewer, falling evenly to x1 at rewardSlow.
+    rewardFast: 4, rewardSlow: 14, rewardMaxMult: 3,
     missionEvery: [3, 5],
     missionLife: [4, 6],
     veteranDrone: 3,           // one extra drone once the squad's average rank reaches this (3 = Sergeant)
@@ -596,6 +598,7 @@ XG.DATA = {
   lattice: {
     start: { compute: 90, substrate: 10, convergence: 8, trace: 0, forces: { drone: 4, warden: 1, harmonic: 0 } },
     tuning: {
+      minWin: { compute: 10, substrate: 6 }, // every won Lattice battle pays at least this (before the speed bonus)
       researchBase: 10,          // protocol cycles per day
       computeBase: 6,            // compute per day from the Nexus
       computePerInfection: 0.07, // compute per day per point of summed infection

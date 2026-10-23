@@ -9,6 +9,11 @@ The in-game **Help → Patch notes** tab shows everything from the first `##` he
 ## Unreleased
 
 ### 2026-10-22
+- **Rewards:** fast wins pay more. Every won battle pays at least its base reward, rising to triple for a win in 4 turns or
+  fewer (double at 9 turns, base at 14 or more): salvage and credits for FIREWALL, compute and substrate for the Lattice.
+  The Lattice now earns at least 10 compute and 6 substrate from every battle it wins, as FIREWALL always earns credits.
+- **Battle:** a restart now changes only where the squads land and how enemies patrol. The map, the objectives and the
+  enemy forces stay exactly the same; squads land next to cover the map already has.
 - **Performance:** the world map is much lighter on your graphics card. Its moving parts (the scan sweep, data packets,
   the satellite and the pulsing mission rings) now animate on their own layer, so the browser no longer redraws the whole
   map many times a second. This should stop video in another window stuttering or pausing while you play.

@@ -321,6 +321,12 @@ XG.Strat = (function () {
     // result: { outcome:'win'|'loss'|'abort', units:[{sid, hp, alive, kills, held}], salvage }
     // held: hostiles the unit hacked that were still ours at the end; each earns XP like a kill (not counted as a kill).
     // Credits a mission pays on success: its reward, but never below the minimum (the final mission ends the war instead).
+    // Speed multiplier for a won battle that took `turns` turns (1 when unknown).
+    speedMult: function (turns) {
+      var T = D.tuning, f = T.rewardFast || 4, sl = T.rewardSlow || 14, mx = T.rewardMaxMult || 3;
+      if (!(turns > 0)) return 1;
+      return Math.round(Math.max(1, Math.min(mx, mx - (mx - 1) * (turns - f) / (sl - f))) * 100) / 100;
+    },
     missionCredits: function (m) { return m.kind === 'uplink' ? 0 : Math.max(D.tuning.minMissionCredits || 0, (m.reward && m.reward.credits) || 0); },
     resolveMission: function (g, missionId, result) {
       var m = g.missions.filter(function (x) { return x.id === missionId; })[0];
@@ -345,8 +351,9 @@ XG.Strat = (function () {
       var reg = region(g, m.region);
       if (result.outcome === 'win') {
         g.stats.missionsWon++;
-        out.salvage = (m.reward.salvage || 0) + (result.salvage || 0);
-        out.credits = Strat.missionCredits(m);
+        out.mult = Strat.speedMult(result.turns);
+        out.salvage = Math.round((m.reward.salvage || 0) * out.mult) + (result.salvage || 0);
+        out.credits = Math.round(Strat.missionCredits(m) * out.mult);
         out.infection = -(m.reward.infection || 0);
         g.salvage += out.salvage; g.credits += out.credits;
         reg.infection = Math.max(0, reg.infection + out.infection);

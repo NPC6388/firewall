@@ -419,6 +419,28 @@ function autoBattle(g, m, squad) {
   check(covered >= units * 0.8, 'raid defenders start in cover facing FIREWALL (' + covered + '/' + units + ')');
 })();
 
+// Battle rewards: x3 for a win in 4 turns or fewer, falling to x1 at 14; every won Lattice battle pays at least minWin.
+(function () {
+  check(Strat.speedMult(4) === 3 && Strat.speedMult(2) === 3 && Strat.speedMult(14) === 1 && Strat.speedMult(30) === 1 && Strat.speedMult(9) === 2 && Strat.speedMult(undefined) === 1, 'speed multiplier: 3 at <=4 turns, 2 at 9, 1 at >=14 or unknown');
+  var g = S.newGame(31), r = S.rng(g), m = Strat.spawnMission(g, r, 'purge'); S.saveRng(g, r);
+  var base = m.reward.salvage, cr = Strat.missionCredits(m);
+  var out = Strat.resolveMission(g, m.id, { outcome: 'win', units: [], salvage: 0, turns: 4 });
+  check(out.salvage === base * 3 && out.credits === cr * 3, 'a 4-turn FIREWALL win pays x3 salvage and credits (' + out.salvage + '/' + base * 3 + ')');
+  m = Strat.spawnMission(g, r, 'purge'); base = m.reward.salvage;
+  out = Strat.resolveMission(g, m.id, { outcome: 'win', units: [], salvage: 2, turns: 20 });
+  check(out.salvage === base + 2, 'a slow FIREWALL win pays the base reward plus battle salvage');
+  var Lat = XG.Lat, lg = Lat.newGame ? Lat.newGame(31) : null;
+  if (lg) {
+    var lr = S.rng(lg), lm = Lat.spawnMission(lg, lr, 'breach'); S.saveRng(lg, lr);
+    var c0 = lg.compute, s0 = lg.substrate;
+    var lo = Lat.resolveMission(lg, lm.id, { outcome: 'loss', lattice: [], humansKilled: 0, turns: 4 });
+    var mw = XG.DATA.lattice.tuning.minWin;
+    check(lo.won && lg.compute - c0 === 10 * 3 && lg.substrate - s0 === mw.substrate * 3, 'a 4-turn Lattice breach win pays x3 of max(base, minWin) (compute +' + (lg.compute - c0) + ', substrate +' + (lg.substrate - s0) + ')');
+    lm = Lat.spawnMission(lg, lr, 'strike'); c0 = lg.compute; s0 = lg.substrate;
+    lo = Lat.resolveMission(lg, lm.id, { outcome: 'loss', lattice: [], humansKilled: 0, turns: 20 });
+    check(lg.compute - c0 === mw.compute && lg.substrate - s0 === 15, 'a slow Lattice strike win pays its base 15 substrate and the minimum compute');
+  } else check(false, 'Lat.newGame exists');
+})();
 // Obstacle variants: fuel barrels chain-explode, barriers and pillars shrug off blasts, glass shatters on a miss, fences block feet but not eyes.
 (function () {
   var g = S.newGame(21), r = S.rng(g), m = Strat.spawnMission(g, r, 'purge'); S.saveRng(g, r);

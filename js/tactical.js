@@ -681,11 +681,21 @@ XG.Tac = (function () {
         all.filter(function (x) { return x.cells.length >= need; }),
         all.filter(function (x) { return x.cells.length + x.clear.length >= need; })
       ];
-      for (var ti = 0; ti < tiers.length; ti++) if (tiers[ti].length) return dr.pick(tiers[ti]);
+      for (var ti = 0; ti < tiers.length; ti++) if (tiers[ti].length) {
+        var covered = tiers[ti].filter(function (x) { return landingCover(b, x) >= 2; }); // existing cover near the block
+        return dr.pick(covered.length ? covered : tiers[ti]);
+      }
     }
     return null;
   }
-  // Put squad A in its block (clearing LOW tiles if the block is short), add a little starting cover behind it, return the anchor.
+  // Cover tiles (LOW/HIGH) within 3 tiles of a landing block's centre: the squad starts next to cover the map already has.
+  function landingCover(b, bl) {
+    var c = edgeXY(b, bl.e, 1, bl.l), n = 0;
+    for (var y = c[1] - 3; y <= c[1] + 3; y++) for (var x = c[0] - 3; x <= c[0] + 3; x++) { var t = tile(b, x, y); if (inB(b, x, y) && (t === LOW || t === HIGH)) n++; }
+    return n;
+  }
+  // Put squad A in its block (clearing LOW tiles only if no block fits the squad) and return the anchor. It never adds cover:
+  // a Restart may change only spawn points and patrols, so the map must come out the same wherever the squad lands.
   function placeSquadA(b, dr, squad, avoid) {
     var n = squad.length, blk = pickBlock(b, dr, n, avoid), W = b.W, H = b.H, i;
     if (!blk) { // no open block anywhere: the open floor nearest a random edge point
@@ -700,15 +710,6 @@ XG.Tac = (function () {
     var spots = blk.cells.filter(function (p) { return !unitAt(b, p[0], p[1]) && !isServer(b, p[0], p[1]); }).slice(0, n); // statics kept on a Restart
     if (!spots.length) spots = [nearestFree(b, blk.cells[0][0], blk.cells[0][1], 6) || blk.cells[0]];
     squad.forEach(function (u, k) { var p = spots[k] || nearestFree(b, spots[0][0], spots[0][1], 4) || spots[0]; u.x = p[0]; u.y = p[1]; });
-    // a little starting cover just beyond the block, either side of the middle (kept only if the floor stays connected)
-    if (blk.l >= 0) [-2, 2].forEach(function (side) {
-      var p = edgeXY(b, blk.e, 3, blk.l + side);
-      if (!inB(b, p[0], p[1]) || b.tiles[p[1] * W + p[0]] !== FLOOR || b.props[p[1] * W + p[0]]) return;
-      var before = floorComponent(b.tiles, W, H).size, ti = p[1] * W + p[0];
-      b.tiles[ti] = LOW;
-      var after = floorComponent(b.tiles, W, H);
-      if (after.size < before - 1 || !squad.every(function (u) { return after.mark[u.y * W + u.x]; })) b.tiles[ti] = FLOOR;
-    });
     b.reachable = floorComponent(b.tiles, W, H).mark;
     var c = blk.l >= 0 ? edgeXY(b, blk.e, 1, blk.l) : spots[0];
     b.anchor = { x: c[0], y: c[1], edge: blk.e };

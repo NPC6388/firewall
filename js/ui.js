@@ -162,7 +162,7 @@ XG.UI = (function () {
 
   function missionCard(g, m) {
     var cls = m.kind === 'relay' ? 'story' : m.kind === 'uplink' ? 'final' : '';
-    var rew = m.kind === 'uplink' ? 'Ends the war.' : 'Reward: ' + m.reward.salvage + ' salvage' + ', §' + St.missionCredits(m) + ', region infection -' + m.reward.infection + '%';
+    var rew = m.kind === 'uplink' ? 'Ends the war.' : 'Reward: ' + m.reward.salvage + ' salvage' + ', §' + St.missionCredits(m) + ', region infection -' + m.reward.infection + '%. Win fast for up to x' + (XG.DATA.tuning.rewardMaxMult || 3) + ' salvage and credits';
     var ready = g.soldiers.filter(function (s) { return S.available(g, s); }).length;
     var tag = St.scenarioTag(m);
     return '<div class="mission ' + cls + '"><div class="mh"><span class="mn">' + m.name + (tag ? ' <span class="scen-tag ' + m.scenario + '">' + tag + '</span>' : '') + '</span><span class="' + (m.daysLeft !== null && m.daysLeft <= 1 ? 'bad' : 'dim') + '">' +
@@ -353,7 +353,7 @@ XG.UI = (function () {
     }));
     UI.modal('<h1 class="' + (win ? 'good' : 'bad') + '">' + (win ? 'MISSION SUCCESS' : out.outcome === 'abort' ? 'SQUAD EXTRACTED' : 'MISSION FAILED') + '</h1>' +
       '<p>' + m.name + ' · ' + m.city + '</p>' +
-      (win ? '<p>Recovered <b>' + out.salvage + '</b> salvage' + (out.credits ? ' and <b>§' + out.credits + '</b>' : '') + '. ' + St.regionData(m.region).name + ' infection ' + out.infection + '%.</p>'
+      (win ? '<p>Recovered <b>' + out.salvage + '</b> salvage' + (out.credits ? ' and <b>§' + out.credits + '</b>' : '') + (out.mult > 1 ? ' (x' + out.mult + ' for a fast win)' : '') + '. ' + St.regionData(m.region).name + ' infection ' + out.infection + '%.</p>'
         : '<p class="bad">' + St.regionData(m.region).name + ' infection +' + out.infection + '%. Convergence +2%.' + (m.kind !== 'purge' ? ' The objective remains; you can try again.' : '') + '</p>') +
       (lines.length ? lines.join('') : '<p class="dim">No casualties, no promotions.</p>') +
       '<div class="modal-actions"><button class="primary" id="res-ok">Return to Command</button></div>');
