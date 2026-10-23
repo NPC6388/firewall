@@ -187,6 +187,11 @@ td { padding: 7px 6px; border-bottom: 1px solid #121c2b; }
 .hv2 .hv-b { flex: 1 1 148px; min-width: 0; }
 .hv2 table.odds { min-width: 0; width: 100%; }
 .hv2 table.odds td { vertical-align: top; }
+/* duel table: factor | your shot | its shot, numbers right-aligned in two equal columns */
+table.odds.duel { width: 100%; min-width: 0; margin-top: 6px; }
+table.odds.duel td:nth-child(2), table.odds.duel td:nth-child(3) { text-align: right; width: 30%; white-space: nowrap; }
+table.odds.duel tr.hd td { color: #8fa3b8; font-size: 11px; border-bottom: 1px solid rgba(143,163,184,.25); }
+.duel-notes { font-size: 11px; line-height: 1.5; margin-top: 4px; }
 .tac-side .info h3 { font-size: 16px; color: #fff; margin: 0; }
 .tac-side .hover { padding: 12px; border-bottom: 1px solid var(--line); font-size: 12.5px; line-height: 1.55; min-height: 110px; }
 .tac-count { padding: 6px 12px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--dim); }

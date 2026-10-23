@@ -9,6 +9,9 @@ The in-game **Help → Patch notes** tab shows everything from the first `##` he
 ## Unreleased
 
 ### 2026-10-22
+- **Battle panel:** hovering a hostile now shows one side-by-side table: every factor of your shot at it and its shot at you
+  (aim, cover, defense, hunker, range, floor/cap), then both hit chances, crits and damage after armor, plus each side's cover.
+  You can see at a glance why its odds differ from yours.
 - **Battle:** a unit standing in a doorway can step-peek one tile out of either side of the door, so it sees and shoots
   along the outside of the wall (and is seen) instead of only along straight lines. It still never sees along the wall.
 - **Maps:** windows break open. A stray miss or a blast shatters a window, leaving an open gap anyone can walk through.

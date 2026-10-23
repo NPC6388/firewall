@@ -668,20 +668,42 @@ XG.TacUI = (function () {
     }).join('') + '<tr class="tot"><td>Hit chance</td><td>' + hi.chance + '%</td></tr>' +
       (hi.flankCrit ? '<tr><td colspan="2" class="good">Flanked: +25 crit</td></tr>' : '') + (hi.object ? '<tr><td colspan="2" class="dim">Object: no cover or defense, no crits</td></tr>' : '') + '</table>';
   }
-  // Column B of the hover panel: the selected unit's defences against the hovered hostile (same numbers as hitInfo).
-  function youVs(u, f) {
-    var b = st.b, nm = u.short || u.name, cd = Tac.coverDetail(b, u.x, u.y, f.x, f.y), back = Tac.hitInfo(b, f, u);
-    var sight = Tac.los(b, f.x, f.y, u.x, u.y), d = Math.hypot(f.x - u.x, f.y - u.y);
-    var side = cd.side ? SIDES.filter(function (o) { return o[0] === cd.side[0] && o[1] === cd.side[1]; })[0][3] : '';
-    var cov = !cd.base ? '<span class="warn">none (flanked)</span>'
-      : (cd.base >= 40 ? 'Full' : 'Half') + ' cover, ' + side + (cd.value < cd.base ? ' at ' + cd.angle + '° (−' + cd.value + ' of ' + cd.base + ')' : ' (−' + cd.value + ')');
-    var row = function (k, v) { return '<tr><td>' + k + '</td><td>' + v + '</td></tr>'; };
-    return '<b>You vs ' + f.name + '</b><table class="odds you">' +
-      row('Cover', cov) + row('Flanked', cd.base && cd.value ? '<span class="good">no</span>' : '<span class="bad">yes</span>') +
-      row('Armor', u.armor || 0) + row('Shield', u.shield || 0) + row('Hunkered', u.hunker ? '<span class="good">yes (−25)</span>' : 'no') +
-      row('Distance', d.toFixed(1) + ' tiles') + row('It sees you', sight ? '<span class="warn">yes</span>' : '<span class="good">no</span>') +
-      row('It hits you', back.ok ? '<b>' + back.chance + '%</b>' + (back.crit ? ' · ' + back.crit + '% crit' : '') : '<span class="dim">no shot</span>') +
-      (back.standoff ? '<tr><td colspan="2" class="warn">Corner standoff</td></tr>' : '') + '</table>';
+  // The duel table for a hovered hostile: every hit-chance factor side by side, your shot at it and its shot at you,
+  // then the result, crit, damage after armor and shields, and who can see whom. Same numbers as Tac.hitInfo.
+  var DUEL_ROWS = [['aim', 'Aim'], ['cover', 'Cover'], ['def', 'Defense'], ['hunker', 'Hunkered'], ['close', 'Close range'],
+    ['mark', 'Scan mark'], ['ow', 'Overwatch'], ['range', 'Range'], ['clamp', 'Floor / cap']];
+  function duelKey(l) {
+    return /^Aim|standoff/i.test(l) ? 'aim' : /cover/i.test(l) ? 'cover' : /defense/i.test(l) ? 'def' : /Hunker/.test(l) ? 'hunker'
+      : /Close/.test(l) ? 'close' : /Marked/.test(l) ? 'mark' : /Overwatch/.test(l) ? 'ow' : /^Range/.test(l) ? 'range' : 'clamp';
+  }
+  function duel(u, f) {
+    var b = st.b, out = Tac.hitInfo(b, u, f), back = Tac.hitInfo(b, f, u);
+    var col = function (hi) { var m = {}; (hi.parts || []).forEach(function (p) { var k = duelKey(p[0]); m[k] = (m[k] || 0) + p[1]; if (/standoff/i.test(p[0])) m.standoff = 1; }); return m; };
+    var A = col(out), B = col(back);
+    var cell = function (hi, m, k) {
+      if (!hi.ok) return '<td class="dim">–</td>';
+      var v = m[k]; if (v === undefined) return '<td class="dim">0</td>';
+      return '<td class="' + (k === 'aim' ? '' : v > 0 ? 'good' : 'bad') + '">' + (k !== 'aim' && v > 0 ? '+' : '') + v + (k === 'aim' && m.standoff ? '*' : '') + '</td>';
+    };
+    var cov = function (tx, ty, fx, fy) { var cd = Tac.coverDetail(b, tx, ty, fx, fy); if (!cd.base) return 'none, flanked';
+      var s = cd.side ? SIDES.filter(function (o) { return o[0] === cd.side[0] && o[1] === cd.side[1]; })[0][3] : '';
+      return (cd.base >= 40 ? 'full' : 'half') + ' ' + s + (cd.value < cd.base ? ' at ' + cd.angle + '°' : ''); };
+    var dmg = function (a, t) { var lo = Math.max(1, a.dmg[0] - (t.armor || 0)), hi = Math.max(1, a.dmg[1] - (t.armor || 0)); return lo === hi ? '' + lo : lo + '–' + hi; };
+    var rows = DUEL_ROWS.filter(function (r) { return r[0] === 'aim' || r[0] === 'cover' || r[0] === 'range' || A[r[0]] !== undefined || B[r[0]] !== undefined; });
+    var h = '<table class="odds duel"><tr class="hd"><td>' + out.d.toFixed(1) + ' tiles</td><td>Your shot</td><td>Its shot</td></tr>' +
+      rows.map(function (r) { return '<tr><td>' + r[1] + '</td>' + cell(out, A, r[0]) + cell(back, B, r[0]) + '</tr>'; }).join('') +
+      '<tr class="tot"><td>Hit chance</td><td>' + (out.ok ? out.chance + '%' : '–') + '</td><td>' + (back.ok ? back.chance + '%' : '–') + '</td></tr>' +
+      '<tr><td>Crit</td><td' + (out.flankCrit ? ' class="good"' : '') + '>' + (out.ok ? out.crit + '%' : '–') + '</td><td' + (back.flankCrit ? ' class="bad"' : '') + '>' + (back.ok ? back.crit + '%' : '–') + '</td></tr>' +
+      '<tr><td>Damage</td><td>' + dmg(u, f) + (f.shield ? ' <span class="dim">+' + f.shield + ' sh</span>' : '') + '</td><td>' + dmg(f, u) + (u.shield ? ' <span class="dim">+' + u.shield + ' sh</span>' : '') + '</td></tr>' +
+      '</table>';
+    var notes = ['Its cover from you: ' + cov(f.x, f.y, u.x, u.y) + '. Your cover from it: ' + cov(u.x, u.y, f.x, f.y) + '.'];
+    if (!out.ok) notes.push('You have no line of fire' + (out.d > u.range ? ' (out of range)' : '') + '.');
+    if (!back.ok) notes.push('It has no shot at you' + (back.d > f.range ? ' (out of range)' : '') + '.');
+    if (A.standoff || B.standoff) notes.push('* Corner standoff: both shots start from 50 instead of aim.');
+    if (u.hunker) notes.push('You are hunkered: −25 to its shot.');
+    if (out.flankCrit) notes.push('It is flanked: +25 crit for you.');
+    if (back.flankCrit) notes.push('You are flanked: +25 crit for it.');
+    return h + '<div class="duel-notes dim">' + notes.join('<br>') + '</div>';
   }
   function hoverPanel() {
     if (!st) return;
@@ -699,12 +721,12 @@ XG.TacUI = (function () {
         if (focus.side === 'enemy' && !focus.alerted) html += '<div class="dim">Unaware of the squad.</div>';
         if (u) {
           var hi = Tac.hitInfo(b, u, focus);
-          html += hi.ok ? '<div>' + (u.short || u.name) + ': <b>' + hi.chance + '%</b> to hit · ' + hi.crit + '% crit · ' + coverLabel(hi) + ' · ' + hi.d.toFixed(1) + ' tiles</div>' + breakdown(hi)
+          if (u.alive && u !== focus) html += duel(u, focus);
+          else html += hi.ok ? '<div>' + (u.short || u.name) + ': <b>' + hi.chance + '%</b> to hit · ' + hi.crit + '% crit · ' + coverLabel(hi) + ' · ' + hi.d.toFixed(1) + ' tiles</div>' + breakdown(hi)
             : '<div class="dim">No line of fire from ' + (u.short || u.name) + '.</div>';
           if (u.hackSkill && focus.hackDef !== null && focus.hackDef !== undefined && !focus.isStatic)
             html += '<div class="good">Hack chance ' + Math.max(10, Math.min(90, u.hackSkill - focus.hackDef)) + '%' + (b.grammar ? ' (override)' : ' (stun)') + '</div>';
           if (focus.kind === 'core' && u.hackSkill) html += '<div class="good">Sever chance ' + Math.min(90, u.hackSkill + 10) + '% when adjacent</div>';
-          if (u.alive && u !== focus) html = '<div class="hv2"><div class="hv-a">' + html + '</div><div class="hv-b">' + youVs(u, focus) + '</div></div>';
         }
       }
     } else if (h && Tac.isServer(b, h.x, h.y)) {

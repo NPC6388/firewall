@@ -20,11 +20,11 @@ export default async function ({ ev, shot, sleep, send }) {
     await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 5, y: 5 }); await sleep(100);
     await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p.x, y: p.y }); await sleep(200);
     const m = await ev(`(function(){var R=function(s){var r=document.querySelector(s); if(!r) return null; r=r.getBoundingClientRect(); return {x:Math.round(r.x),y:Math.round(r.y),w:Math.round(r.width),h:Math.round(r.height)};};
-      return {info:R('#tac-info'), hover:R('#tac-hover'), a:R('.hv-a'), b:R('.hv-b'), cv:R('#tac-canvas'), side:R('.tac-side')};})()`);
+      return {info:R('#tac-info'), hover:R('#tac-hover'), duel:R('table.duel'), cv:R('#tac-canvas'), side:R('.tac-side')};})()`);
     console.log(w, JSON.stringify(m));
     console.log(await ev(`document.getElementById('tac-hover').innerText`));
-    if (!m.b) console.log('FAIL: no column B at ' + w);
-    else console.log(w + (m.b.y > m.a.y + 20 ? ' stacked' : ' two columns'), 'info height', m.info.h);
+    if (!m.duel) console.log('FAIL: no duel table at ' + w);
+    else console.log(w + ' duel table ' + m.duel.w + 'px wide', 'info height', m.info.h);
     const s = m.side;
     const res = await send('Page.captureScreenshot', { format: 'png', clip: { x: s.x, y: s.y, width: s.w, height: Math.min(s.h, 700), scale: 1 } });
     await ev(`1`);

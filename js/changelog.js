@@ -7,6 +7,7 @@ XG.CHANGELOG = [
    {
     "name": "2026-10-22",
     "items": [
+     "<b>Battle panel:</b> hovering a hostile now shows one side-by-side table: every factor of your shot at it and its shot at you (aim, cover, defense, hunker, range, floor/cap), then both hit chances, crits and damage after armor, plus each side's cover. You can see at a glance why its odds differ from yours.",
      "<b>Battle:</b> a unit standing in a doorway can step-peek one tile out of either side of the door, so it sees and shoots along the outside of the wall (and is seen) instead of only along straight lines. It still never sees along the wall.",
      "<b>Maps:</b> windows break open. A stray miss or a blast shatters a window, leaving an open gap anyone can walk through.",
      "<b>Lattice:</b> your machines now gain +2 aim per mark as well as +1 HP (half of a FIREWALL soldier's +4 aim per rank), so they keep up with veteran five-soldier squads.",
