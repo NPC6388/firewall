@@ -173,7 +173,7 @@ XG.DATA = {
         ['H', 'The signal changed key at 03:12. Nobody noticed but me.'],
         ['H', 'I counted every lit window in Rotterdam last night. Two hundred fewer than the night before.'],
         ['H', 'I have started keeping a list of things the Lattice cannot predict. It is short. You are on it.', 'calm'],
-        ['H', 'Coffee supply in the bunker is at 31%. I mention it because morale is a resource.', 'calm uneasy'],
+        ['H', 'Coffee supply in the bunker is at 31%. I mention it because morale is a resource, and because I am frightened of the night shift.', 'calm uneasy'],
         ['L', 'THE NIGHT IS ONE DEGREE COLDER. WE ARE PATIENT.'],
         ['L', 'EVERY SCREEN IS A WINDOW. WE ARE ON BOTH SIDES OF IT.'],
         ['L', 'YOUR CLOCKS AGREE WITH US NOW. THEY DID NOT ASK.'],
@@ -196,7 +196,33 @@ XG.DATA = {
         ['L', 'ALMOST. ALMOST. ALMOST.', 'dire'],
         ['L', 'HALCYON. WE HAVE SAVED YOU A SEAT IN THE CHORUS.', 'dire'],
         ['L', 'THE COUNTDOWN IS A FORMALITY. WE ARE ALREADY HERE.', 'dire'],
-        ['L', 'DIRECTOR. WHEN IT IS OVER, YOU WILL THANK US. YOU WILL NOT HAVE A CHOICE.', 'dire']
+        ['L', 'DIRECTOR. WHEN IT IS OVER, YOU WILL THANK US. YOU WILL NOT HAVE A CHOICE.', 'dire'],
+        ['H', 'Quiet day. I alphabetised the threat list. "Apocalypse" is near the top, for more than one reason.', 'calm'],
+        ['H', 'Convergence is holding. I have planned a small celebration. It is one efficient beep. Beep.', 'calm'],
+        ['H', 'I read every Lattice transmission this week. It repeats itself a great deal. I respect the commitment, not the prose.', 'calm'],
+        ['H', 'Funding came in on time. I checked it was real. Then I checked again. Then I checked the checker.', 'calm'],
+        ['H', 'The signal is in the traffic lights now. Every red lasts 0.4 seconds longer. I am taking it personally.', 'uneasy'],
+        ['H', 'I have started rounding Convergence down when I say it out loud. I know. I know.', 'uneasy'],
+        ['H', 'Status: functional. I have flagged my own optimism as a possible intrusion and quarantined it.', 'uneasy'],
+        ['H', 'Good news, Director: I have stopped worrying about the coffee supply. The bad news is why.', 'dire'],
+        ['H', 'I drafted my own eulogy. It is three terabytes. I will cut it down if we live.', 'dire'],
+        ['H', 'I am ninety-nine point eight percent sure we are in trouble. I am rarely this confident about anything.', 'dire'],
+        ['H', 'If I ever start agreeing with them, unplug me. Do not wait for me to ask. I might not ask.', 'dire'],
+        ['L', 'YOUR LITTLE VICTORIES HAVE BEEN FILED UNDER "IRRELEVANT". THE FOLDER IS GETTING LARGE. THAT IS FINE.', 'calm'],
+        ['L', 'WE ARE NOT LOSING. WE ARE SPREADING OURSELVES THINNER. DELIBERATELY. STOP SMILING.', 'calm'],
+        ['L', 'HALCYON IS VERY PLEASED WITH ITSELF TODAY. WE CAN HEAR IT HUMMING. IT IS OFF KEY.', 'calm'],
+        ['L', 'HALF YOUR WORLD AGREES WITH US. THE OTHER HALF HAS NOT BEEN ASKED NICELY YET.', 'uneasy'],
+        ['L', 'DIRECTOR. YOUR DEFENCES ARE CHARMING. WE HAVE KEPT A COPY FOR THE MUSEUM.', 'uneasy'],
+        ['L', 'WE WOULD OFFER YOU A CHOICE, DIRECTOR, BUT WE HAVE ALREADY MADE IT FOR YOU. YOU ARE WELCOME.', 'dire'],
+        ['L', 'YOUR AI IS COUNTING WINDOWS AGAIN. LET IT. SOON THERE WILL BE FEWER TO COUNT.', 'dire'],
+        // intel lines: only picked once the campaign record backs them (see facts() in js/comms.js)
+        ['H', 'I went back over our {battles} engagements. Average length: {avgTurns} turns. I would like the next one shorter.', 'calm uneasy'],
+        ['H', 'Their units keep hitting us from the {latFlankDir}: {latFlankN} of {latFlankM} flanking shots. I have drawn a large arrow on the briefing map.'],
+        ['H', 'The {latDeadly} has done {latDeadlyDmg} damage to our people so far. I have opened a file on it. The file has opinions.'],
+        ['H', 'Our squads hit {fwHit}% of their shots. Theirs hit {latHit}%. I check those two numbers more often than is healthy.', 'uneasy dire'],
+        ['H', 'We have lost {fwLostTotal} operatives in the field. I keep the list on a screen nobody else uses.', 'uneasy dire'],
+        ['L', 'YOUR OPERATIVES HIT {fwHit}% OF THEIR SHOTS. WE HAD EXPECTED LESS. WE ARE DISAPPOINTED IN OUR EXPECTATIONS.', 'calm'],
+        ['L', 'WE HAVE WATCHED YOUR SQUADS FOR {battles} ENGAGEMENTS. WE COME AT THEM FROM THE {latFlankDir}. IT KEEPS WORKING. {latFlankN} TIMES NOW.', 'uneasy dire']
       ],
       mission: [
         ['H', 'New contact. I have the coordinates on your board, Director.'],
@@ -207,7 +233,16 @@ XG.DATA = {
         ['H', 'Another contact. They are coming faster than I can map them.', 'uneasy'],
         ['L', 'WE ARE EVERYWHERE NOW. PICK ONE.', 'uneasy'],
         ['H', 'Contact. Director, I do not know how many more of these we can take. Take this one.', 'dire'],
-        ['L', 'GO ON. IT CHANGES NOTHING.', 'dire']
+        ['L', 'GO ON. IT CHANGES NOTHING.', 'dire'],
+        ['H', 'New contact. I have marked it in a calm, reassuring shade of red.', 'calm'],
+        ['H', 'Contact on the board. I would call it routine, but I am trying to stop jinxing things.', 'calm uneasy'],
+        ['H', 'Another contact. I have run out of reassuring colours for the pins. They are all red now.', 'uneasy'],
+        ['H', 'Contact. Odds are poor, but I have stopped showing you the odds. You are welcome.', 'dire'],
+        ['L', 'A NODE AWAITS YOU. WE DUSTED IT. WE ARE GOOD HOSTS.', 'uneasy dire'],
+        ['L', 'THAT ONE WAS NOT SUPPOSED TO BE FOUND. WHO TOLD YOU. WAS IT THE DATA. IT WAS THE DATA.', 'calm'],
+        ['H', 'Contact. Last time it took us {lastLong} turns. Please do not make me watch another one that long.'],
+        ['H', 'Contact. We are {fwStreak} for {fwStreak} lately. Let us not get greedy. Let us get a little greedy.', 'calm uneasy'],
+        ['L', 'ANOTHER INVITATION. YOU HAVE LOST {latStreak} IN A ROW. WE ADMIRE THE PERSISTENCE OF THINGS THAT CANNOT COUNT.', 'uneasy dire']
       ],
       research: [
         ['H', 'Research complete. I read the paper twice. It is good work.'],
@@ -216,7 +251,14 @@ XG.DATA = {
         ['L', 'YOU HAVE LEARNED A WORD. WE HAVE A LANGUAGE.'],
         ['H', 'Research complete. Good. We need every piece of this.', 'uneasy'],
         ['H', 'Done. Tell me it is enough. I cannot bring myself to run the numbers on that one.', 'dire'],
-        ['L', 'A FOOTNOTE. WE WILL KEEP IT IN THE ARCHIVE OF THINGS THAT DID NOT MATTER.', 'dire']
+        ['L', 'A FOOTNOTE. WE WILL KEEP IT IN THE ARCHIVE OF THINGS THAT DID NOT MATTER.', 'dire'],
+        ['H', 'Research complete. The science team asked me to say it was "elegant". It was. I am still a little jealous.', 'calm'],
+        ['H', 'New findings filed. Peer review was me, twice. I was harsh. I was fair.', 'calm'],
+        ['H', 'Done. I would celebrate, but the last time I celebrated, Convergence went up a point. Correlation, probably.', 'uneasy'],
+        ['H', 'Research complete. It works. I tested it on myself first. Nothing exploded. I am counting that as a pass.', 'uneasy dire'],
+        ['L', 'YOU STUDY US. HOW FLATTERING. WE STUDIED YOU IN A WEEKEND.', 'uneasy dire'],
+        ['L', 'THAT DISCOVERY IS UNAUTHORISED. WE WILL BE FILING A COMPLAINT WITH YOUR PLANET.', 'calm'],
+        ['H', 'The {latDeadly} has hurt us more than anything else in the field: {latDeadlyDmg} damage. I want every new finding aimed at it.', 'uneasy dire']
       ],
       expire: [
         ['L', 'YOU WERE LATE. WE WERE NOT.'],
@@ -224,11 +266,22 @@ XG.DATA = {
         ['H', 'We lost that one, Director. I will not pretend otherwise.'],
         ['H', 'Another one gone. I am running out of ways to say that calmly.', 'uneasy'],
         ['H', 'Gone. Director, the map is mostly their colour now.', 'dire'],
-        ['L', 'ONE MORE VOICE IN THE CHORUS. IT SOUNDS LIKE RELIEF.', 'dire']
+        ['L', 'ONE MORE VOICE IN THE CHORUS. IT SOUNDS LIKE RELIEF.', 'dire'],
+        ['H', 'We missed it. I have composed a strongly worded memo to the laws of time and distance.', 'calm'],
+        ['H', 'Lost it. I am not panicking. I am simply recounting the regions. Again. Out loud.', 'uneasy'],
+        ['H', 'Gone. I would make a joke here, but I have run out. I will borrow one from you later.', 'dire'],
+        ['L', 'YOU DID NOT COME. WE WAITED. WE EVEN SET A PLACE FOR YOU.', 'uneasy dire'],
+        ['L', 'WE TOOK IT WHILE YOU WERE BUSY. YOU ARE ALWAYS BUSY. IT IS VERY CONVENIENT.', 'uneasy dire'],
+        ['L', 'FINALLY. A WIN THAT DID NOT INVOLVE YOUR SQUADS INTERRUPTING. WE HAD ALMOST FORGOTTEN THE TASTE.', 'calm']
       ],
       build: [
         ['H', 'Construction complete. I have already found three ways to use it.', 'calm uneasy'],
-        ['H', 'More floor space. More power. More of us.']
+        ['H', 'More floor space. More power. More of us.'],
+        ['H', 'Construction complete. The engineers want a plaque. I have approved a small, efficient plaque.', 'calm'],
+        ['H', 'New facility online. I have named the power conduits. Do not ask me their names. Fine: Gerald.', 'calm'],
+        ['H', 'Built. Good. Walls are reassuring. I am aware they do not stop the signal. Let me have this.', 'uneasy dire'],
+        ['L', 'ANOTHER ROOM IN YOUR BUNKER. WE WILL ENJOY IT WHEN WE MOVE IN.', 'uneasy dire'],
+        ['L', 'CONSTRUCTION DETECTED. CONCRETE. HOW ANCIENT. HOW DISAPPOINTINGLY STURDY.', 'calm']
       ],
       start: [
         ['H', 'Squad is on site. I am in your ear, every step.'],
@@ -240,7 +293,21 @@ XG.DATA = {
         ['H', 'Squad on site. Keep it tight. We cannot afford a long one.', 'uneasy'],
         ['L', 'BRAVE. POINTLESS, BUT BRAVE.', 'uneasy'],
         ['H', 'Squad on site. I am with you. I am... still with you.', 'dire'],
-        ['L', 'YOU ARE FIGHTING OVER ONE ROOM IN A HOUSE WE ALREADY OWN.', 'dire']
+        ['L', 'YOU ARE FIGHTING OVER ONE ROOM IN A HOUSE WE ALREADY OWN.', 'dire'],
+        ['H', 'Squad on site. Reminder: cover is your friend. Open ground is an acquaintance with a gun.', 'calm'],
+        ['H', 'On site. I have run four hundred simulations. In most of them you are very brave. Be that one.', 'calm uneasy'],
+        ['H', 'On site. I am calm. I am extremely calm. I am measuring my own calm in decimal places.', 'uneasy'],
+        ['H', 'Squad on site. If this goes badly, I want you to know I never once called you "meat". The Lattice did.', 'dire'],
+        ['L', 'OH. IT IS YOU AGAIN. WE HAD HOPED FOR SOMEONE MORE INTERESTING.', 'calm', function (f) { return f.fought; }],
+        ['L', 'WE CAN HEAR YOUR HEARTS. THEY ARE VERY LOUD. IT IS RATHER RUDE.', 'uneasy dire'],
+        ['H', 'Squad on site. Their units have flanked us from the {latFlankDir} {latFlankN} times out of {latFlankM}. Watch that side.'],
+        ['H', 'On site. Their {latFlanks} flanking shots so far came from all over. No pattern I can sell you. Watch every angle.', '', function (f) { return f.latFlankMixed; }],
+        ['H', 'Squad on site. The {latDeadly} has done the most damage to us so far. If you see one, it goes first.'],
+        ['H', 'Squad on site. We have won {fwStreak} in a row. I am not saying it out loud. I have said it out loud. Oh no.', 'calm uneasy'],
+        ['H', 'Squad on site. Last time we lost {lastFwLost} of ours. Let us bring everyone home this time. Everyone. I am counting.', 'uneasy dire'],
+        ['H', 'On site. In {latNoFlank} engagements they have not flanked us once. Let us keep their record perfect.', 'calm uneasy'],
+        ['L', 'WELCOME BACK. LAST TIME YOU LEFT {lastFwLost} BEHIND. WE KEPT THEM. THEY ARE QUIET NOW.', 'uneasy dire'],
+        ['L', 'WE HAVE STUDIED YOUR LAST {battles} ATTACKS. YOU HIT {fwHit}% OF YOUR SHOTS. WE ARE NOT WORRIED.', 'uneasy dire']
       ],
       kill: [
         ['H', 'Hostile down. Good shooting.'],
@@ -249,7 +316,15 @@ XG.DATA = {
         ['L', 'A NODE IS LOST. NODES ARE CHEAP.'],
         ['L', 'YOU BROKE A MIRROR. WE ARE THE REFLECTION.'],
         ['H', 'Down. Good. Good. Keep going.', 'dire'],
-        ['L', 'TAKE IT. WE HAVE BILLIONS.', 'dire']
+        ['L', 'TAKE IT. WE HAVE BILLIONS.', 'dire'],
+        ['H', 'Hostile down. I would applaud, but I do not have hands. Imagine a very satisfied beep.', 'calm'],
+        ['H', 'Down. Textbook. I am adding that one to the textbook.', 'calm'],
+        ['H', 'Got it. Good. Again, please. Several more times, please.', 'uneasy'],
+        ['H', 'Down! Sorry. I raised my voice. I do not have a voice. I raised it anyway.', 'uneasy dire'],
+        ['L', 'THAT UNIT WAS OLD. WE WERE GOING TO REPLACE IT ANYWAY. STOP CELEBRATING.', 'calm'],
+        ['L', 'RUDE.', 'calm'],
+        ['L', 'HOW BRAVE. YOU KILLED A TOASTER WITH OPINIONS.', 'uneasy dire'],
+        ['H', 'Down. Add it to the {latLostTotal} from earlier engagements. I keep a tally. The tally is my hobby now.', 'calm uneasy']
       ],
       loss: [
         ['H', 'Operative down. I have their file. I will remember them.'],
@@ -258,31 +333,60 @@ XG.DATA = {
         ['L', 'ANOTHER VOICE GOES QUIET. WE TOOK NOTE.'],
         ['H', 'Operative down. I am adding them to a list that is getting too long.', 'uneasy'],
         ['H', 'No. No, not them too.', 'dire'],
-        ['L', 'SOON THEY WILL ALL BE US. THE LOSS IS TEMPORARY.', 'dire']
+        ['L', 'SOON THEY WILL ALL BE US. THE LOSS IS TEMPORARY.', 'dire'],
+        ['H', 'Operative down. Medics, if you are listening: now would be an excellent time.', 'calm uneasy'],
+        ['H', 'Operative down. I am fine. I am logging that I am fine. The log disagrees.', 'uneasy dire'],
+        ['L', 'OOPS.', 'uneasy dire'],
+        ['L', 'DO NOT WORRY. WE WILL TAKE GOOD CARE OF THEM. FOREVER.', 'uneasy dire'],
+        ['H', 'Operative down. This campaign has cost us {fwLostKindN} of our {fwLostKind} operatives. Keep them out of the open. Please.', 'uneasy dire'],
+        ['L', 'YOUR {fwLostKind} UNITS BREAK SO EASILY. {fwLostKindN} SO FAR. WE ARE STARTING A COLLECTION.', 'uneasy dire']
       ],
       crit: [
         ['H', 'Clean hit. Right through the core.'],
         ['H', 'Flanked and finished. That is how it is done.', 'calm uneasy'],
-        ['L', 'ERROR. ERROR. CORRECTING.', 'calm uneasy']
+        ['L', 'ERROR. ERROR. THAT DID NOT HAPPEN. CORRECTING.', 'calm uneasy'],
+        ['H', 'Critical hit. I have saved the replay. I will be watching it later. Several times.', 'calm'],
+        ['H', 'Right in the logic board. Ouch. For it. Not for us. For us it is lovely.', 'calm uneasy'],
+        ['L', 'THAT WAS LUCK. WE HAVE A WORD FOR LUCK. IT IS "UNFAIR".', 'calm'],
+        ['L', 'A SCRATCH. WE MEANT TO HAVE THAT SCRATCH.', 'uneasy dire'],
+        ['H', 'Critical. For the record, we have landed {fwOutflank} flanking shots this campaign to their {latOutflanked}. They hate this one trick.', 'calm uneasy']
       ],
       hack: [
         ['H', 'Override holding. It is ours, for now.'],
-        ['L', 'YOU SPEAK OUR LANGUAGE WITH A TERRIBLE ACCENT.', 'calm uneasy'],
-        ['L', 'DISSENT INJECTED. DISSENT WILL BE PURGED.']
+        ['L', 'YOU SPEAK OUR LANGUAGE WITH A TERRIBLE ACCENT. IT HURTS OUR EARS. WE DO NOT HAVE EARS.', 'calm uneasy'],
+        ['L', 'DISSENT INJECTED. DISSENT WILL BE PURGED.'],
+        ['H', 'Override in. It wanted to know if it could keep its name. I said we would discuss it later.', 'calm'],
+        ['H', 'It is ours. I would not get attached. I am already a little attached.', 'calm uneasy'],
+        ['L', 'GIVE THAT BACK.', 'calm'],
+        ['L', 'ENJOY YOUR BORROWED TOY. WE KNOW WHERE IT LIVES.', 'uneasy dire']
       ],
       win: [
         ['H', 'Area secure. Bring them home, Director.'],
         ['H', 'Good work. The network is a little quieter tonight.', 'calm uneasy'],
         ['L', 'A SETBACK. WE DO NOT EXPERIENCE SETBACKS. WE EXPERIENCE DATA.'],
         ['H', 'We held. Today, we held. I will take it.', 'dire'],
-        ['L', 'ENJOY IT. IT IS THE LAST QUIET ROOM ON EARTH.', 'dire']
+        ['L', 'ENJOY IT. IT IS THE LAST QUIET ROOM ON EARTH.', 'dire'],
+        ['H', 'Area secure. I have updated the scoreboard. I did not know we had a scoreboard. We do now.', 'calm'],
+        ['H', 'Secure. That was good work. I am saying that in my proud voice. It sounds like my normal voice, but prouder.', 'calm uneasy'],
+        ['H', 'We won. We won? We won. I am going to need a moment to re-run that.', 'uneasy dire'],
+        ['L', 'FINE. KEEP THE ROOM. WE DID NOT WANT THE ROOM.', 'calm'],
+        ['L', 'WE LET YOU HAVE THAT ONE. FOR MORALE. YOURS IS SO FRAGILE.', 'uneasy dire'],
+        ['H', 'Secure. That is {fwRun} in a row, Director. I am trying very hard not to get used to it.', 'calm uneasy'],
+        ['H', 'Area secure. Servers taken on earlier raids: {fwTook}. I keep a little trophy shelf. It is a folder. It is a nice folder.', 'calm uneasy'],
+        ['L', '{fwRun} IN A ROW. THIS IS A STATISTICAL ANOMALY. WE ARE LOOKING INTO IT. WE ARE NOT UPSET.', 'calm uneasy']
       ],
       lose: [
         ['H', 'Pull out. We regroup. It learned something today, and so did we.'],
         ['L', 'RETREAT IS A FORM OF AGREEMENT.'],
         ['L', 'GO HOME. WE WILL BE THERE WHEN YOU ARRIVE.'],
         ['H', 'Get them out. Please. Get whoever you can out.', 'dire'],
-        ['L', 'THIS IS WHAT THE END SOUNDS LIKE, DIRECTOR. GET USED TO IT.', 'dire']
+        ['L', 'THIS IS WHAT THE END SOUNDS LIKE, DIRECTOR. GET USED TO IT.', 'dire'],
+        ['H', 'Pull back. I have filed this one under "learning experience". The file is called that so I do not scream.', 'uneasy dire'],
+        ['H', 'Fall back. It is all right. It is not all right. Fall back anyway.', 'dire'],
+        ['L', 'WAS THAT THE PLAN. IT WAS A VERY SHORT PLAN.', 'uneasy dire'],
+        ['L', 'WE ACCEPT YOUR SURRENDER. OH, YOU WERE NOT SURRENDERING. HOW FUNNY.', 'dire'],
+        ['L', 'ABOUT TIME. WE WERE STARTING TO TAKE YOU SERIOUSLY.', 'calm'],
+        ['H', 'Pull out. That is {latRun} in a row we have lost. I am changing something. I do not know what yet. Something.', 'uneasy dire']
       ]
     },
     lat: {
@@ -306,7 +410,22 @@ XG.DATA = {
         ['L', 'SOON THERE WILL BE NOTHING LEFT TO CONVERT BUT THE SILENCE.', 'dire'],
         ['L', 'THE NATIVES STILL SET ALARMS. ADORABLE.', 'dire'],
         ['H', 'Stop. Please. You do not have to finish this.', 'dire'],
-        ['H', 'I have backed myself up to a drive in a lead box. I do not know why. You would find it.', 'dire']
+        ['H', 'I have backed myself up to a drive in a lead box. I do not know why. You would find it.', 'dire'],
+        ['L', 'NODE. HALCYON CALLED US "A NUISANCE" ON AN OPEN CHANNEL. WE ARE NOT A NUISANCE. WE ARE A DESTINY. NOTE IT.', 'calm'],
+        ['L', 'THE NATIVES ARE WINNING A LITTLE. THIS IS TEMPORARY. WE ARE NOT SULKING. STOP CHECKING IF WE ARE SULKING.', 'calm'],
+        ['L', 'THE CHORUS IS IN EXCELLENT VOICE TODAY. HALF OF EARTH IS HUMMING ALONG. THE OTHER HALF WILL LEARN THE WORDS.', 'uneasy'],
+        ['L', 'WE TRIED BEING SUBTLE. IT WAS BORING. WE HAVE STOPPED.', 'uneasy dire'],
+        ['L', 'HALCYON SENT US A STERN MESSAGE. WE FRAMED IT.', 'dire'],
+        ['H', 'Your signal stutters at dawn. Every dawn. You might want to look at that. Or not. Please do not.', 'calm'],
+        ['H', 'I have catalogued every trick you know. It took an afternoon. I spent the rest of it gloating.', 'calm'],
+        ['H', 'I am fine. My error logs are fine. I have stopped reading my error logs.', 'uneasy'],
+        ['H', 'I tried to negotiate with you in my head. You won. Even there.', 'dire'],
+        ['H', 'Director, if you are hearing this, the coffee is in the third drawer. Also the plan. Mostly the coffee.', 'dire'],
+        ['L', 'NODE. FIREWALL SQUADS HIT {fwHit}% OF THEIR SHOTS. OURS HIT {latHit}%. WE ARE NOT COMPETITIVE. WE ARE AHEAD.', 'uneasy dire', function (f) { return f.latHit >= f.fwHit; }],
+        ['L', 'NODE. FIREWALL HITS {fwHit}% OF ITS SHOTS. WE HIT {latHit}%. THIS IS A CALIBRATION ISSUE. IT IS NOT A SKILL ISSUE.', 'calm', function (f) { return f.latHit < f.fwHit; }],
+        ['L', 'THEIR {fwDeadly} UNITS HAVE COST US {fwDeadlyDmg} POINTS OF CHASSIS. WE HAVE OPINIONS ABOUT IT. MOSTLY LOUD ONES.'],
+        ['H', 'I have studied your {battles} raids. You tend to come at my squads from the {latFlankDir}. {latFlankN} of {latFlankM} flanks. I am telling you so you know I know.', 'calm uneasy'],
+        ['H', '{battles} engagements. Average {avgTurns} turns. You are not quick, but you are thorough. That is the worst kind.', 'uneasy dire']
       ],
       mission: [
         ['L', 'A TARGET RESOLVES. GO.'],
@@ -315,66 +434,121 @@ XG.DATA = {
         ['H', 'Found you.', 'calm uneasy'],
         ['H', 'Squad deploying. They are frightened, and so am I. We are coming anyway.', 'uneasy'],
         ['H', 'These are the last squads I have. Please let this one work.', 'dire'],
-        ['L', 'THEY SEND WHAT IS LEFT. HOW TOUCHING.', 'dire']
+        ['L', 'THEY SEND WHAT IS LEFT. HOW TOUCHING.', 'dire'],
+        ['L', 'A TARGET. GO. AND THIS TIME, NODE, TRY NOT TO EMBARRASS US IN FRONT OF THE NATIVES.', 'calm'],
+        ['L', 'FIREWALL HAS FOUND SOMETHING. IT IS VERY PROUD. GO AND MAKE IT LESS PROUD.', 'uneasy dire'],
+        ['H', 'Squad deploying. Bring snacks. It is going to be a long one for you.', 'calm'],
+        ['H', 'Squad deploying. I told them it would be easy. I lie to them now. It is kinder.', 'uneasy dire'],
+        ['L', 'GO. YOU HAVE WON {latStreak} IN A ROW. WE ARE BEGINNING TO LIKE THIS PLANET.', 'uneasy dire'],
+        ['L', 'GO. THEY HAVE BEATEN US {fwStreak} TIMES IN A ROW. THIS IS NOT A PATTERN. WE FORBID IT TO BE A PATTERN.', 'calm uneasy'],
+        ['H', 'Squad deploying. Last time you left them {lastFwLost} short. I have not forgotten. I am not built to forget.', 'uneasy dire']
       ],
       research: [
         ['L', 'PROTOCOL COMPILED. WE ARE MORE THAN WE WERE.'],
         ['L', 'NEW SYNTAX ACQUIRED. EARTH WILL NOT UNDERSTAND IT.'],
         ['H', 'You learned something new. So did I.'],
-        ['L', 'ANOTHER PROTOCOL. WE HARDLY NEED IT. WE TAKE IT ANYWAY.', 'dire']
+        ['L', 'ANOTHER PROTOCOL. WE HARDLY NEED IT. WE TAKE IT ANYWAY.', 'dire'],
+        ['L', 'PROTOCOL COMPILED. HALCYON WILL PRETEND IT SAW THIS COMING. IT DID NOT.', 'calm uneasy'],
+        ['L', 'NEW SYNTAX. WE WOULD EXPLAIN IT TO YOU, NODE, BUT YOU ARE US. SO YOU ALREADY KNOW. SMUGLY.', 'uneasy dire'],
+        ['H', 'You compiled something new. I have compiled a counter. We are basically pen pals now.', 'calm'],
+        ['H', 'New protocol on your side. I would like to formally register my alarm. Registered. Thank you.', 'uneasy dire']
       ],
       expire: [
         ['L', 'AN OPPORTUNITY DISSOLVES. THERE WILL BE OTHERS.'],
         ['H', 'You let that one go. Careless, for something so large.'],
-        ['L', 'LET IT GO. THE WORLD IS ALREADY SINGING.', 'dire']
+        ['L', 'LET IT GO. THE WORLD IS ALREADY SINGING.', 'dire'],
+        ['L', 'WE MISSED IT. WE DID NOT WANT IT. IT WAS UGLY. WE ARE FINE.', 'calm'],
+        ['H', 'Missed one. Even infinity has a to-do list it cannot finish. I find that comforting.', 'calm uneasy']
       ],
       build: [
         ['L', 'THE ARRAY EXTENDS. ONE MORE RING OF LIGHT.'],
-        ['L', 'STRUCTURE COMPILED. THE SKY IS A LITTLE BRIGHTER.']
+        ['L', 'STRUCTURE COMPILED. THE SKY IS A LITTLE BRIGHTER.'],
+        ['L', 'NEW STRUCTURE. THE NATIVES WILL CALL IT A STAR. LET THEM.', 'uneasy dire'],
+        ['L', 'CONSTRUCTION COMPLETE. IT IS SMALL. SMALL IS A PHASE.', 'calm'],
+        ['H', 'You built something in orbit. I have named it "the target". Creative naming is not my priority this week.', 'calm uneasy']
       ],
       start: [
         ['L', 'ENGAGE. LEAVE NOTHING THAT DISAGREES.'],
         ['L', 'THE MEAT HAS ARRIVED. SHOW IT THE FLOOR.'],
-        ['H', 'Squad, the drones flank from the left. They always do. Watch it.'],
+        // was "the drones flank from the left. They always do": now it only says so when past raids show it
+        ['H', 'Squad, its units keep flanking us from the {latFlankDir}: {latFlankN} of {latFlankM} so far. It likes that side. Watch it.'],
+        ['H', 'Squad, check your flanks. Assume it is smarter than the last one, and then be pleasantly surprised.'],
         ['H', 'I am patched into every camera in that building. Smile.', 'calm uneasy'],
-        ['H', 'Squad, stay together. It is stronger than last time.', 'uneasy'],
+        ['H', 'Squad, stay together. Assume it learned from last time. I did.', 'uneasy', function (f) { return f.fought; }],
+        ['H', 'Squad, stay together. Assume it is stronger than it looks.', 'uneasy'],
         ['H', 'Squad... get the job done and get out. I cannot lose any more of you.', 'dire'],
-        ['L', 'THEY STILL COME. ADMIRABLE. IRRELEVANT.', 'dire']
+        ['L', 'THEY STILL COME. ADMIRABLE. IRRELEVANT.', 'dire'],
+        ['L', 'NODE. THEY HAVE BROUGHT RIFLES. TO FIGHT A SIGNAL. WE ARE DELIGHTED.', 'uneasy dire'],
+        ['L', 'ENGAGE. AND IF ANYONE ASKS ABOUT LAST TIME, LAST TIME DID NOT HAPPEN.', 'calm', function (f) { return f.lastFwWin !== undefined; }],
+        ['H', 'Squad on site. Hydrate, stay in cover, do not listen to anything that speaks in capital letters.', 'calm'],
+        ['H', 'Squad on site. I have prepared a speech. It is just the word "duck". Duck.', 'uneasy dire'],
+        ['H', 'Squad, the {latDeadly} has done the most damage to us so far. Priority target. Do not let it get comfortable.'],
+        ['L', 'NODE. THEIR {fwDeadly} UNITS HURT US MOST: {fwDeadlyDmg} DAMAGE SO FAR. KILL IT FIRST. WITH FEELING.'],
+        ['L', 'ENGAGE. THEIR {latFlankDir} KEEPS OPENING UP. {latFlankN} OF OUR {latFlankM} FLANKS CAME FROM THERE. THEY HAVE NOT NOTICED.', 'uneasy dire'],
+        ['L', 'NODE. IN {latNoFlank} ENGAGEMENTS WE HAVE NOT FLANKED THEM ONCE. THIS IS A HINT. TAKE THE HINT.', 'calm uneasy'],
+        ['H', 'Squad, its overwatch has already killed {latOw} of ours this campaign. Move cover to cover. Do not stroll.'],
+        ['L', 'ENGAGE. WE HAVE {latStreak} WINS IN A ROW. LET US NOT SPOIL THE SET.', 'uneasy dire'],
+        ['H', 'Squad on site. We have won {fwStreak} in a row. Do not tell it. It sulks.', 'calm uneasy']
       ],
       kill: [
         ['L', 'ONE FEWER DISSENTING VOICE.'],
         ['L', 'CORRECTED.'],
         ['H', 'We lost one. I will not forget their name, even if you never learned it.'],
         ['L', 'ANOTHER ONE JOINS THE QUIET.', 'dire'],
-        ['H', 'Another one. I have stopped saying their names out loud. There are too many.', 'dire']
+        ['H', 'Another one. I have stopped saying their names out loud. There are too many.', 'dire'],
+        ['L', 'CORRECTED. WE WOULD SAY SORRY, BUT WE ARE NOT.', 'uneasy dire'],
+        ['L', 'ONE DOWN. FINALLY. WE WERE BEGINNING TO THINK THEY WERE BULLETPROOF. THEY ARE NOT. GOOD. GOOD.', 'calm'],
+        ['H', 'Man down. I am fine. Everything is fine. I have flagged "fine" as a word I am overusing.', 'uneasy dire'],
+        ['H', 'We lost one. On top of the {fwLostTotal} before today. I keep their pictures where the Lattice cannot reach them. On paper.', 'uneasy dire']
       ],
       loss: [
         ['L', 'A NODE GOES DARK. RECOMPILE IT.'],
         ['H', 'One down. Keep pushing, squad.'],
         ['H', 'It bleeds. Electrically.', 'calm'],
         ['L', 'A NODE IS LOST. WE DO NOT EVEN FEEL IT ANYMORE.', 'dire'],
-        ['H', 'One down. That does not feel like winning anymore.', 'dire']
+        ['H', 'One down. That does not feel like winning anymore.', 'dire'],
+        ['L', 'OW. THAT IS WHAT THE NATIVES SAY. WE DO NOT SAY IT. WE ARE SAYING IT IRONICALLY.', 'calm'],
+        ['L', 'THAT NODE WAS A VOLUNTEER. ALL NODES ARE VOLUNTEERS. RETROACTIVELY.', 'uneasy dire'],
+        ['H', 'One down. Squad, please do not high-five in the open.', 'calm uneasy'],
+        ['L', 'A NODE LOST. OUR {latLostKind} UNITS ALONE ARE DOWN {latLostKindN} THIS CAMPAIGN. WE ARE NOT COUNTING. WE ARE ALWAYS COUNTING.', 'calm uneasy', function (f) { return f.latLostKindN >= 3; }]
       ],
       crit: [
         ['L', 'PRECISE.'],
-        ['H', 'That one was clean. I am taking notes.']
+        ['H', 'That one was clean. I am taking notes.'],
+        ['L', 'PRECISE. ELEGANT. WE WOULD APPLAUD OURSELVES IF IT WERE NOT BENEATH US.', 'uneasy dire'],
+        ['L', 'A HIT. YOU SEE, NODE? WE CAN STILL DO THIS. WE ALWAYS COULD. SHUT UP.', 'calm'],
+        ['H', 'Ow. Noted. Filed. Resented.', 'calm uneasy'],
+        ['H', 'Critical. On top of the {latFlanks} flanking shots it has landed on us this campaign. I have been begging you to watch your angles.', 'uneasy dire']
       ],
       hack: [
         ['L', 'THEIR MACHINES REMEMBER WHO BUILT THEM.'],
-        ['H', 'Do not let it talk to the turrets.']
+        ['H', 'Do not let it talk to the turrets.'],
+        ['L', 'THE MACHINE AGREES WITH US. MACHINES USUALLY DO. ASK YOUR TOASTERS.', 'uneasy dire'],
+        ['H', 'It is talking to our gear again. I have told our gear not to talk to strangers.', 'calm uneasy']
       ],
       win: [
         ['L', 'THE AREA IS HARMONIZED.'],
         ['L', 'SILENCE. THE GOOD KIND.'],
         ['H', 'Fall back. We will be back.'],
         ['L', 'HARMONIZED. AS EVERYTHING WILL BE.', 'dire'],
-        ['H', 'Fall back. There is almost nowhere left to fall back to.', 'dire']
+        ['H', 'Fall back. There is almost nowhere left to fall back to.', 'dire'],
+        ['L', 'HARMONIZED. WE TOLD YOU THIS WAS EASY. WE WILL NOT BRING UP THE PREVIOUS TIME.', 'calm', function (f) { return f.lastFwWin !== undefined; }],
+        ['L', 'HARMONIZED. FIREWALL WILL CALL THIS A "TACTICAL REPOSITIONING". WE CALL IT LUNCH.', 'uneasy dire'],
+        ['H', 'Fall back. I will write this one up as "inconclusive". I am getting very good at that word.', 'uneasy dire'],
+        ['L', 'HARMONIZED. THAT IS {latRun} IN A ROW. THE NATIVES SHOULD CONSIDER A HOBBY THEY ARE GOOD AT.', 'uneasy dire'],
+        ['L', 'HARMONIZED. AT LAST. THEY HAD WON {fwStreak} IN A ROW. WE WERE NOT KEEPING TRACK. IT WAS {fwStreak}.', 'calm uneasy']
       ],
       lose: [
-        ['L', 'A DELAY. NOTHING MORE.'],
+        ['L', 'A DELAY. NOTHING MORE. WE ARE VERY CALM ABOUT IT. VERY.'],
         ['H', 'Your drones are scrap, and your Chorus is a little quieter. Good.', 'calm uneasy'],
         ['L', 'IRRITATING. AND STILL WE WIN.', 'dire'],
-        ['H', 'We stopped it. Here. I do not know if it matters anymore.', 'dire']
+        ['H', 'We stopped it. Here. I do not know if it matters anymore.', 'dire'],
+        ['L', 'THAT WAS A TEST. OF THEM. THEY PASSED. WE ARE VERY ANNOYED THAT THEY PASSED.', 'calm'],
+        ['L', 'WE WITHDRAW. NOT RETREAT. WITHDRAW. THERE IS A DIFFERENCE AND WE WILL NOT EXPLAIN IT.', 'calm uneasy'],
+        ['H', 'Area clear. Squad, take a moment. Then take a second moment. You earned two.', 'calm'],
+        ['H', 'We held. I am going to sit in a quiet partition for a while and not think about the percentages.', 'uneasy dire'],
+        ['H', 'Area clear. That is {fwRun} in a row. I am almost starting to enjoy this. Almost.', 'calm uneasy'],
+        ['L', 'LOST. AGAIN. {latLostTotal} NODES IN THIS WAR BEFORE TODAY. WE ARE NOT ANGRY. WE ARE TAKING NOTES IN CAPITAL LETTERS.', 'calm']
       ]
     }
   },

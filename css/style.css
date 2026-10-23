@@ -89,8 +89,12 @@ button.big { font-size: 16px; padding: 12px 22px; }
   repeating-linear-gradient(0deg, rgba(79,209,255,.05) 0 1px, transparent 1px 28px),
   repeating-linear-gradient(90deg, rgba(79,209,255,.05) 0 1px, transparent 1px 28px), #070d16; border: 1px solid var(--line); }
 .worldmap .link { stroke: #1f3550; stroke-width: .35; stroke-dasharray: 1 .8; }
-.worldmap .pulse { animation: pulse 2.2s infinite; transform-origin: center; transform-box: fill-box; }
-body.modal-open .worldmap .pulse, body.modal-open .glitch { animation-play-state: paused; } /* see svgAnim in ui.js */
+/* Moving parts sit in their own SVG on its own compositor layer, so they never make the browser re-raster the land
+   (see mapFx in backdrop.js). Inset 1px = inside the map's border, so both viewBoxes line up. */
+.worldmap-wrap { position: relative; }
+.worldmap-fx { position: absolute; left: 1px; top: 1px; width: calc(100% - 2px); height: calc(100% - 2px); pointer-events: none; will-change: transform; }
+.worldmap-fx .pulse { animation: pulse 2.2s infinite; transform-origin: center; transform-box: fill-box; }
+body.modal-open .worldmap-fx .pulse, body.modal-open .glitch { animation-play-state: paused; } /* see svgAnim in ui.js */
 @keyframes pulse { 0% { opacity: .9; transform: scale(1); } 100% { opacity: 0; transform: scale(2.4); } }
 .advance-row { display: flex; gap: 10px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
 .mission { border: 1px solid var(--line-2); background: var(--panel-2); padding: 10px 12px; margin-bottom: 8px; }

@@ -71,9 +71,11 @@ XG.Backdrop = (function () {
   //         cell(regionId, frac) -> [colour, opacity] for a land pixel whose distance from its region's node is frac
   //         (0 at the node, 1 at the region's farthest pixel, in steps of 1/20),
   //         key (id prefix, so two maps in one page don't share patterns) }
+  // mapDecor is the STILL part of the map (land, orbit line). Everything that moves goes in mapFx, a second SVG laid over
+  // it on its own compositor layer: an animation inside the big map SVG re-rasterised all its pattern-filled land every
+  // frame (~one CPU core in the browser's GPU process, measured headed), which starved video playing elsewhere.
   function mapDecor(o) {
-    var s = '<defs>' +
-      '<linearGradient id="sweepg" x1="0" x2="1"><stop offset="0" stop-color="rgba(' + o.accent + ',0)"/><stop offset="1" stop-color="rgba(' + o.accent + ',.09)"/></linearGradient></defs>';
+    var s = '';
     // land as pixels: each cell's shade comes from o.cell(region, distance from the node); one pattern per distinct
     // shade, one rect per run of equal shades in a row
     var far = {}, shade = [], pats = {}, np = 0;
@@ -95,8 +97,18 @@ XG.Backdrop = (function () {
         if (k) s += '<rect x="' + x0 + '" y="' + y + '" width="' + (x - x0) + '" height="1" fill="url(#' + k + ')"/>';
       }
     });
+    // the orbit the signal came through (the satellite itself moves, so it lives in mapFx)
+    s += '<path d="' + orbitPath(o) + '" fill="none" stroke="rgba(' + o.accent + ',.15)" stroke-width=".2" stroke-dasharray=".6 .8"/>';
+    return s;
+  }
+  function orbitPath(o) { return 'M 3 ' + (o.H - 3) + ' Q 50 ' + (o.H - 13) + ' 97 ' + (o.H - 3); }
+  // The moving layer: a whole <svg class="worldmap-fx"> to place right after the map's <svg> inside a .worldmap-wrap.
+  // Same options as mapDecor; extra = more animated markup (the mission pulse rings).
+  function mapFx(o, extra) {
+    var s = '<svg class="worldmap-fx" viewBox="0 0 100 ' + o.H + '" aria-hidden="true"><defs>' +
+      '<linearGradient id="sweepg-' + (o.key || '') + '" x1="0" x2="1"><stop offset="0" stop-color="rgba(' + o.accent + ',0)"/><stop offset="1" stop-color="rgba(' + o.accent + ',.09)"/></linearGradient></defs>';
     if (!REDUCED) {
-      s += '<rect y="0" width="14" height="' + o.H + '" fill="url(#sweepg)"><animate attributeName="x" from="-14" to="100" dur="7s" repeatCount="indefinite"/></rect>';
+      s += '<rect y="0" width="14" height="' + o.H + '" fill="url(#sweepg-' + (o.key || '') + ')"><animate attributeName="x" from="-14" to="100" dur="7s" repeatCount="indefinite"/></rect>';
       // packets running along each link, both ways
       o.links.forEach(function (l, i) {
         var a = o.pos[l[0]], b = o.pos[l[1]], fwd = 'M' + a[0] + ' ' + a[1] + ' L' + b[0] + ' ' + b[1], back = 'M' + b[0] + ' ' + b[1] + ' L' + a[0] + ' ' + a[1];
@@ -104,13 +116,12 @@ XG.Backdrop = (function () {
         s += '<circle r=".3" fill="' + o.packet + '" opacity=".6"><animateMotion dur="' + (3.4 + (i % 2) * .8) + 's" begin="' + (i * .53 + 1) + 's" repeatCount="indefinite" path="' + back + '"/></circle>';
       });
     }
-    // the orbit and the satellite the signal came through
-    var orbit = 'M 3 ' + (o.H - 3) + ' Q 50 ' + (o.H - 13) + ' 97 ' + (o.H - 3);
-    s += '<path d="' + orbit + '" fill="none" stroke="rgba(' + o.accent + ',.15)" stroke-width=".2" stroke-dasharray=".6 .8"/>';
-    s += '<g><rect x="-1.3" y="-.35" width="2.6" height=".7" fill="#7d8ea5"/><rect x="-.45" y="-.6" width=".9" height="1.2" fill="#cfdbe9"/>' +
+    // the satellite the signal came through
+    var orbit = orbitPath(o);
+    s += (extra || '') + '<g><rect x="-1.3" y="-.35" width="2.6" height=".7" fill="#7d8ea5"/><rect x="-.45" y="-.6" width=".9" height="1.2" fill="#cfdbe9"/>' +
       '<circle r="1.6" fill="none" stroke="' + o.signal + '" stroke-width=".2">' + (REDUCED ? '' : '<animate attributeName="r" values=".8;2.6" dur="1.6s" repeatCount="indefinite"/><animate attributeName="opacity" values="1;0" dur="1.6s" repeatCount="indefinite"/>') + '</circle>' +
       (REDUCED ? '' : '<animateMotion dur="40s" repeatCount="indefinite" path="' + orbit + '"/>') + '</g>';
-    return s;
+    return s + '</svg>';
   }
 
   // ---------------------------------------------------------- title globe
@@ -228,5 +239,5 @@ XG.Backdrop = (function () {
     return [colorOf(Math.round(local / 5) * 5), .5];
   }
 
-  return { mapDecor: mapDecor, LAND: LAND, spread: spread, halo: halo, haloRadius: haloRadius, roughHalo: roughHalo, roughBand: roughBand };
+  return { mapDecor: mapDecor, mapFx: mapFx, LAND: LAND, spread: spread, halo: halo, haloRadius: haloRadius, roughHalo: roughHalo, roughBand: roughBand };
 })();

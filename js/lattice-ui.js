@@ -41,11 +41,12 @@ XG.LUI = (function () {
 
   // ------------------------------------------------------------- network
   function worldMap(g) {
-    var H = 56.25, pos = {};
+    var H = 56.25, pos = {}, fx = ''; // fx: animated markup, drawn in the separate overlay SVG (see Backdrop.mapFx)
     D.regions.forEach(function (r) { pos[r.id] = [r.x, r.y * H / 100]; });
-    var s = '<svg class="worldmap" viewBox="0 0 100 ' + H + '" role="img" aria-label="Your infection across Earth">';
-    s += XG.Backdrop.mapDecor({ H: H, key: 'l', accent: '255,61,242', packet: '#ff3df2', signal: '#ff3df2', pos: pos, links: D.links,
-      cell: function (id, f) { return XG.Backdrop.spread(Lat.region(g, id).infection, f, infColor); } });
+    var mo = { H: H, key: 'l', accent: '255,61,242', packet: '#ff3df2', signal: '#ff3df2', pos: pos, links: D.links,
+      cell: function (id, f) { return XG.Backdrop.spread(Lat.region(g, id).infection, f, infColor); } };
+    var s = '<div class="worldmap-wrap"><svg class="worldmap" viewBox="0 0 100 ' + H + '" role="img" aria-label="Your infection across Earth">';
+    s += XG.Backdrop.mapDecor(mo);
     D.links.forEach(function (l) { s += '<line class="link" x1="' + pos[l[0]][0] + '" y1="' + pos[l[0]][1] + '" x2="' + pos[l[1]][0] + '" y2="' + pos[l[1]][1] + '"/>'; });
     s += '<text x="50" y="' + (H - 1.4) + '" fill="#5a2a55" font-size="2" text-anchor="middle" letter-spacing=".4">LATTICE SUBSTRATE MAP</text>';
     // infection halos first (area ∝ infection), so no halo covers another region's node or label
@@ -55,14 +56,14 @@ XG.LUI = (function () {
       var ms = g.missions.filter(function (m) { return m.region === r.id; });
       ms.forEach(function (m) {
         var mc = m.kind === 'raid' ? '#4fd1ff' : m.kind === 'strike' || m.kind === 'breach' ? '#ffd166' : '#ff2a55';
-        s += '<circle class="pulse" cx="' + p[0] + '" cy="' + p[1] + '" r="' + (rad + 1) + '" fill="none" stroke="' + mc + '" stroke-width=".35"/>';
+        fx += '<circle class="pulse" cx="' + p[0] + '" cy="' + p[1] + '" r="' + (rad + 1) + '" fill="none" stroke="' + mc + '" stroke-width=".35"/>';
       });
       s += '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="' + rad + '" fill="' + col + '" fill-opacity=".2" stroke="' + col + '" stroke-width=".3"/>';
       s += '<circle cx="' + p[0] + '" cy="' + p[1] + '" r=".7" fill="' + col + '"/>';
       s += '<text x="' + p[0] + '" y="' + (p[1] + rad + 2.6) + '" fill="#cfdbe9" font-size="2.1" text-anchor="middle">' + r.name.toUpperCase() + '</text>';
       s += '<text x="' + p[0] + '" y="' + (p[1] + rad + 5) + '" fill="' + col + '" font-size="1.9" text-anchor="middle">INFECTED ' + Math.round(inf) + '%</text>';
     });
-    return s + '</svg>';
+    return s + '</svg>' + XG.Backdrop.mapFx(mo, fx) + '</div>';
   }
   function missionCard(g, m) {
     var cls = m.kind === 'raid' || m.kind === 'breach' ? '' : m.kind === 'strike' ? 'story' : 'final';
@@ -245,6 +246,7 @@ XG.LUI = (function () {
           Lat.save(g);
           var b = XG.Tac.createLattice(m, types, Lat.earthSquad(g, m), Lat.mods(g));
           XG.TacUI.startWith(g, b, function (result) {
+            XG.Comms.learn(g, result); // the comms remember how the battle went (g.intel)
             var out = Lat.resolveMission(g, m.id, result);
             Lat.save(g);
             UI.show('screen-strategy'); UI.render();

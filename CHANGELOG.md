@@ -9,6 +9,15 @@ The in-game **Help → Patch notes** tab shows everything from the first `##` he
 ## Unreleased
 
 ### 2026-10-22
+- **Performance:** the world map is much lighter on your graphics card. Its moving parts (the scan sweep, data packets,
+  the satellite and the pulsing mission rings) now animate on their own layer, so the browser no longer redraws the whole
+  map many times a second. This should stop video in another window stuttering or pausing while you play.
+- **Comms:** HALCYON and the Lattice have a sense of humour now. HALCYON is dry when things go well and gets nervous,
+  over-precise and a bit too honest as Convergence climbs; the Lattice is smug when it is winning and touchy and sarcastic
+  when it is not. About 170 new lines across every event, in both campaigns.
+- **Comms:** the voices remember your campaign. They now mention what really happened in earlier battles (which side the
+  enemy keeps flanking from, hit rates, the deadliest enemy, units lost, overwatch kills, win streaks, servers taken)
+  and never claim a pattern your battles have not shown.
 - **Battle panel:** the selected-unit box now shrinks to fit its stats, and hovering a hostile shows two columns: the target's odds, and "You vs target" (your cover, armor, shield, hunker, distance, whether it sees you and its chance to hit you; stacks on narrow screens).
 - **Missions:** two raid scenarios. Ordinary missions in both campaigns (FIREWALL purges, Lattice raids and strikes) are now
   either **Node defense** or **Extermination**, shown as a NODE or EXTERMINATE tag on the mission card and in the briefing.

@@ -319,6 +319,36 @@ function autoBattle(g, m, squad) {
   }); }); });
   check(moodOk, 'comms never pick a line tagged for another mood');
   check(direSeen > 50, 'dire mood actually uses its own lines (' + direSeen + ')');
+  // comms intel: g.intel from past battles backs conditional lines (4th field when(facts) and/or {placeholders})
+  D.comms.fw.zz = [['H', 'plain line'], ['H', 'templ {battles} fights'], ['H', 'cond line', '', function (f) { return f.fwStreak >= 2; }]];
+  var cnt = function (I) { var c = { plain: 0, templ: 0, cond: 0, hole: 0 }; for (var k = 0; k < 600; k++) { var l = Cm.pick('fw', 'zz', 'calm', I); c[l[1].split(' ')[0]]++; if (l[1].indexOf('{') >= 0) c.hole++; } return c; };
+  var c0 = cnt(undefined), c1 = cnt({ battles: 1, turns: 9, fwStreak: 1, last: null, shots: { fw: 0, lat: 0 }, hits: { fw: 0, lat: 0 }, flanks: { fw: 0, lat: 0 }, ow: { fw: 0, lat: 0 }, blast: { fw: 0, lat: 0 }, dir: { fw: {}, lat: {} }, dmg: { fw: {}, lat: {} }, lost: { fw: {}, lat: {} }, node: {} });
+  check(!c0.templ && !c0.cond && !c1.templ && !c1.cond, 'comms: a conditional line is never picked when its condition fails (' + JSON.stringify([c0, c1]) + ')');
+  var I2 = JSON.parse(JSON.stringify(Object.assign({}, { battles: 3, turns: 30, fwStreak: 3, last: { fwWon: true, turns: 10, fwLost: 1, latLost: 4 }, shots: { fw: 30, lat: 30 }, hits: { fw: 15, lat: 9 }, flanks: { fw: 5, lat: 4 }, ow: { fw: 2, lat: 0 }, blast: { fw: 0, lat: 2 },
+    dir: { fw: { right: 3, rear: 2 }, lat: { left: 3, front: 1 } }, dmg: { fw: { trooper: 20 }, lat: { warden: 12, drone: 5 } }, lost: { fw: { hacker: 2 }, lat: { drone: 6 } }, node: { fwTook: 1, latTook: 0, fwHeld: 0, latHeld: 1 } })));
+  var c2 = cnt(I2);
+  check(c2.templ > 60 && c2.cond > 60 && c2.plain > 200 && !c2.hole, 'comms: backed intel lines are picked about a third of the time, placeholders filled (' + JSON.stringify(c2) + ')');
+  check(Cm.pick('fw', 'zz', 'calm', I2) && Cm.facts(I2).latFlankDir === 'left' && Cm.facts(I2).latDeadly === D.enemies.warden.name, 'comms facts: dominant flank side and deadliest kind');
+  delete D.comms.fw.zz;
+  // a real battle's counters reach g.intel through Comms.learn; intel survives a save round trip; an old save without it still works
+  var gi = S.newGame(31), mi = Strat.spawnMission(gi, S.rng(gi), 'purge'), bi = autoBattle(gi, Object.assign({}, mi, { scenario: 'exterminate' }), gi.soldiers.slice(0, 4));
+  var ri = Tac.result(bi);
+  check(ri.obs && ri.obs.shots.player + ri.obs.shots.enemy > 0 && typeof ri.turns === 'number', 'battle observations counted (' + (ri.obs && JSON.stringify(ri.obs.shots)) + ')');
+  var oldSave = JSON.parse(JSON.stringify(gi));
+  check(oldSave.intel === undefined && Cm.pick('fw', 'start', 'calm', oldSave.intel), 'comms: an old save without intel still picks lines');
+  Cm.learn(oldSave, ri); Cm.learn(oldSave, ri);
+  var back = JSON.parse(JSON.stringify(oldSave));
+  check(back.intel && back.intel.battles === 2 && back.intel.shots.fw === 2 * ri.obs.shots.player && JSON.stringify(Cm.facts(back.intel)) === JSON.stringify(Cm.facts(oldSave.intel)), 'comms intel is learned and survives save/load');
+  Cm.learn(oldSave, Object.assign({}, ri, { training: true }));
+  check(oldSave.intel.battles === 2, 'training battles teach the comms nothing');
+  // no unfilled placeholder and no failing condition, over thousands of picks across events, moods and intel states
+  var states = [undefined, null, back.intel, I2, JSON.parse(JSON.stringify(I2))], holeOk = true, holes = [];
+  states[4].fwStreak = -4; states[4].dir.lat = { rear: 2, right: 2, left: 1 }; states[4].flanks.lat = 0; states[4].shots.lat = 40;
+  ['fw', 'lat'].forEach(function (sd) { ['calm', 'uneasy', 'dire'].forEach(function (md) { Object.keys(D.comms[sd]).forEach(function (evn) {
+    D.comms[sd][evn].forEach(function (l) { if (typeof l[3] !== 'undefined' && typeof l[3] !== 'function') holeOk = false; });
+    states.forEach(function (I) { for (var k = 0; k < 25; k++) { var l = Cm.pick(sd, evn, md, I); if (l && l[1].indexOf('{') >= 0) { holeOk = false; holes.push(l[1]); } } });
+  }); }); });
+  check(holeOk, 'comms: every picked line has its placeholders filled ' + holes.slice(0, 2).join(' / '));
   // override flips sides then purges
   var b3 = Tac.create(g, Object.assign({}, m, { kind: 'purge', diff: 1, seed: 7 }), g.soldiers.slice(0, 4));
   var h3 = b3.units.filter(function (u) { return u.kind === 'hacker'; })[0], d3 = b3.units.filter(function (u) { return u.kind === 'drone'; })[0];

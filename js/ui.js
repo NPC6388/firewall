@@ -131,11 +131,12 @@ XG.UI = (function () {
 
   // ----- command
   function worldMap(g) {
-    var vis = St.infectionVisible(g), H = 56.25, pos = {};
+    var vis = St.infectionVisible(g), H = 56.25, pos = {}, fx = ''; // fx: animated markup for the overlay SVG (Backdrop.mapFx)
     D.regions.forEach(function (r) { pos[r.id] = [r.x, r.y * H / 100]; });
-    var s = '<svg class="worldmap" viewBox="0 0 100 ' + H + '" role="img" aria-label="Regional infection map">';
-    s += XG.Backdrop.mapDecor({ H: H, accent: '79,209,255', packet: '#4fd1ff', signal: '#ff2a55', pos: pos, links: D.links,
-      cell: function (id, f) { return vis ? XG.Backdrop.spread(St.region(g, id).infection, f, infColor) : ['#4a5d78', .32]; } });
+    var mo = { H: H, accent: '79,209,255', packet: '#4fd1ff', signal: '#ff2a55', pos: pos, links: D.links,
+      cell: function (id, f) { return vis ? XG.Backdrop.spread(St.region(g, id).infection, f, infColor) : ['#4a5d78', .32]; } };
+    var s = '<div class="worldmap-wrap"><svg class="worldmap" viewBox="0 0 100 ' + H + '" role="img" aria-label="Regional infection map">';
+    s += XG.Backdrop.mapDecor(mo);
     D.links.forEach(function (l) { s += '<line class="link" x1="' + pos[l[0]][0] + '" y1="' + pos[l[0]][1] + '" x2="' + pos[l[1]][0] + '" y2="' + pos[l[1]][1] + '"/>'; });
     s += '<text x="50" y="' + (H - 1.4) + '" fill="#2f4560" font-size="2" text-anchor="middle" letter-spacing=".4">HALCYON GLOBAL NETWORK VIEW</text>';
     // infection halos first (area ∝ infection), so no halo covers another region's node or label;
@@ -148,7 +149,7 @@ XG.UI = (function () {
       var ms = g.missions.filter(function (m) { return m.region === r.id; });
       ms.forEach(function (m) {
         var mc = m.kind === 'purge' ? '#ff2a55' : m.kind === 'relay' ? '#c792ff' : '#ff3df2';
-        s += '<circle class="pulse" cx="' + p[0] + '" cy="' + p[1] + '" r="' + (rad + 1) + '" fill="none" stroke="' + mc + '" stroke-width=".35"/>';
+        fx += '<circle class="pulse" cx="' + p[0] + '" cy="' + p[1] + '" r="' + (rad + 1) + '" fill="none" stroke="' + mc + '" stroke-width=".35"/>';
       });
       s += '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="' + rad + '" fill="' + col + '" fill-opacity=".18" stroke="' + col + '" stroke-width=".3"/>';
       s += '<circle cx="' + p[0] + '" cy="' + p[1] + '" r=".7" fill="' + col + '"/>';
@@ -156,7 +157,7 @@ XG.UI = (function () {
       s += '<text x="' + p[0] + '" y="' + (p[1] + rad + 5) + '" fill="' + col + '" font-size="1.9" text-anchor="middle">' + (vis ? 'INFECTION ' + Math.round(inf) + '%' : 'INFECTION ' + XG.Backdrop.roughBand(inf).label) + '</text>';
       if (ms.length) s += '<text x="' + (p[0] + rad + 1) + '" y="' + (p[1] - rad + .6) + '" fill="#ff6b85" font-size="2">⚠ ' + ms.length + '</text>';
     });
-    return s + '</svg>';
+    return s + '</svg>' + XG.Backdrop.mapFx(mo, fx) + '</div>';
   }
 
   function missionCard(g, m) {

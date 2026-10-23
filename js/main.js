@@ -79,6 +79,7 @@ var XG = globalThis.XG = globalThis.XG || {};
         if (!squad.length) return;
         S.save(g);
         XG.TacUI.start(g, m, squad, function (result) {
+          XG.Comms.learn(g, result); // the comms remember how the battle went (g.intel)
           var out = St.resolveMission(g, m.id, result);
           S.save(g);
           UI.show('screen-strategy'); UI.render();

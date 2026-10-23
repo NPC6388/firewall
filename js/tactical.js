@@ -803,6 +803,7 @@ XG.Tac = (function () {
     }
     b.rng = keep;
     b.visible = null; b.explored = null;
+    b.obs = null; obs(b); // fresh comms observations, facing taken from the new spawn points
     refreshVis(b);
   }
   // Restart: the same battle and map (the turn-1 snapshot), both squads landing somewhere new.
@@ -1020,6 +1021,25 @@ XG.Tac = (function () {
     ev.push({ t: 'log', msg: msg, cls: cls || '' });
   }
 
+  // Battle observations for the comms (b.obs; XG.Comms.learn folds them into g.intel after the battle). Cheap counters only,
+  // keyed by side ('player' = FIREWALL, 'enemy' = the Lattice). face: FIREWALL's facing at deployment (toward the Lattice);
+  // flank directions are taken relative to the TARGET side's facing (the Lattice faces the other way).
+  function obs(b) {
+    if (b.obs) return b.obs;
+    var two = function () { return { player: 0, enemy: 0 }; }, map2 = function () { return { player: {}, enemy: {} }; };
+    var c = { player: [0, 0, 0], enemy: [0, 0, 0] };
+    b.units.forEach(function (u) { if (!u.isStatic && u.x >= 0 && c[u.side]) { c[u.side][0] += u.x; c[u.side][1] += u.y; c[u.side][2]++; } });
+    var fx = c.enemy[2] && c.player[2] ? c.enemy[0] / c.enemy[2] - c.player[0] / c.player[2] : 1, fy = c.enemy[2] && c.player[2] ? c.enemy[1] / c.enemy[2] - c.player[1] / c.player[2] : 0;
+    return (b.obs = { face: [fx || 1, fy], shots: two(), hits: two(), flanks: two(), ow: two(), blast: two(), dir: map2(), dmg: map2(), lost: map2() });
+  }
+  function bump(o, k, n) { o[k] = (o[k] || 0) + (n || 1); }
+  function faction(u) { return u.origSide || u.side; }
+  // Where shooter a stands as seen by target t's squad: 'front' | 'left' | 'right' | 'rear' (45° sectors around its facing).
+  function flankDir(b, a, t) {
+    var f = obs(b).face, s = faction(t) === 'player' ? 1 : -1, vx = a.x - t.x, vy = a.y - t.y;
+    var along = (f[0] * vx + f[1] * vy) * s, across = (f[0] * vy - f[1] * vx) * s;
+    return Math.abs(along) >= Math.abs(across) ? (along > 0 ? 'front' : 'rear') : (across > 0 ? 'right' : 'left');
+  }
   function damage(b, t, amount, ev, src, opts) {
     opts = opts || {};
     if (amount <= 0 || !t.alive) return;
@@ -1031,14 +1051,17 @@ XG.Tac = (function () {
     if (amount > 0) {
       t.hp -= amount;
       ev.push({ t: 'dmg', id: t.id, x: t.x, y: t.y, amount: amount, hpAfter: Math.max(0, t.hp), crit: !!opts.crit });
+      if (src && src.kind && !src.override && obs(b).dmg[src.side]) bump(obs(b).dmg[src.side], src.kind, amount);
     }
     if (t.side === 'enemy') alert(b, t, ev);
+    if (t.hp <= 0 && (opts.blast || opts.cause === 'is caught in the blast')) bump(obs(b).blast, faction(t));
     if (t.hp <= 0) kill(b, t, ev, src, opts.cause);
   }
 
   function kill(b, t, ev, src, cause) {
     t.alive = false; t.hp = 0; t.overwatch = false;
     ev.push({ t: 'death', id: t.id, x: t.x, y: t.y });
+    if (!t.isStatic && obs(b).lost[faction(t)]) bump(obs(b).lost[faction(t)], t.kind);
     var credit = src && (src.creditTo ? unitById(b, src.creditTo) : src);
     if (credit && credit.side === 'player' && credit.sid && t.origSide !== 'player' && (t.side === 'enemy' || t.origSide === 'enemy')) credit.kills++;
     if (t.side === 'enemy' || t.origSide === 'enemy') b.salvage += (t.xp || 1) * 2;
@@ -1052,7 +1075,14 @@ XG.Tac = (function () {
     var hi = hitInfo(b, a, t, opts);
     if (!hi.ok) return false;
     var hit = b.rng.chance(hi.chance);
-    var crit = hit && b.rng.chance(hi.crit);
+    var crit = hit && b.rng.chance(hi.crit), ob = obs(b);
+    if (ob.shots[a.side] !== undefined) {
+      bump(ob.shots, a.side); if (hit) bump(ob.hits, a.side);
+      // a flank: no cover against this shooter although the target stands beside some
+      if (hi.flankCrit && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(function (o) { return coverOf(tile(b, t.x + o[0], t.y + o[1])) > 0; })) {
+        bump(ob.flanks, a.side); bump(ob.dir[a.side], flankDir(b, a, t));
+      }
+    }
     ev.push({ t: 'shot', from: a.id, to: t.id, fx: a.x, fy: a.y, tx: t.x, ty: t.y, hit: hit, kind: a.kind === 'sentinel' ? 'pulse' : a.side === 'enemy' ? 'lattice' : 'bullet' });
     var tag = (opts.overwatch ? 'Overwatch: ' : '') + (a.short || a.name) + ' → ' + (t.short || t.name) + ' (' + hi.chance + '%)';
     if (!hit) {
@@ -1069,6 +1099,7 @@ XG.Tac = (function () {
     var dmg = b.rng.int(a.dmg[0], a.dmg[1]) + (crit ? 2 : 0);
     log(b, ev, tag + ': ' + (crit ? 'CRIT ' : 'hit ') + dmg + '.', a.side === 'player' ? 'good' : 'bad');
     damage(b, t, dmg, ev, a, { crit: crit });
+    if (opts.overwatch && !t.alive && ob.ow[a.side] !== undefined) bump(ob.ow, a.side);
     return true;
   }
 
@@ -1268,7 +1299,7 @@ XG.Tac = (function () {
       var hitList = b.units.filter(function (t) { return t.alive && cheb(t.x, t.y, x, y) <= 1; });
       hitList.forEach(function (t) {
         var d = emp ? (t.side === 'enemy' && t.machine ? 5 : t.machine ? 2 : 0) : 3;
-        damage(b, t, d, ev, u, { ignoreArmor: emp });
+        damage(b, t, d, ev, u, { ignoreArmor: emp, blast: true });
       });
       if (!emp) for (var yy = y - 1; yy <= y + 1; yy++) for (var xx = x - 1; xx <= x + 1; xx++) {
         clearTile(b, xx, yy, ev, 'blast');
@@ -1727,6 +1758,8 @@ XG.Tac = (function () {
     return {
       outcome: b.outcome || 'abort',
       scenario: b.mission.scenario || null, captured: !!b.captured,
+      kind: b.mission.lkind || b.mission.kind || null, turns: b.turn, training: !!b.training,
+      nodeAttacker: b.server ? b.nodeAttacker : null, obs: b.obs || null,
       salvage: b.outcome === 'win' ? b.salvage : 0,
       lattice: b.units.filter(function (u) { return u.deployed; }).map(function (u) { return { kind: u.kind, alive: u.alive }; }),
       humansKilled: b.units.filter(function (u) { return u.sid && !u.alive; }).length,
