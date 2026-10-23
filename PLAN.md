@@ -148,6 +148,13 @@ Each sprint ends with something playable. **Sprints 0–4 = the MVP.**
   mass Spike, cyber programs' firewall wall / quarantine field), shown on the hover panel so the player can read them.
 - Rebalance both campaigns afterwards (`smoke.js 30 4 30 40`): a bot that throws grenades is a lot more dangerous.
 
+**Backlog: a design session for challenge** (idea, 2026-10-22; for another day)
+- A dedicated Claude session spends at most 50% of a fresh session's token limit designing improvements that make the game
+  more challenging while keeping the two teams balanced against each other. Its output is a ranked list of design
+  changes (tactical and strategic), each with the balance lever it touches and how to measure it (`smoke.js 30 4 30 40`
+  bot rates plus the user's playtest feel), and the cheapest ones prototyped. The budget cap is part of the brief:
+  check usage as it goes and stop and hand over at the halfway mark.
+
 **Sprint 7: Strategy depth**
 - **Cyber-Ops layer:** hackers dive into a fast node-graph "netrun" minigame between missions to slow regions or steal intel.
 - Regional **Firewall Relays** (build per region to cap infection), Dark Events (Lattice plays a card each month).

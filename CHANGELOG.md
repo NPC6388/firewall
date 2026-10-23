@@ -9,6 +9,7 @@ The in-game **Help → Patch notes** tab shows everything from the first `##` he
 ## Unreleased
 
 ### 2026-10-22
+- **Battle panel:** the selected-unit box now shrinks to fit its stats, and hovering a hostile shows two columns: the target's odds, and "You vs target" (your cover, armor, shield, hunker, distance, whether it sees you and its chance to hit you; stacks on narrow screens).
 - **Missions:** two raid scenarios. Ordinary missions in both campaigns (FIREWALL purges, Lattice raids and strikes) are now
   either **Node defense** or **Extermination**, shown as a NODE or EXTERMINATE tag on the mission card and in the briefing.
   Node defense puts a server near the defenders: the attacker scores a capture point at the end of each turn it has a unit

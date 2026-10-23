@@ -11,8 +11,8 @@ const SCR = path.join(HERE, 'shots'); fs.mkdirSync(SCR, { recursive: true });
 const EDGE = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe';
 // Set PAGE_URL=https://npc6388.github.io/firewall/ to test the live site instead of the local file.
 const PAGE = process.env.PAGE_URL || 'file:///' + path.resolve(HERE, '..', '..', 'index.html').replace(/\\/g, '/');
-const port = 9333;
-const proc = spawn(EDGE, ['--headless=new', '--remote-debugging-port=' + port, '--user-data-dir=' + path.join(os.tmpdir(), 'firewall-edge-profile'),
+const port = +(process.env.CDP_PORT || 9333); // set CDP_PORT to run several drivers at once (each gets its own profile)
+const proc = spawn(EDGE, ['--headless=new', '--remote-debugging-port=' + port, '--user-data-dir=' + path.join(os.tmpdir(), 'firewall-edge-profile' + (port === 9333 ? '' : '-' + port)),
   '--window-size=1500,950', '--mute-audio', '--no-first-run', '--disable-gpu', 'about:blank'], { stdio: 'ignore' });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

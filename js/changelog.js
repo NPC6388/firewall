@@ -7,6 +7,7 @@ XG.CHANGELOG = [
    {
     "name": "2026-10-22",
     "items": [
+     "<b>Battle panel:</b> the selected-unit box now shrinks to fit its stats, and hovering a hostile shows two columns: the target's odds, and \"You vs target\" (your cover, armor, shield, hunker, distance, whether it sees you and its chance to hit you; stacks on narrow screens).",
      "<b>Missions:</b> two raid scenarios. Ordinary missions in both campaigns (FIREWALL purges, Lattice raids and strikes) are now either <b>Node defense</b> or <b>Extermination</b>, shown as a NODE or EXTERMINATE tag on the mission card and in the briefing. Node defense puts a server near the defenders: the attacker scores a capture point at the end of each turn it has a unit beside the server and the defender has none there, and two points take it. The defender wins by holding out to the turn limit (10 turns). The server cannot be shot or destroyed, gives no cover, and a ring on it shows the capture and who holds the zone. Extermination has no time limit: it ends when one side is gone.",
      "<b>Battle:</b> Restart mission now changes only where both sides spawn and where patrols walk. The map, the enemies, the Relay, the Uplink Core and the server stay exactly where they were.",
      "<b>Battle:</b> pressing Tab to switch operatives now centres the camera on the one you switched to.",

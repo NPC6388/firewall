@@ -668,6 +668,21 @@ XG.TacUI = (function () {
     }).join('') + '<tr class="tot"><td>Hit chance</td><td>' + hi.chance + '%</td></tr>' +
       (hi.flankCrit ? '<tr><td colspan="2" class="good">Flanked: +25 crit</td></tr>' : '') + (hi.object ? '<tr><td colspan="2" class="dim">Object: no cover or defense, no crits</td></tr>' : '') + '</table>';
   }
+  // Column B of the hover panel: the selected unit's defences against the hovered hostile (same numbers as hitInfo).
+  function youVs(u, f) {
+    var b = st.b, nm = u.short || u.name, cd = Tac.coverDetail(b, u.x, u.y, f.x, f.y), back = Tac.hitInfo(b, f, u);
+    var sight = Tac.los(b, f.x, f.y, u.x, u.y), d = Math.hypot(f.x - u.x, f.y - u.y);
+    var side = cd.side ? SIDES.filter(function (o) { return o[0] === cd.side[0] && o[1] === cd.side[1]; })[0][3] : '';
+    var cov = !cd.base ? '<span class="warn">none (flanked)</span>'
+      : (cd.base >= 40 ? 'Full' : 'Half') + ' cover, ' + side + (cd.value < cd.base ? ' at ' + cd.angle + '° (−' + cd.value + ' of ' + cd.base + ')' : ' (−' + cd.value + ')');
+    var row = function (k, v) { return '<tr><td>' + k + '</td><td>' + v + '</td></tr>'; };
+    return '<b>You vs ' + f.name + '</b><table class="odds you">' +
+      row('Cover', cov) + row('Flanked', cd.base && cd.value ? '<span class="good">no</span>' : '<span class="bad">yes</span>') +
+      row('Armor', u.armor || 0) + row('Shield', u.shield || 0) + row('Hunkered', u.hunker ? '<span class="good">yes (−25)</span>' : 'no') +
+      row('Distance', d.toFixed(1) + ' tiles') + row('It sees you', sight ? '<span class="warn">yes</span>' : '<span class="good">no</span>') +
+      row('It hits you', back.ok ? '<b>' + back.chance + '%</b>' + (back.crit ? ' · ' + back.crit + '% crit' : '') : '<span class="dim">no shot</span>') +
+      (back.standoff ? '<tr><td colspan="2" class="warn">Corner standoff</td></tr>' : '') + '</table>';
+  }
   function hoverPanel() {
     if (!st) return;
     var b = st.b, h = st.hover, u = selUnit(), html = '', ao = aimObject();
@@ -689,6 +704,7 @@ XG.TacUI = (function () {
           if (u.hackSkill && focus.hackDef !== null && focus.hackDef !== undefined && !focus.isStatic)
             html += '<div class="good">Hack chance ' + Math.max(10, Math.min(90, u.hackSkill - focus.hackDef)) + '%' + (b.grammar ? ' (override)' : ' (stun)') + '</div>';
           if (focus.kind === 'core' && u.hackSkill) html += '<div class="good">Sever chance ' + Math.min(90, u.hackSkill + 10) + '% when adjacent</div>';
+          if (u.alive && u !== focus) html = '<div class="hv2"><div class="hv-a">' + html + '</div><div class="hv-b">' + youVs(u, focus) + '</div></div>';
         }
       }
     } else if (h && Tac.isServer(b, h.x, h.y)) {
