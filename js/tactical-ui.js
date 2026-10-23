@@ -463,7 +463,7 @@ XG.TacUI = (function () {
       if (!seen) dur = 0; else st.fx.push({ e: e, t0: now, dur: dur + 120 });
     } else if (e.t === 'dmg' || e.t === 'heal') {
       st.displayHp[e.id] = e.hpAfter;
-      floater(e.x, e.y, (e.t === 'dmg' ? '-' : '+') + e.amount + (e.crit ? ' CRIT' : ''), e.t === 'heal' ? '#7dff9b' : e.crit ? '#ffd166' : '#ff6b85', now);
+      if (e.t === 'dmg' || (u && u.side === HS()) || b.visible[e.y * W + e.x]) floater(e.x, e.y, (e.t === 'dmg' ? '-' : '+') + e.amount + (e.crit ? ' CRIT' : ''), e.t === 'heal' ? '#7dff9b' : e.crit ? '#ffd166' : '#ff6b85', now);
     } else if (e.t === 'text') floater(e.x, e.y, e.text, e.color, now);
     else if (e.t === 'boom' || e.t === 'scan') st.fx.push({ e: e, t0: now, dur: dur + 200 });
     else if (e.t === 'spawn') { delete st.hidden[e.id]; st.fx.push({ e: e, t0: now, dur: dur + 200 }); }
@@ -1197,7 +1197,7 @@ XG.TacUI = (function () {
     if (e.t === 'dmg') {
       st.flash[e.id] = now;
       if (e.crit) { shake(3, now); A.play('crit'); }
-    } else if (e.t === 'heal') { var hc = center(e.x, e.y); G.FX.heal(L, hc[0], hc[1], now); A.play('heal'); }
+    } else if (e.t === 'heal') { if ((u && u.side === HS()) || seen(e.x, e.y)) { var hc = center(e.x, e.y); G.FX.heal(L, hc[0], hc[1], now); A.play('heal'); } } // the AI side heals in the fog too
     else if (e.t === 'death' && u && (u.side === HS() || seen(e.x, e.y))) {
       var dc = center(e.x, e.y), rgb = G.rgbOf(u.color), soft = !!D.software[u.kind];
       if (u.kind === 'harmonic' || soft) { G.FX.derez(L, dc[0], dc[1], rgb, now); A.play('death-soft'); }

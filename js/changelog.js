@@ -5,6 +5,12 @@ XG.CHANGELOG = [
   "name": "Unreleased",
   "groups": [
    {
+    "name": "2026-10-23 (challenge-phase1 branch)",
+    "items": [
+     "<b>Lattice campaign battles:</b> the FIREWALL squad now uses its abilities against you. Troopers throw grenades into clusters of two or more of your units (or at a wounded one in cover), Scientists patch up a neighbour who is down 3+ HP, Hackers stun your biggest machine in range, and Sentinels shield whichever soldier is most exposed. They only act on what their own squad can see. Combat training is unchanged."
+    ]
+   },
+   {
     "name": "2026-10-22",
     "items": [
      "<b>Battle panel:</b> hovering a hostile now shows one side-by-side table: every factor of your shot at it and its shot at you (aim, cover, defense, hunker, range, floor/cap), then both hit chances, crits and damage after armor, plus each side's cover. You can see at a glance why its odds differ from yours.",

@@ -1391,7 +1391,16 @@ XG.Tac = (function () {
   function after(b, ev) { refreshVis(b); checkAlerts(b, ev); checkOutcome(b); return ev; }
 
   // ------------------------------------------------------------ abilities
-  function canAct(b, u) { return u.alive && u.side === b.human && b.side === b.human && !b.outcome && u.ap > 0; }
+  // The person acts on their own turn; the AI side may act only while ai() is running for it (aiActing), never in training.
+  var aiActing = false;
+  function canAct(b, u) {
+    return u.alive && u.side === b.side && !b.outcome && u.ap > 0 && (u.side === b.human || (aiActing && !b.training));
+  }
+  // What a side can see: the person's side uses the fog map (b.visible); the AI side uses its own units' sight lines.
+  function sideSees(b, side, x, y) {
+    if (side === b.human) return !!(b.visible && b.visible[y * b.W + x]);
+    return b.units.some(function (o) { return o.alive && o.side === side && !o.isStatic && dist(o.x, o.y, x, y) <= SIGHT && los(b, o.x, o.y, x, y); });
+  }
 
   // Returns null if usable, or a reason string.
   function abilityBlock(b, u, id) {
@@ -1434,7 +1443,7 @@ XG.Tac = (function () {
   function tileOk(b, u, id, x, y) {
     var A = D.abilities[id];
     if (!inB(b, x, y) || dist(u.x, u.y, x, y) > A.range) return false;
-    if (id === 'grenade') return b.visible[y * b.W + x];
+    if (id === 'grenade') return sideSees(b, u.side, x, y);
     return true;
   }
 
@@ -1794,6 +1803,9 @@ XG.Tac = (function () {
           break;
         }
       }
+      var ab = aiAbility(b, u, foes, ev);
+      if (ab === 'end') break;
+      if (ab === 'ap') continue;
       if (b.server && nodeGoal(b, u)) { // node: get into the server zone (or stay in it), then shoot from there or watch it
         var sv = b.server;
         if (cheb(u.x, u.y, sv.x, sv.y) <= 1) {
@@ -1828,6 +1840,52 @@ XG.Tac = (function () {
       Array.prototype.push.apply(ev, mev);
     }
     return ev;
+  }
+  // The AI side uses its class abilities (never the person's side, never in training). Targets are limited to what
+  // the AI side can see (sideSees), not the fog map. Returns 'end' (the ability ended the turn), 'ap' (it cost 1 AP,
+  // keep going) or null (nothing worth doing). Medkit and shield first (1 AP), then grenade, then hack.
+  function aiAbility(b, u, foes, ev) {
+    if (b.training || u.dummy || u.side === b.human || u.stunned) return null;
+    var has = function (id) { return u.abilities.indexOf(id) >= 0 && !abilityBlock(b, u, id); };
+    var use = function (fn) { aiActing = true; try { var r = fn(); } finally { aiActing = false; } if (r) Array.prototype.push.apply(ev, r); return r; };
+    var seen = foes.filter(function (f) { return !f.isStatic && sideSees(b, u.side, f.x, f.y); });
+    var allies = b.units.filter(function (a) { return a.alive && a.side === u.side && !a.isStatic; });
+    if (has('medkit')) {
+      var w = targets(b, u, 'medkit').filter(function (t) { return t.maxHp - t.hp >= 3; }).sort(function (a, c) { return a.hp - c.hp; })[0];
+      if (w && use(function () { return act.medkit(b, u, w); })) return 'ap';
+    }
+    if (has('shield') && seen.length) {
+      // the most exposed ally: the summed odds of every seen hostile that can hit it now
+      var expo = allies.filter(function (a) { return (a.shield || 0) < 2; }).map(function (a) {
+        return { a: a, s: seen.reduce(function (n, f) { var hi = hitInfo(b, f, a); return n + (hi.ok ? hi.chance : 0); }, 0) };
+      }).filter(function (x) { return x.s >= 40; }).sort(function (p, q) { return q.s - p.s; })[0];
+      if (expo && use(function () { return act.shield(b, u, expo.a); })) return 'ap';
+    }
+    if (has('grenade') && seen.length) {
+      var R = D.abilities.grenade.range, best = null, done = {};
+      seen.forEach(function (f) {
+        for (var dy = -1; dy <= 1; dy++) for (var dx = -1; dx <= 1; dx++) {
+          var x = f.x + dx, y = f.y + dy, k = x + ',' + y;
+          if (done[k] || !inB(b, x, y) || dist(u.x, u.y, x, y) > R) continue;
+          done[k] = 1;
+          var inBlast = b.units.filter(function (t) { return t.alive && !t.isStatic && cheb(t.x, t.y, x, y) <= 1; });
+          if (inBlast.some(function (t) { return t.side === u.side && (!b.emp || t.machine); })) continue; // never catch our own
+          var hit = inBlast.filter(function (t) { return t.side !== u.side && (!b.emp || t.machine); });
+          var wounded = hit.some(function (t) { return t.hp < t.maxHp && coverValue(b, t.x, t.y, u.x, u.y) > 0; });
+          if (hit.length < 2 && !wounded) continue;
+          var sc = hit.length * 10 + (wounded ? 5 : 0) - (dx || dy ? 1 : 0);
+          if ((!best || sc > best.s) && tileOk(b, u, 'grenade', x, y)) best = { x: x, y: y, s: sc };
+        }
+      });
+      if (best && use(function () { return act.grenade(b, u, best.x, best.y); })) return 'end';
+    }
+    if (has('hack')) {
+      // the biggest machine in range and in sight that is not already stunned
+      var h = targets(b, u, 'hack').filter(function (t) { return !t.stunned && t.side !== u.side && sideSees(b, u.side, t.x, t.y) && Math.max(10, Math.min(90, u.hackSkill - t.hackDef)) >= 30; })
+        .sort(function (a, c) { return c.maxHp - a.maxHp || c.hp - a.hp; })[0];
+      if (h && h.hp >= 4 && use(function () { return act.hack(b, u, h); })) return 'end';
+    }
+    return null;
   }
   function bestShot(b, u, foes) {
     var best = null;

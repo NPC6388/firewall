@@ -420,6 +420,53 @@ function autoBattle(g, m, squad) {
   check(covered >= units * 0.8, 'raid defenders start in cover facing FIREWALL (' + covered + '/' + units + ')');
 })();
 
+// The bot side uses abilities (Lattice campaign: FIREWALL is the AI): grenade at 2+ targets, medkit on a hurt neighbour,
+// hack the biggest machine, Aegis shield on the most exposed ally. It aims with its own sight, not the person's fog map.
+(function () {
+  var g = XG.Lat.newGame(77); g.day = 30; g.trace = 50;
+  var m = XG.Lat.spawnMission(g, S.rng(g), 'raid'); m.scenario = 'exterminate';
+  var b = Tac.createLattice(m, ['warden', 'drone', 'drone'], XG.Lat.earthSquad(g, m), {}), W = b.W;
+  var fw = b.units.filter(function (u) { return u.side === 'player'; }), lat = b.units.filter(function (u) { return u.side === 'enemy' && !u.isStatic; });
+  var kind = function (k) { return fw.filter(function (u) { return u.kind === k; })[0]; };
+  var tr = kind('trooper'), hk = kind('hacker'), sc = kind('scientist'), real = b.rng.chance;
+  var reset = function () {
+    b.tiles.fill(Tac.FLOOR); b.props.fill(0); b.faces.fill(0); b.tileHp = {}; b.outcome = null; b.side = 'player'; b.approach = false; b.server = null;
+    fw.forEach(function (u, i) { u.x = 2 + i; u.y = 25; u.ap = 2; u.alive = true; u.hp = u.maxHp; u.shield = 0; u.overwatch = false; u.charges = { grenade: 1, medkit: 2 }; u.cooldowns = {}; });
+    lat.forEach(function (u, i) { u.x = 36; u.y = 1 + i * 4; u.alive = true; u.hp = u.maxHp; u.stunned = 0; u.side = 'enemy'; });
+    b.visible.fill(false); // the person (the Lattice) sees nothing: the bot must use its own eyes
+  };
+  reset(); tr.x = 10; tr.y = 10; lat[1].x = 15; lat[1].y = 10; lat[2].x = 15; lat[2].y = 11; lat[0].x = 36; lat[0].y = 26;
+  var ev = Tac.ai(b, tr) || [];
+  check(ev.some(function (e) { return e.t === 'boom'; }) && tr.charges.grenade === 0, 'the bot Trooper throws a grenade at two hostiles side by side');
+  reset(); tr.x = 10; tr.y = 10; lat[1].x = 15; lat[1].y = 10; lat[2].x = 15; lat[2].y = 11; lat[0].x = 36; lat[0].y = 26;
+  for (var y = 0; y < b.H; y++) b.tiles[y * W + 12] = Tac.WALL; // a wall between them: no line of sight, so no grenade
+  fw.forEach(function (u) { if (u !== tr) { u.x = 1; u.y = 26 - fw.indexOf(u); } });
+  b.visible.fill(true); // even if the person's fog map shows everything
+  Tac.ai(b, tr);
+  check(tr.charges.grenade === 1, 'the bot does not grenade targets its own side cannot see');
+  reset(); tr.x = 10; tr.y = 10; lat[1].x = 15; lat[1].y = 10; lat[0].x = 36; lat[0].y = 26; lat[2].x = 36; lat[2].y = 20; sc.x = 14; sc.y = 11;
+  Tac.ai(b, tr);
+  check(tr.charges.grenade === 1, 'the bot never throws a grenade that would catch its own unit');
+  reset(); sc.x = 10; sc.y = 10; tr.x = 11; tr.y = 10; tr.hp = tr.maxHp - 4;
+  ev = Tac.ai(b, sc) || [];
+  check(tr.hp === tr.maxHp && sc.charges.medkit === 1 && ev.some(function (e) { return e.t === 'heal'; }), 'the bot Scientist patches up a neighbour down 4 HP');
+  reset(); sc.x = 10; sc.y = 10; tr.x = 11; tr.y = 10; tr.hp = tr.maxHp - 2;
+  Tac.ai(b, sc);
+  check(sc.charges.medkit === 2, 'the bot keeps its medkit for wounds of 3+ HP');
+  reset(); hk.x = 10; hk.y = 10; var wd = lat[0]; wd.x = 17; wd.y = 10; lat[1].x = 16; lat[1].y = 12;
+  b.rng.chance = function () { return true; };
+  ev = Tac.ai(b, hk) || [];
+  b.rng.chance = real;
+  check(wd.kind === 'warden' && wd.stunned === 2 && ev.some(function (e) { return e.t === 'hack'; }), 'the bot Hacker stuns the biggest machine in range (the Warden)');
+  reset(); var sn = sc; sn.abilities = ['shoot', 'shield', 'overwatch']; sn.x = 2; sn.y = 2; tr.x = 10; tr.y = 10; lat[1].x = 14; lat[1].y = 10; lat[2].x = 14; lat[2].y = 9;
+  ev = Tac.ai(b, sn) || [];
+  check(tr.shield === 3 && ev.some(function (e) { return e.t === 'text' && /AEGIS/.test(e.text); }), 'the bot Sentinel shields the most exposed ally');
+  sn.abilities = XG.DATA.classes.scientist.abilities.slice();
+  var tb = Tac.createTraining(S.newGame(5), S.newGame(5).soldiers.slice(0, 2)), dummy = tb.units.filter(function (u) { return u.side === 'enemy'; })[0];
+  tb.side = 'enemy'; dummy.ap = 2; dummy.abilities = ['shoot', 'grenade']; dummy.charges = { grenade: 1 };
+  check(!Tac.act.grenade(tb, dummy, dummy.x + 1, dummy.y) && !(Tac.ai(tb, dummy) || []).some(function (e) { return e.t === 'boom'; }), 'combat training: the bot side never uses abilities');
+})();
+
 // Battle rewards: x3 for a win in 4 turns or fewer, falling to x1 at 14; every won Lattice battle pays at least minWin.
 (function () {
   check(Strat.speedMult(4) === 3 && Strat.speedMult(2) === 3 && Strat.speedMult(14) === 1 && Strat.speedMult(30) === 1 && Strat.speedMult(9) === 2 && Strat.speedMult(undefined) === 1, 'speed multiplier: 3 at <=4 turns, 2 at 9, 1 at >=14 or unknown');
