@@ -148,7 +148,7 @@ Each sprint ends with something playable. **Sprints 0–4 = the MVP.**
   mass Spike, cyber programs' firewall wall / quarantine field), shown on the hover panel so the player can read them.
 - Rebalance both campaigns afterwards (`smoke.js 30 4 30 40`): a bot that throws grenades is a lot more dangerous.
 
-**Backlog: a design session for challenge** (idea, 2026-10-22; for another day)
+**Backlog: a design session for challenge** (done 2026-10-23: see `CHALLENGE.md` for the ranked proposals and phases)
 - A dedicated Claude session spends at most 50% of a fresh session's token limit designing improvements that make the game
   more challenging while keeping the two teams balanced against each other. Its output is a ranked list of design
   changes (tactical and strategic), each with the balance lever it touches and how to measure it (`smoke.js 30 4 30 40`
