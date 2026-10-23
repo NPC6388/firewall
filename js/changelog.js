@@ -7,6 +7,7 @@ XG.CHANGELOG = [
    {
     "name": "2026-10-23",
     "items": [
+     "<b>Lattice campaign: wins pay for rebuilding.</b> Every won battle now pays at least 24 compute and 12 substrate (was 12 and 10), before the speed bonus, so a win covers about two fresh drones.",
      "<b>Lattice campaign: fewer stun locks.</b> A FIREWALL Hacker now tries a hack at most once every 3 turns. Before, it could stun a fresh machine of yours every turn and keep two of them out of the fight at once.",
      "<b>Windows:</b> you can climb straight through a window now, with no need to shoot it first. Whoever goes through smashes it, so it leaves an open gap that is no longer half cover for anyone.",
      "<b>Lattice pods wake together:</b> once one Lattice unit spots your squad, its whole pod comes alive at once, along with anything else within 11 tiles (was 7). Sneaking up on a group is tenser; picking off one sentry no longer splits a pod.",

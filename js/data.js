@@ -709,7 +709,7 @@ XG.DATA = {
   lattice: {
     start: { compute: 90, substrate: 10, convergence: 8, trace: 0, forces: { drone: 4, warden: 1, harmonic: 0 } },
     tuning: {
-      minWin: { compute: 12, substrate: 10 }, // every won Lattice battle pays at least this (before the speed bonus)
+      minWin: { compute: 24, substrate: 12 }, // every won Lattice battle pays at least this (before the speed bonus); 24 so a win rebuilds about two drones (user 2026-10-23)
       researchBase: 15,          // protocol cycles per day (10 before protocol cost creep, 2026-10-23)
       computeBase: 6,            // compute per day from the Nexus
       computePerInfection: 0.07, // compute per day per point of summed infection

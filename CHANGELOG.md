@@ -9,6 +9,8 @@ The in-game **Help → Patch notes** tab shows everything from the first `##` he
 ## Unreleased
 
 ### 2026-10-23
+- **Lattice campaign: wins pay for rebuilding.** Every won battle now pays at least 24 compute and 12 substrate (was 12 and
+  10), before the speed bonus, so a win covers about two fresh drones.
 - **Lattice campaign: fewer stun locks.** A FIREWALL Hacker now tries a hack at most once every 3 turns. Before, it could stun a
   fresh machine of yours every turn and keep two of them out of the fight at once.
 - **Windows:** you can climb straight through a window now, with no need to shoot it first. Whoever goes through smashes it,
