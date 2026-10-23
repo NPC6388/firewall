@@ -5,6 +5,17 @@ XG.CHANGELOG = [
   "name": "Unreleased",
   "groups": [
    {
+    "name": "2026-10-23 (Lattice campaign: missions you cannot ignore)",
+    "items": [
+     "<b>Ignored raids hurt:</b> a FIREWALL raid you leave unanswered now purges 20% infection in that region (was 10%), adds +5% Trace (was +2%) and knocks one of your Array nodes offline for 4 days. Every raid brief ends with a line saying what ignoring it costs. Losing a raid also costs 3% Convergence.",
+     "<b>Strike rewards are a choice:</b> a won strike still knocks FIREWALL back a step, and then you pick Trace -8% or +25 substrate on the result screen. If you advance time without choosing, you get the Trace cut.",
+     "<b>The Uplink assault is FIREWALL's best:</b> when Trace reaches 100%, the squad that comes for the Uplink brings one more trooper and fights one rank above your machines' mark.",
+     "<b>FIREWALL keeps climbing:</b> won strikes still set FIREWALL back, but its rank never drops below one level per 20 days (was 30), so strikes buy you time rather than a permanent lead.",
+     "<b>Substrate has a use:</b> Hard-Light Projection (30), Phase Shielding (30), Recursive Harmonics (40) and Harmonic Overture (60) now cost substrate to start (paid once), and Harmonics cost 16 substrate (was 12). Every won battle pays at least 10 substrate (was 6).",
+     "<b>Protocols get dearer:</b> each finished protocol makes the next one 8% more expensive in cycles; the cards show the real cost. To match, the Nexus compiles protocols faster (15 cycles a day, was 10) and Convergence grows a little faster (+0.27% a day base, was 0.22%)."
+    ]
+   },
+   {
     "name": "2026-10-23 (challenge-phase1 branch)",
     "items": [
      "<b>Lattice campaign battles:</b> the FIREWALL squad now uses its abilities against you. Troopers throw grenades into clusters of two or more of your units (or at a wounded one in cover), Scientists patch up a neighbour who is down 3+ HP, Hackers stun your biggest machine in range, and Sentinels shield whichever soldier is most exposed. They only act on what their own squad can see. Combat training is unchanged.",

@@ -65,14 +65,26 @@ XG.LUI = (function () {
     });
     return s + '</svg>' + XG.Backdrop.mapFx(mo, fx) + '</div>';
   }
+  // one line under a brief when walking away has a price (raids); nothing for missions you may skip freely
+  function ignoreLine(m) {
+    var t = Lat.ignoreText(m);
+    return t ? '<p class="warn ignore-cost">Ignoring this costs: ' + t + '</p>' : '';
+  }
+  // a won strike pays one reward of your choice (Lat.claimStrike)
+  // modal: the result screen wires the buttons itself (ids lres-trace / lres-sub); otherwise they are l-claim actions
+  function strikeChoice(g, modal) {
+    var C = L.tuning.strikeChoice, act = function (k) { return modal ? ' id="lres-' + (k === 'trace' ? 'trace' : 'sub') + '"' : ' data-action="l-claim" data-arg="' + k + '"'; };
+    return '<div class="modal-actions strike-choice"><button class="primary"' + act('trace') + '>Trace -' + C.trace + '% <span class="dim">(now ' + pct(g.trace) + ')</span></button>' +
+      '<button class="primary"' + act('substrate') + '>+' + C.substrate + ' substrate <span class="dim">(now ' + g.substrate + ')</span></button></div>';
+  }
   function missionCard(g, m) {
     var cls = m.kind === 'raid' || m.kind === 'breach' ? '' : m.kind === 'strike' ? 'story' : 'final';
     var ready = Lat.forceCount(g), es = Lat.earthSquad(g, m);
-    var who = es.software ? 'Defenders: ' + es.squad.length + ' security programs' : 'FIREWALL rank ' + D.ranks[es.level].name;
+    var who = es.software ? 'Defenders: ' + es.squad.length + ' security programs' : 'FIREWALL rank ' + D.ranks[es.rank != null ? es.rank : es.level].name;
     var tag = XG.Strat.scenarioTag(m);
     return '<div class="mission ' + cls + '"><div class="mh"><span class="mn">' + m.name + (tag ? ' <span class="scen-tag ' + m.scenario + '">' + tag + '</span>' : '') + '</span><span class="' + (m.daysLeft <= 1 ? 'bad' : 'dim') + '">' + m.daysLeft + 'd left</span></div>' +
       '<div class="dim">' + m.city + ', ' + Lat.regionData(m.region).name + ' · ' + who + '</div>' +
-      '<p>' + m.brief + '</p>' +
+      '<p>' + m.brief + '</p>' + ignoreLine(m) +
       '<button class="primary" data-action="l-deploy" data-arg="' + m.id + '"' + (ready ? '' : ' disabled title="No units compiled"') + '>Deploy forces ▸</button></div>';
   }
   function viewNetwork(g) {
@@ -85,7 +97,8 @@ XG.LUI = (function () {
       '<div class="advance-row"><button class="primary big" data-action="l-advance">Advance time ▸▸</button><button data-action="l-advance-day">+1 day</button>' +
       '<span class="dim">Protocol: ' + (cur ? L.protocols[cur].name + ' (' + Lat.daysLeft(g, cur) + 'd)' : '<span class="warn">idle</span>') + '</span></div>' +
       '<h2 style="margin-top:14px">Seed a region <small>' + L.tuning.seedCost + ' compute · +' + L.tuning.seedGain + '% infection · ' + L.tuning.seedCooldown + 'd cooldown</small></h2><div class="advance-row" style="margin-top:6px">' + seeds + '</div></div></div>' +
-      '<div><div class="panel"><h2>Operations <small>' + g.missions.length + ' active</small></h2>' +
+      '<div>' + (g.pendingReward ? '<div class="panel" style="margin-bottom:16px"><h2>Strike reward <small>' + g.pendingReward.mission + '</small></h2><p>Choose one. Advancing time takes the Trace cut.</p>' + strikeChoice(g) + '</div>' : '') +
+      '<div class="panel"><h2>Operations <small>' + g.missions.length + ' active</small></h2>' +
       (g.phase === 'infiltration' ? '<p class="warn">Phase one: Infiltration. Earth has not noticed you yet. FIREWALL forms when Detection reaches ' + L.tuning.phaseTrace + '% or on day ' + L.tuning.phaseDay + '.</p>' : '') +
       (g.missions.length ? g.missions.map(function (m) { return missionCard(g, m); }).join('') : '<p class="dim">' + (g.phase === 'infiltration' ? 'No breach targets yet.' : 'FIREWALL is quiet.') + ' Advance time.</p>') +
       '</div><div class="panel" style="margin-top:16px"><h2>Event stream</h2><div class="feed">' +
@@ -95,19 +108,20 @@ XG.LUI = (function () {
   // ----------------------------------------------------------- protocols
   function viewProtocols(g) {
     var rate = Lat.researchRate(g), cur = g.research.current;
-    var head = '<div class="panel" style="margin-bottom:16px"><h2>Protocols <small>' + rate.toFixed(0) + ' cycles/day · compute cores ' + Lat.built(g, 'core') + '</small></h2>' +
+    var head = '<div class="panel" style="margin-bottom:16px"><h2>Protocols <small>' + rate.toFixed(0) + ' cycles/day · compute cores ' + Lat.built(g, 'core') + ' · each finished protocol makes the next ' + Math.round(L.tuning.protoCreep * 100) + '% dearer</small></h2>' +
       (cur ? '<p>Compiling protocol: <b>' + L.protocols[cur].name + '</b>, ' + Lat.daysLeft(g, cur) + ' day(s) left.</p><div class="bar"><div style="width:' +
-        Math.round(100 * (g.research.progress[cur] || 0) / L.protocols[cur].cost) + '%"></div></div>' : '<p class="warn">No protocol compiling. Idle cycles are wasted cycles.</p>') + '</div>';
+        Math.round(100 * (g.research.progress[cur] || 0) / Lat.protoCost(g, cur)) + '%"></div></div>' : '<p class="warn">No protocol compiling. Idle cycles are wasted cycles.</p>') + '</div>';
     var order = { active: 0, available: 1, locked: 3, done: 4 };
     var ids = Object.keys(L.protocols).sort(function (a, b) { return order[Lat.protoState(g, a)] - order[Lat.protoState(g, b)]; });
     return head + '<div class="cards">' + ids.map(function (id) {
       var t = L.protocols[id], st = Lat.protoState(g, id), btn;
-      if (st === 'available') btn = '<button class="primary" data-action="l-protocol" data-arg="' + id + '">' + (cur ? 'Switch to this' : 'Begin compiling') + '</button>';
+      var why = st === 'available' ? Lat.canStartProtocol(g, id) : null, cost = Lat.protoCost(g, id), sub = Lat.protoSubstrate(g, id);
+      if (st === 'available') btn = '<button class="primary" data-action="l-protocol" data-arg="' + id + '"' + (why ? ' disabled' : '') + '>' + (cur ? 'Switch to this' : 'Begin compiling') + '</button>' + (why ? '<span class="bad"> ' + why + '</span>' : '');
       else if (st === 'active') btn = '<span class="good">▶ Compiling</span>';
       else if (st === 'done') btn = '<span class="dim">✓ Integrated</span>';
       else btn = '<span class="dim">Requires ' + t.req.map(function (r) { return L.protocols[r].name; }).join(', ') + '</span>';
-      var prog = g.research.progress[id] ? Math.round(100 * g.research.progress[id] / t.cost) : 0;
-      return '<div class="card ' + st + '"><h3>' + t.name + '</h3><p>' + t.desc + '</p><div class="meta">' + t.cost + ' cycles · ~' + Math.ceil(t.cost / rate) + ' days' +
+      var prog = g.research.progress[id] ? Math.round(100 * g.research.progress[id] / cost) : 0;
+      return '<div class="card ' + st + '"><h3>' + t.name + '</h3><p>' + t.desc + '</p><div class="meta">' + (st === 'done' ? 'integrated' : cost + ' cycles' + (sub ? ' + ' + sub + ' substrate' : '') + ' · ~' + Math.ceil(Math.max(0, cost - (g.research.progress[id] || 0)) / rate) + ' days') +
         (prog && st !== 'done' ? ' · ' + prog + '% done' : '') + '</div>' + btn + '</div>';
     }).join('') + '</div>';
   }
@@ -117,8 +131,8 @@ XG.LUI = (function () {
     var grid = g.array.map(function (b, i) {
       if (!b) return '<div class="slot empty' + (UI.slot === i ? ' sel' : '') + '" data-action="slot" data-arg="' + i + '">+ compile node</div>';
       var f = L.nodes[b.type];
-      return '<div class="slot' + (b.daysLeft || b.demolish ? ' building' : '') + (UI.slot === i ? ' sel' : '') + '" data-action="slot" data-arg="' + i + '"><b>' + f.name + '</b>' +
-        (b.daysLeft ? '<span class="warn">Compiling: ' + b.daysLeft + 'd</span>' : b.demolish ? '<span class="bad">Dismantling (offline): ' + b.demolish + 'd</span>' : '<span class="dim">' + f.desc + '</span>') + '</div>';
+      return '<div class="slot' + (b.daysLeft || b.demolish || b.offline ? ' building' : '') + (UI.slot === i ? ' sel' : '') + '" data-action="slot" data-arg="' + i + '"><b>' + f.name + '</b>' +
+        (b.daysLeft ? '<span class="warn">Compiling: ' + b.daysLeft + 'd</span>' : b.offline ? '<span class="bad">Offline (FIREWALL purge): ' + b.offline + 'd</span>' : b.demolish ? '<span class="bad">Dismantling (offline): ' + b.demolish + 'd</span>' : '<span class="dim">' + f.desc + '</span>') + '</div>';
     }).join('');
     var side, sb = UI.slot !== null ? g.array[UI.slot] : null;
     if (UI.slot !== null && !sb) {
@@ -168,9 +182,10 @@ XG.LUI = (function () {
       '<div class="panel"><h2>Directives</h2>' +
       '<p><b>Goal:</b> reach Convergence 100%. It grows faster with infection, Harmonic Choirs and Recursive Harmonics.</p>' +
       '<p><b>Phase one, Infiltration:</b> Earth\'s only defense is its security software. Breach it (you move first) for infection and compute. Detection rises anyway; at ' + L.tuning.phaseTrace + '% (or day ' + L.tuning.phaseDay + ') the natives form FIREWALL.</p>' +
-      '<p><b>Phase two, War. Threat:</b> FIREWALL\'s Trace grows daily and faster over time. At 100% they assault the Uplink. Hold it and Trace drops to 55%. Ghost Packets and Signal Masks slow Trace; winning strikes cuts it by 12%.</p>' +
-      '<p><b>Raids:</b> FIREWALL attacks a cell (they move first). Wipe them or survive 10 turns. Ignored raids purge the region.</p>' +
-      '<p><b>Strikes:</b> hit a safehouse (you move first). Each win cuts Trace 8% and knocks FIREWALL back a rank level. Attacks stall after 25 turns.</p>' +
+      '<p><b>Phase two, War. Threat:</b> FIREWALL\'s Trace grows daily and faster over time. At 100% they assault the Uplink. Hold it and Trace drops to 55%. Ghost Packets and Signal Masks slow Trace; a won strike can cut it by ' + L.tuning.strikeChoice.trace + '%. The Uplink squad at Trace 100 is FIREWALL\'s best: one more trooper, one rank higher.</p>' +
+      '<p><b>Raids:</b> FIREWALL attacks a cell (they move first). Wipe them or hold the server node. An ignored raid purges the region (-' + L.tuning.raidIgnored.infection + '% infection), feeds Trace (+' + L.tuning.raidIgnored.trace + '%) and knocks an Array node offline for ' + L.tuning.raidIgnored.offlineDays + ' days; a lost raid also costs ' + L.tuning.raidLost.convergence + '% Convergence.</p>' +
+      '<p><b>Strikes:</b> hit a safehouse (you move first). Each win knocks FIREWALL back a rank level and pays your choice: Trace -' + L.tuning.strikeChoice.trace + '% or +' + L.tuning.strikeChoice.substrate + ' substrate. Setbacks never push FIREWALL below one level per ' + L.tuning.earthFloorDays + ' days. Attacks stall after 25 turns.</p>' +
+      '<p><b>Substrate:</b> the late protocols (Hard-Light, Phase Shielding, Recursive Harmonics, Overture) cost substrate to start, and Harmonics eat ' + L.units.harmonic.cost.substrate + ' each.</p>' +
       '<p><b>FIREWALL gets stronger</b> on its own: ranks rise with time and Trace, Faraday armor from day 40, coil weapons from day 50 (or Trace 60%), five-person squads from day 35.</p>' +
       '<p><b>Combat:</b> the same controls as FIREWALL. Harmonics have Data Spike (never misses, ignores cover); with Detonation Protocol, drones can explode.</p></div></div>';
   }
@@ -182,9 +197,9 @@ XG.LUI = (function () {
     ['harmonic', 'warden', 'drone'].forEach(function (k) { while (pick[k] < g.forces[k] && total() < size) pick[k]++; });
     function draw() {
       var es = Lat.earthSquad(g, m);
-      UI.modal('<h1>' + m.name + '</h1><p class="dim">' + m.brief + '</p>' +
+      UI.modal('<h1>' + m.name + '</h1><p class="dim">' + m.brief + '</p>' + ignoreLine(m) +
         (es.software ? '<p>Defenders: ' + es.squad.map(function (s) { return s.name; }).join(', ') + '</p>' :
-          '<p>FIREWALL squad: <b>' + es.squad.length + '</b> × ' + D.ranks[es.level].name + (es.g.flags.armor ? ' · Faraday armor' : '') + (es.g.flags.coil ? ' · coil weapons' : '') + (es.g.flags.emp ? ' · EMP' : '') + '</p>') +
+          '<p>FIREWALL squad: <b>' + es.squad.length + '</b> × ' + D.ranks[es.rank != null ? es.rank : es.level].name + (es.g.flags.armor ? ' · Faraday armor' : '') + (es.g.flags.coil ? ' · coil weapons' : '') + (es.g.flags.emp ? ' · EMP' : '') + '</p>') +
         '<p>Deploy up to <b>' + size + '</b> units (' + total() + ' chosen).</p>' +
         ['harmonic', 'warden', 'drone'].map(function (k) {
           var E = D.enemies[k];
@@ -213,8 +228,13 @@ XG.LUI = (function () {
       '<p>' + out.notes.join(' ') + '</p>' +
       '<p>' + (m.kind === 'breach' ? 'Programs purged' : 'Humans harmonized') + ': <b>' + out.humansKilled + '</b> · substrate recovered: <b>' + out.substrate + '</b></p>' +
       '<p class="' + (lost.length ? 'bad' : 'dim') + '">' + (lost.length ? 'Destroyed: ' + lost.join(', ') + '.' : 'No units lost.') + '</p>' +
-      '<div class="modal-actions"><button class="primary" id="lres-ok">Return to the Network</button></div>');
-    $('lres-ok').onclick = function () { UI.closeModal(); done(); };
+      (out.choice && UI.g.pendingReward ? '<h2>Choose the strike reward</h2>' + strikeChoice(UI.g, true) :
+        '<div class="modal-actions"><button class="primary" id="lres-ok">Return to the Network</button></div>'));
+    if (out.choice && UI.g.pendingReward) {
+      ['trace', 'substrate'].forEach(function (k) {
+        $(k === 'trace' ? 'lres-trace' : 'lres-sub').onclick = function () { var msg = Lat.claimStrike(UI.g, k); Lat.save(UI.g); UI.closeModal(); if (msg) UI.toast([msg]); done(); };
+      });
+    } else $('lres-ok').onclick = function () { UI.closeModal(); done(); };
   };
 
   // ------------------------------------------------------------ actions
@@ -238,6 +258,7 @@ XG.LUI = (function () {
       'l-demolish': function () { Lat.demolish(UI.g, UI.slot); api.commit(); },
       'l-cancel-demolish': function () { Lat.cancelDemolish(UI.g, UI.slot); api.commit(); },
       'l-compile': function (k) { Lat.compile(UI.g, k); api.commit(); },
+      'l-claim': function (k) { var msg = Lat.claimStrike(UI.g, k); api.commit(msg ? [msg] : []); },
       'l-deploy': function (id) {
         var g = UI.g, m = g.missions.filter(function (x) { return x.id === +id; })[0];
         if (!m) return;

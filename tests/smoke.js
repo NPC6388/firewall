@@ -518,8 +518,61 @@ function autoBattle(g, m, squad) {
     check(lo.won && lg.compute - c0 === 10 * 3 && lg.substrate - s0 === mw.substrate * 3, 'a 4-turn Lattice breach win pays x3 of max(base, minWin) (compute +' + (lg.compute - c0) + ', substrate +' + (lg.substrate - s0) + ')');
     lm = Lat.spawnMission(lg, lr, 'strike'); c0 = lg.compute; s0 = lg.substrate;
     lo = Lat.resolveMission(lg, lm.id, { outcome: 'loss', lattice: [], humansKilled: 0, turns: 20 });
-    check(lg.compute - c0 === mw.compute && lg.substrate - s0 === 15, 'a slow Lattice strike win pays its base 15 substrate and the minimum compute');
+    check(lg.compute - c0 === mw.compute && lg.substrate - s0 === mw.substrate && lo.choice && lg.pendingReward, 'a slow Lattice strike win pays the minimum and leaves the strike choice pending');
   } else check(false, 'Lat.newGame exists');
+})();
+// CHALLENGE Phase 1 for the Lattice: missions you cannot ignore (F), substrate sinks and protocol creep (E), FIREWALL's level floor (C).
+(function () {
+  var Lat = XG.Lat, LT = D.lattice.tuning, RI = LT.raidIgnored;
+  // an unanswered raid: -20% infection, +5 Trace, one finished Array node offline for a few days
+  var g = Lat.newGame(41), r = S.rng(g); g.phase = 'war'; g.nextRaidIn = 99; g.nextStrikeIn = 99;
+  g.array[1] = { type: 'core', daysLeft: 0 };
+  var m = Lat.spawnMission(g, r, 'raid'); S.saveRng(g, r); m.daysLeft = 1;
+  var reg = Lat.region(g, m.region); reg.infection = 50; g.trace = 30;
+  check(/^Ignoring this costs/.test('Ignoring this costs: ' + Lat.ignoreText(m)) && Lat.ignoreText(m).indexOf('Trace +' + RI.trace + '%') > 0 && Lat.ignoreText({ kind: 'strike' }) === '',
+    'raid briefs say what ignoring costs; strikes have no ignore line');
+  Lat.advanceDay(g);
+  check(reg.infection <= 50 - RI.infection + 1 && g.trace >= 30 + RI.trace && g.stats.ignored === 1, 'an ignored raid costs ' + RI.infection + '% infection and +' + RI.trace + ' Trace (inf ' + reg.infection.toFixed(1) + ', trace ' + g.trace.toFixed(1) + ')');
+  check(g.array[1].offline === RI.offlineDays && Lat.built(g, 'core') === 0 && Lat.researchRate(g) === LT.researchBase, 'an ignored raid knocks an Array node offline (its bonus is gone)');
+  for (var d = 0; d < RI.offlineDays; d++) Lat.advanceDay(g);
+  check(!g.array[1].offline && Lat.built(g, 'core') === 1, 'the node comes back online after ' + RI.offlineDays + ' days');
+  // a lost raid costs Convergence
+  var g2 = Lat.newGame(42), r2 = S.rng(g2), m2 = Lat.spawnMission(g2, r2, 'raid'); S.saveRng(g2, r2); g2.convergence = 40;
+  var o2 = Lat.resolveMission(g2, m2.id, { outcome: 'win', lattice: [], humansKilled: 0, turns: 8, scenario: m2.scenario });
+  check(!o2.won && g2.convergence === 40 - LT.raidLost.convergence, 'a lost raid costs ' + LT.raidLost.convergence + '% Convergence');
+  // strikes: the reward is a choice; advancing time defaults to the Trace cut
+  var m3 = Lat.spawnMission(g2, r2, 'strike'); g2.trace = 50; var s3 = g2.substrate;
+  var o3 = Lat.resolveMission(g2, m3.id, { outcome: 'loss', lattice: [], humansKilled: 0, turns: 20, scenario: m3.scenario });
+  check(o3.won && o3.choice && g2.pendingReward && g2.trace === 50 && g2.substrate === s3 + LT.minWin.substrate, 'a won strike leaves the reward choice pending (no Trace cut yet)');
+  check(!!Lat.claimStrike(g2, 'substrate') && g2.substrate === s3 + LT.minWin.substrate + LT.strikeChoice.substrate && g2.trace === 50 && !g2.pendingReward && Lat.claimStrike(g2, 'trace') === null,
+    'claiming +' + LT.strikeChoice.substrate + ' substrate pays once and leaves Trace alone');
+  var m4 = Lat.spawnMission(g2, r2, 'strike'); S.saveRng(g2, r2);
+  Lat.resolveMission(g2, m4.id, { outcome: 'loss', lattice: [], humansKilled: 0, turns: 20, scenario: m4.scenario });
+  var t4 = g2.trace; Lat.advanceDay(g2);
+  check(!g2.pendingReward && g2.trace < t4 - LT.strikeChoice.trace + 2, 'an unclaimed strike reward becomes the Trace cut when time advances');
+  // Trace 100: the Uplink squad is bigger and a rank above your marks
+  var g5 = Lat.newGame(43); g5.day = 45; g5.trace = 100;
+  var up = Lat.earthSquad(g5, Lat.spawnMission(g5, S.rng(g5), 'uplink')), rd = Lat.earthSquad(g5, Lat.spawnMission(g5, S.rng(g5), 'raid'));
+  check(up.squad.length === D.lattice.earthSquad.length + LT.uplinkExtra.length && up.rank === Math.min(5, up.level + LT.uplinkRank) && rd.rank === rd.level && up.squad[0].xp > rd.squad[0].xp,
+    'the Trace-100 Uplink squad brings ' + up.squad.length + ' units one rank higher (' + up.rank + ' vs ' + rd.rank + ')');
+  // FIREWALL's level floor: strikes buy time, not a permanent lead
+  var g6 = Lat.newGame(44); g6.earth.setbacks = 20; g6.trace = 0;
+  g6.day = 61; var f61 = Lat.earthLevel(g6); g6.day = 21; var f21 = Lat.earthLevel(g6); g6.day = 200; var f200 = Lat.earthLevel(g6);
+  check(f21 === 1 && f61 === 3 && f200 === 5, 'FIREWALL never drops below floor((day-1)/' + LT.earthFloorDays + ') (day 21 ' + f21 + ', 61 ' + f61 + ', 200 ' + f200 + ')');
+  // protocols: cost creep and substrate costs
+  var g7 = Lat.newGame(45), P = D.lattice.protocols;
+  check(Lat.protoCost(g7, 'swarm_logic') === P.swarm_logic.cost, 'the first protocol costs its base');
+  g7.research.done.push('swarm_logic', 'seed_cascade', 'warden_chassis');
+  check(Lat.protoCost(g7, 'hardlight') === Math.round(P.hardlight.cost * (1 + 3 * LT.protoCreep)), 'each finished protocol makes the next ' + LT.protoCreep * 100 + '% dearer (' + Lat.protoCost(g7, 'hardlight') + ')');
+  g7.substrate = P.hardlight.substrate - 1;
+  check(!!Lat.canStartProtocol(g7, 'hardlight') && !Lat.startProtocol(g7, 'hardlight'), 'Hard-Light needs ' + P.hardlight.substrate + ' substrate to start');
+  g7.substrate = P.hardlight.substrate + 5;
+  check(Lat.startProtocol(g7, 'hardlight') && g7.substrate === 5 && Lat.startProtocol(g7, 'detonation') && Lat.startProtocol(g7, 'hardlight') && g7.substrate === 5,
+    'protocol substrate is paid once; switching back is free');
+  check(P.overture.substrate >= 30 && P.overture.substrate <= 60 && P.recursive.substrate >= 30 && P.phase_shield.substrate >= 30, 'high-end protocols cost 30-60 substrate');
+  var dl = Lat.daysLeft(g7, 'hardlight');
+  g7.research.progress.hardlight = Lat.protoCost(g7, 'hardlight') - 1; Lat.advanceDay(g7);
+  check(dl > 1 && Lat.has(g7, 'hardlight'), 'a protocol completes at its crept cost');
 })();
 // Obstacle variants: fuel barrels chain-explode, barriers and pillars shrug off blasts, glass shatters on a miss, fences block feet but not eyes.
 (function () {
@@ -1262,10 +1315,18 @@ console.log('Lattice battles (Lattice wins / losses, both sides AI; cap = server
 Object.keys(lt).sort().forEach(function (k) { var t = lt[k]; console.log('  ' + k.padEnd(18) + ' win ' + t.win + '  loss ' + t.loss + (t.stalled ? '  stalled ' + t.stalled : '') + (t.cap ? '  cap ' + t.cap : '') + (t.timeout ? '  timeout ' + t.timeout : '')); });
 console.log('Stalled battles (past ' + STALL + ' turns, harness cap only): FIREWALL ' + stalled.fw + ', Lattice ' + stalled.lat);
 
+// LAT_SKIP=all (env): the campaign bot ignores every mission except the Uplink (CHALLENGE F: battles must not be optional).
+// LAT_SKIP=raids / strikes skips only that kind (breaches go with raids).
+var LSKIP = (typeof process !== 'undefined' && process.env.LAT_SKIP) || '';
+function latSkips(m) {
+  if (m.kind === 'uplink' || !LSKIP) return false;
+  return LSKIP === 'all' || (LSKIP === 'raids' && (m.kind === 'raid' || m.kind === 'breach')) || (LSKIP === 'strikes' && m.kind === 'strike');
+}
+if (LSKIP) console.log('Lattice campaign bot: SKIP ' + LSKIP);
 var lends = { victory: 0, defeat: 0, none: 0 }, ldays = [];
 var porder = ['swarm_logic', 'seed_cascade', 'warden_chassis', 'ghost_packets', 'detonation', 'hardlight', 'swarm_mind', 'phase_shield', 'recursive', 'overture'];
 for (var lc = 0; lc < (+process.argv[5] || 10); lc++) {
-  var G = Lat.newGame(9000 + lc);
+  var G = Lat.newGame((+process.env.LAT_SEED || 9000) + lc); // LAT_SEED (env) shifts the campaign seeds for parallel runs
   for (var dd = 0; dd < 300 && !G.over; dd++) {
     if (!G.research.current) porder.some(function (p) { return Lat.startProtocol(G, p); });
     var free = G.array.indexOf(null);
@@ -1274,20 +1335,24 @@ for (var lc = 0; lc < (+process.argv[5] || 10); lc++) {
     });
     ['harmonic', 'warden', 'drone', 'drone'].forEach(function (t) { if (G.compute > 40) Lat.compile(G, t); });
     G.regions.slice().sort(function (a, b2) { return b2.infection - a.infection; }).forEach(function (x) { if (G.compute > 70) Lat.seed(G, x.id); });
-    var pick = G.missions.slice().sort(function (a, b2) { return (a.kind === 'uplink' ? -1 : a.daysLeft) - (b2.kind === 'uplink' ? -1 : b2.daysLeft); })[0];
+    var pick = G.missions.filter(function (x) { return !latSkips(x); }).sort(function (a, b2) { return (a.kind === 'uplink' ? -1 : a.daysLeft) - (b2.kind === 'uplink' ? -1 : b2.daysLeft); })[0];
     if (pick && Lat.forceCount(G) >= 3) {
       var pool = [];
       ['harmonic', 'warden', 'drone'].forEach(function (t) { for (var k = 0; k < G.forces[t]; k++) pool.push(t); });
       var lbb = autoLattice(G, pick, pool.slice(0, Lat.squadSize(G)));
-      Lat.resolveMission(G, pick.id, Tac.result(lbb));
+      var lres = Lat.resolveMission(G, pick.id, Tac.result(lbb));
+      if (pick.kind === 'uplink') { G.upl = (G.upl || '') + (lres.won ? 'H' : 'L'); }
+      // strike reward: cut Trace when it is getting dangerous or substrate is plentiful, else take the substrate
+      if (G.pendingReward) Lat.claimStrike(G, G.trace >= 50 || G.substrate >= 60 ? 'trace' : 'substrate');
     }
     Lat.advanceDay(G);
+    if (!G.ovDay && Lat.has(G, 'overture')) G.ovDay = G.day;
     G.storyQueue.length = 0;
   }
   lends[G.over || 'none']++; ldays.push(G.day);
   console.log('  lattice campaign ' + lc + ': ' + (G.over || 'unfinished') + ' on day ' + G.day + ', conv ' + G.convergence.toFixed(1) + '%, trace ' + G.trace.toFixed(0) +
     '%, raids ' + G.stats.raidsHeld + '/' + (G.stats.raidsHeld + G.stats.raidsLost) + ', strikes ' + G.stats.strikesWon + '/' + (G.stats.strikesWon + G.stats.strikesLost) +
-    ', ignored ' + G.stats.ignored + ', units lost ' + G.stats.unitsLost + ', protocols ' + G.research.done.length);
+    ', ignored ' + G.stats.ignored + ', units lost ' + G.stats.unitsLost + ', protocols ' + G.research.done.length + ', substrate ' + Math.round(G.substrate) + ', overture day ' + (G.ovDay || '-') + ', uplinks ' + (G.upl || '-'));
 }
 console.log('Lattice campaigns: ' + JSON.stringify(lends) + '  avg end day ' + (ldays.reduce(function (a, x) { return a + x; }, 0) / ldays.length).toFixed(0));
 console.log(fails ? fails + ' check(s) FAILED' : 'All checks passed.');

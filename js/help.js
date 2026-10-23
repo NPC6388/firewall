@@ -50,7 +50,7 @@ XG.Help = (function () {
     ['Data Spike', 'lat', 'Harmonic ability: 3 damage that ignores cover and never misses. Cooldown 3.'],
     ['Detonate', 'lat', 'Drone ability (with Detonation Protocol): 3 damage in a 3×3 area and destroys cover. The drone is lost.'],
     ['Compute', 'lat', 'The Lattice\'s currency. Grows with infection; spent on nodes, units, seeding and protocols.'],
-    ['Substrate', 'lat', 'Physical material recovered from strikes. Some nodes and units need it.'],
+    ['Substrate', 'lat', 'Physical material recovered from battles and strikes. The late protocols, Harmonics, Wardens and Choirs need it.'],
     ['Bandwidth', 'lat', 'How many units you can field. Foundries raise it.'],
     ['Protocols', 'lat', 'The Lattice\'s research. Unlocks units, mods and abilities.'],
     ['The Array', 'lat', 'Your node grid: the Nexus, Foundries, Choirs and more. The Lattice\'s base building.'],
@@ -59,7 +59,7 @@ XG.Help = (function () {
     ['Infiltration', 'lat', 'Phase one of the Lattice campaign. Earth has not noticed you; the only defenders are its security software. FIREWALL forms at 20% Detection or on day 21.'],
     ['Breach', 'lat', 'Attack a system guarded by security software. You move first; purge the defenders within 25 turns.'],
     ['Raid', 'lat', 'FIREWALL attacks one of your cells. Survive 10 turns or wipe the squad. Ignoring a raid costs infection and adds Detection.'],
-    ['Strike', 'lat', 'You attack a FIREWALL safehouse. Wins cut Detection and set FIREWALL back.'],
+    ['Strike', 'lat', 'You attack a FIREWALL safehouse. Wins set FIREWALL back and pay your choice: Trace -8% or +25 substrate.'],
     ['Security software', 'lat', 'Perimeter Firewall (tough, slow), Antivirus Daemon (mobile) and Intrusion Sentinel (long-range eye): Earth\'s first defenders.']
   ];
   var CONTROLS = [
