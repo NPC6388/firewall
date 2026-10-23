@@ -220,7 +220,8 @@ intel from `g.intel`).
 
 ## 4. Recommended order
 
-**Phase 1 — quick wins, about a session**
+**Phase 1 — quick wins, about a session** (built 2026-10-23, on main; results in docs/challenge/phase1-results.md,
+phase1b-firewall.md and phase1b-lattice.md. Bot campaigns: FIREWALL 46%, Lattice 56%, skip-every-mission Lattice 0%)
 - A1 (bot abilities) + A3 (pod wake)
 - F for the Lattice (ignore penalties, strike choice)
 - E sinks (salvage/substrate) + tech cost creep
