@@ -425,6 +425,71 @@ function autoBattle(g, m, squad) {
   sq.forEach(function (s) { s.xp = 0; });
 })();
 
+// Challenge phase 1b (FIREWALL campaign): pods wake together, escalation past day 73, salvage sinks, hire/tech creep, expiry panic.
+(function () {
+  var D = XG.DATA, T = D.tuning, g = S.newGame(91), r = S.rng(g), m = Strat.spawnMission(g, r, 'purge'); S.saveRng(g, r);
+  m.diff = 3; m.scenario = 'exterminate';
+  // A3: an alerted unit wakes its whole pod, however spread out, plus anything within alertRadius
+  var b = Tac.create(g, m, g.soldiers.slice(0, 4)), en = b.units.filter(function (u) { return u.side === 'enemy'; });
+  en.forEach(function (u) { u.alerted = false; });
+  var pod0 = en.filter(function (u) { return u.pod === 0; }), other = en.filter(function (u) { return u.pod !== 0; });
+  pod0.forEach(function (u, i) { u.x = 1 + i * 15; u.y = 1; }); // far apart: only the pod rule can wake them
+  other.forEach(function (u, i) { u.x = 1 + i; u.y = 26; });   // far from pod0[0]
+  other[0].x = pod0[0].x + T.alertRadius - 1; other[0].y = 1;
+  Tac.wake(b, pod0[0], []);
+  check(pod0.length >= 2 && pod0.every(function (u) { return u.alerted; }), 'A3: the whole pod wakes together, even spread across the map');
+  check(other[0].alerted && other.slice(1).every(function (u) { return !u.alerted || Tac.dist(u.x, u.y, pod0[0].x, pod0[0].y) <= T.alertRadius; }), 'A3: units of other pods wake only within alertRadius (' + T.alertRadius + ')');
+  // C: difficulty rows past day 73; steps 6-7 add Harmonic-led pods, never aim
+  var dg = S.newGame(92), dd = function (day) { dg.day = day; return Strat.difficulty(dg); };
+  check(dd(1) === 1 && dd(19) === 2 && dd(73) === 5 && dd(90) === 5 && dd(91) === 6 && dd(109) === 7 && dd(300) === 7, 'difficulty follows tuning.difficultyDays and reaches 7 on day 109');
+  var kinds = function (diff) { var bm = Tac.create(g, Object.assign({}, m, { diff: diff }), g.soldiers.slice(0, 4)); return bm.units.filter(function (u) { return u.side === 'enemy'; }); };
+  var k5 = kinds(5), k6 = kinds(6), k7 = kinds(7), harm = function (L) { return L.filter(function (u) { return u.kind === 'harmonic'; }); };
+  check(k6.length > k5.length && k7.length > k6.length && harm(k7).length === 3 && harm(k6).length === 2, 'difficulty 6 and 7 field bigger pods with more Harmonics (' + k5.length + '/' + k6.length + '/' + k7.length + ')');
+  check(harm(k7)[0].aim === harm(k5)[0].aim, 'steps past difficulty 5 never raise enemy aim');
+  // E: tech cost creep
+  var tg = S.newGame(93);
+  check(Strat.techCost(tg, 'squad_size') === 70, 'tech cost starts at its base');
+  tg.research.done.push('signal_analysis', 'lattice_grammar');
+  check(Strat.techCost(tg, 'squad_size') === Math.round(70 * (1 + 2 * T.techCreep)) && Strat.techCost(tg, 'signal_analysis') === Math.round(40 * (1 + T.techCreep)), 'each finished tech makes the rest 8% dearer (' + Strat.techCost(tg, 'squad_size') + ' RP)');
+  tg.research.done.push('drone_teardown', 'emp'); tg.research.current = 'squad_size'; tg.research.progress.squad_size = 70; // 4 done: 92 RP
+  Strat.advanceDay(tg);
+  check(tg.research.current === 'squad_size', 'research needs the crept cost, not the base cost, to finish');
+  // E: hire cost rises per hire, roster capped
+  var hg = S.newGame(94); hg.credits = 1000;
+  var paid = []; for (var k = 0; k < 2; k++) { var c0 = hg.credits; Strat.hire(hg, 'trooper'); paid.push(c0 - hg.credits); }
+  check(paid[0] === T.hireCost && paid[1] === T.hireCost + T.hireStep, 'each recruit costs hireStep more (' + paid.join(', ') + ')');
+  hg.hired = 50; check(Strat.hireCost(hg) === T.hireMax, 'hire cost stops at hireMax');
+  check(hg.soldiers.length === T.rosterCap && !Strat.hire(hg, 'hacker') && Strat.canHire(hg) && hg.soldiers.length === T.rosterCap, 'the roster is capped at ' + T.rosterCap);
+  hg.research.done.push('halcyon'); hg.base[1] = { type: 'workshop', daysLeft: 0 }; hg.salvage = 500;
+  check(!!Strat.canFabricate(hg, 'sentinel'), 'a full roster blocks a new Sentinel chassis');
+  hg.soldiers.pop();
+  var s1 = Strat.fabCost(hg, 'sentinel'); Strat.fabricate(hg, 'sentinel'); var s2 = Strat.fabCost(hg, 'sentinel');
+  check(s2.salvage === s1.salvage + D.fabrication.sentinel.costStep.salvage && s2.credits === s1.credits + D.fabrication.sentinel.costStep.credits, 'each Sentinel chassis costs more than the last');
+  // E: Sentinel repairs cost salvage per HP; no salvage, no repair
+  var sn = hg.soldiers.filter(function (s) { return s.cls === 'sentinel'; })[0], mx = S.stats(hg, sn).maxHp;
+  sn.hp = mx - 3; hg.salvage = T.repairSalvage + 1; hg.missions = []; hg.nextMissionIn = 99;
+  Strat.advanceDay(hg);
+  check(sn.hp === mx - 2 && hg.salvage === 1, 'a Sentinel repair costs ' + T.repairSalvage + ' salvage per HP');
+  Strat.advanceDay(hg);
+  check(sn.hp === mx - 2 && hg.salvage === 1, 'no salvage, no Sentinel repair');
+  // E: grenades and medkits used are restocked for salvage after the mission
+  var rg = S.newGame(95), rr = S.rng(rg), rm = Strat.spawnMission(rg, rr, 'purge'); S.saveRng(rg, rr);
+  var rb = Tac.create(rg, rm, rg.soldiers.slice(0, 4)), rres = Tac.result(rb);
+  var tr = rb.units.filter(function (u) { return u.kind === 'trooper'; })[0], sci = rb.units.filter(function (u) { return u.kind === 'scientist'; })[0];
+  tr.charges.grenade = 0; sci.charges.medkit = 1; rres = Tac.result(rb); rres.outcome = 'loss';
+  rg.salvage = 40;
+  var rout = Strat.resolveMission(rg, rm.id, rres);
+  check(rout.restock === T.restock.grenade + T.restock.medkit && rg.salvage === 40 - rout.restock, 'used grenades and medkits are restocked for salvage (' + rout.restock + ')');
+  // F: an expired mission also cuts funding at once (never below zero); the card can show the cost up front
+  var eg = S.newGame(96), er = S.rng(eg), em = Strat.spawnMission(eg, er, 'purge'); S.saveRng(eg, er);
+  eg.missions = [em]; em.daysLeft = 1; eg.credits = 100; eg.nextMissionIn = 99;
+  Strat.advanceDay(eg);
+  check(eg.missions.length === 0 && eg.credits === 100 - T.expirePenalty.credits && Strat.expireCost(em).credits === T.expirePenalty.credits, 'an expired mission cuts §' + T.expirePenalty.credits + ' of funding');
+  var em2 = Strat.spawnMission(eg, er, 'purge'); eg.missions = [em2]; em2.daysLeft = 1; eg.credits = 5;
+  Strat.advanceDay(eg);
+  check(eg.credits === 0, 'the expiry funding cut never drives credits below zero');
+})();
+
 // Lattice campaign: your machines deploy at the mark matching the FIREWALL squad's level; structures never upgrade.
 (function () {
   var D = XG.DATA, g = XG.Lat.newGame(31); g.day = 60; g.trace = 80;
@@ -1132,7 +1197,7 @@ Object.keys(tally).sort().forEach(function (k) {
 var nc = +process.argv[3] || 10, ends = { victory: 0, defeat: 0, none: 0 }, days = [];
 var order = ['signal_analysis', 'lattice_grammar', 'drone_teardown', 'halcyon', 'relay_analysis', 'squad_size', 'emp', 'faraday', 'triangulation', 'coilguns', 'firewall'];
 for (var c = 0; c < nc; c++) {
-  var gc = S.newGame(5000 + c);
+  var gc = S.newGame(5000 + c + (+process.env.CAMP_SEED || 0)); // CAMP_SEED=n shifts the seeds (parallel balance runs)
   for (var d = 0; d < 400 && !gc.over; d++) {
     if (!gc.research.current) order.some(function (t) { return Strat.startResearch(gc, t); });
     var slot = gc.base.indexOf(null);
@@ -1155,7 +1220,7 @@ for (var c = 0; c < nc; c++) {
   }
   ends[gc.over || 'none']++; days.push(gc.day);
   console.log('  campaign ' + c + ': ' + (gc.over || 'unfinished') + ' on day ' + gc.day + ', conv ' + gc.convergence.toFixed(1) +
-    '%, won ' + gc.stats.missionsWon + ' lost ' + gc.stats.missionsLost + ' expired ' + gc.stats.expired + ', KIA ' + gc.memorial.length + ', techs ' + gc.research.done.length);
+    '%, won ' + gc.stats.missionsWon + ' lost ' + gc.stats.missionsLost + ' expired ' + gc.stats.expired + ', KIA ' + gc.memorial.length + ', techs ' + gc.research.done.length + ', salvage ' + gc.salvage + ', credits ' + gc.credits + ', roster ' + gc.soldiers.length);
 }
 console.log('Campaigns: ' + JSON.stringify(ends) + '  avg end day ' + (days.reduce(function (a, x) { return a + x; }, 0) / days.length).toFixed(0));
 

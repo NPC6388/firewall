@@ -628,7 +628,7 @@ XG.Tac = (function () {
     var E = D.enemies[type], mk = E.static ? 0 : b.mark || 0, hp = E.hp + mk * D.markBonus.hp;
     var u = {
       id: b.nextId++, side: 'enemy', kind: type, name: E.name + (mk ? ' ' + D.latticeMarks[mk] : ''), glyph: E.glyph, color: E.color, x: x, y: y, mark: mk,
-      hp: hp, maxHp: hp, armor: E.armor, aim: E.aim + (b.mission.diff - 1) * 2 + mk * D.markBonus.aim, mobility: E.mobility,
+      hp: hp, maxHp: hp, armor: E.armor, aim: E.aim + (Math.min(5, b.mission.diff) - 1) * 2 + mk * D.markBonus.aim, mobility: E.mobility, // steps past 5 add units, not aim
       dmg: E.dmg.slice(), range: E.range, close: 10, crit: 5, defense: E.defense, machine: !!E.machine,
       hackDef: E.hackDef, special: E.special || null, isStatic: !!E.static, spawn: E.spawn || null, spawned: 0,
       abilities: E.static ? [] : (E.abilities || ['shoot']).slice(), charges: {}, cooldowns: {}, ap: 0, overwatch: false, hunker: false,
@@ -672,7 +672,10 @@ XG.Tac = (function () {
     2: ['drone', 'drone', 'warden', 'drone'],
     3: ['drone', 'drone', 'warden', 'harmonic', 'drone'],
     4: ['drone', 'warden', 'harmonic', 'drone', 'drone'],
-    5: ['drone', 'warden', 'warden', 'harmonic', 'drone', 'drone']
+    5: ['drone', 'warden', 'warden', 'harmonic', 'drone', 'drone'],
+    // past day 90/108 (tuning.difficultyDays): bigger pods, each of the first two led by a Harmonic
+    6: ['harmonic', 'drone', 'warden', 'harmonic', 'drone', 'warden', 'drone'],
+    7: ['harmonic', 'warden', 'drone', 'harmonic', 'drone', 'drone', 'harmonic', 'warden']
   };
 
   // Average rank of the operatives in a squad (machines don't rank up).
@@ -700,7 +703,7 @@ XG.Tac = (function () {
     if (b.server && b.outside) b.turnLimit = nodeTurns('purge', true); // the attackers have to walk in first
     // Units are made off-map; deploy() places both sides (and can do it again with a new seed on Restart).
     squad.forEach(function (s) { makeSquadUnit(b, g, s, OFF, OFF); });
-    var list = (COMPOSITION[mission.diff] || COMPOSITION[5]).slice();
+    var list = (COMPOSITION[Math.min(7, mission.diff)] || COMPOSITION[5]).slice();
     if (mission.kind === 'relay') {
       list.pop();
       makeEnemy(b, 'relay', OFF, OFF);
@@ -1135,9 +1138,10 @@ XG.Tac = (function () {
   function alert(b, u, ev) {
     if (u.alerted || u.side !== 'enemy') return;
     u.alerted = true;
-    var woke = 1;
+    var woke = 1, R = D.tuning.alertRadius || 7;
+    // the whole pod wakes together, and so does anything else within alertRadius
     b.units.forEach(function (o) {
-      if (o.alive && o.side === 'enemy' && !o.alerted && dist(o.x, o.y, u.x, u.y) <= 7) { o.alerted = true; woke++; }
+      if (o.alive && o.side === 'enemy' && !o.alerted && ((u.pod !== undefined && o.pod === u.pod) || dist(o.x, o.y, u.x, u.y) <= R)) { o.alerted = true; woke++; }
     });
     if (isVisible(b, u)) ev.push({ t: 'text', x: u.x, y: u.y, text: '!', color: '#ff4d6d' });
     log(b, ev, 'Lattice pod activated (' + woke + ' contact' + (woke > 1 ? 's' : '') + ').', 'bad');
@@ -2058,7 +2062,10 @@ XG.Tac = (function () {
       lattice: b.units.filter(function (u) { return u.deployed; }).map(function (u) { return { kind: u.kind, alive: u.alive }; }),
       humansKilled: b.units.filter(function (u) { return u.sid && !u.alive; }).length,
       units: b.units.filter(function (u) { return u.sid; }).map(function (u) {
-        return { sid: u.sid, hp: u.hp, alive: u.alive, kills: u.kills, hacks: u.hacks || 0, held: held(b, u), name: u.name };
+        // spent: grenades / medkits used, which the FIREWALL campaign restocks for salvage
+        var spent = {};
+        ['grenade', 'medkit'].forEach(function (k) { if (u.abilities.indexOf(k) >= 0) spent[k] = Math.max(0, D.abilities[k].charges - (u.charges[k] || 0)); });
+        return { sid: u.sid, hp: u.hp, alive: u.alive, kills: u.kills, hacks: u.hacks || 0, held: held(b, u), name: u.name, spent: spent };
       })
     };
   }
@@ -2066,7 +2073,7 @@ XG.Tac = (function () {
 
   return {
     MAP_W: MAP_W, MAP_H: MAP_H, BASE_W: BASE_W, BASE_H: BASE_H, FLOOR: FLOOR, WALL: WALL, LOW: LOW, HIGH: HIGH, PIT: PIT, SIGHT: SIGHT, propOf: propOf, clearTile: clearTile, objectAt: objectAt, objectById: objectById, objectTargets: objectTargets, cornerStandoff: cornerStandoff, rangePenalty: rangePenalty, refreshVis: refreshVis,
-    create: create, redeploy: redeploy, deploy: deploy, squadRank: squadRank, createLattice: createLattice, createTraining: createTraining, refillAP: refillAP, act: act, endPlayerTurn: endPlayerTurn, enemyStep: enemyStep, ai: ai,
+    create: create, wake: alert, redeploy: redeploy, deploy: deploy, squadRank: squadRank, createLattice: createLattice, createTraining: createTraining, refillAP: refillAP, act: act, endPlayerTurn: endPlayerTurn, enemyStep: enemyStep, ai: ai,
     endTurn: endTurn, aiStep: aiStep,
     reach: reach, pathTo: pathTo, moveRange: moveRange, hitInfo: hitInfo, targets: targets, tileOk: tileOk,
     abilityBlock: abilityBlock, coverValue: coverValue, coverDetail: coverDetail, los: los, isVisible: isVisible, unitAt: unitAt,

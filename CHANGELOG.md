@@ -11,6 +11,21 @@ The in-game **Help → Patch notes** tab shows everything from the first `##` he
 ### 2026-10-23
 - **Windows:** you can climb straight through a window now, with no need to shoot it first. Whoever goes through smashes it,
   so it leaves an open gap that is no longer half cover for anyone.
+- **Lattice pods wake together:** once one Lattice unit spots your squad, its whole pod comes alive at once, along with
+  anything else within 11 tiles (was 7). Sneaking up on a group is tenser; picking off one sentry no longer splits a pod.
+- **The Lattice keeps escalating:** after day 90 and again after day 108 its cells grow bigger, with Harmonics leading
+  the pods (threat now runs past five bars). Their aim stops rising at day 73; they win by numbers, not by stats.
+- **Research gets dearer:** every tech you finish makes each remaining one 8% more expensive. Research cards show the
+  real cost (and the base cost beside it), so the order you choose matters.
+- **Recruits cost more each time:** the first hire is §30, then §40, §50... up to §75; the price eases back two steps
+  each month. The roster holds 8 people and Sentinels in all. Losing veterans now hurts.
+- **Salvage has uses:** grenades (5 salvage) and medkits (2) used in a mission are restocked afterwards, Sentinel repairs
+  cost 2 salvage per HP (no salvage, no repair), each new Sentinel chassis costs more than the last, and Firewall
+  Protocols (25) and Uplink Triangulation (30) now need salvage to start.
+- **Ignored missions hurt the budget:** a mission that expires now also costs §15 of funding as that region panics.
+  Every mission card says what ignoring it costs.
+- **To make room for all that:** missions stay open a day longer (5-7 days), research runs at 12 RP a day base (was 10),
+  regional funding is §38 a month per clean region (was §32), and Convergence creeps a touch slower.
 - **Lattice campaign battles:** the FIREWALL squad now uses its abilities against you. Troopers throw grenades into
   clusters of two or more of your units (or at a wounded one in cover), Scientists patch up a neighbour who is down 3+ HP,
   Hackers stun your biggest machine in range, and Sentinels shield whichever soldier is most exposed. They only act on what

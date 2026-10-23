@@ -65,9 +65,14 @@ XG.Strat = (function () {
       g.research.current = id;
       return true;
     },
+    // Real RP cost: each finished tech adds tuning.techCreep (8%) of the base cost to every tech not yet done.
+    techCost: function (g, id) {
+      var t = D.techs[id], n = g.research.done.length - (has(g, id) ? 1 : 0);
+      return Math.round(t.cost * (1 + (D.tuning.techCreep || 0) * n));
+    },
     daysLeft: function (g, id) {
       var done = g.research.progress[id] || 0;
-      return Math.max(1, Math.ceil((D.techs[id].cost - done) / Strat.researchRate(g)));
+      return Math.max(1, Math.ceil((Strat.techCost(g, id) - done) / Strat.researchRate(g)));
     },
 
     // ------------------------------------------------------------- base
@@ -137,13 +142,16 @@ XG.Strat = (function () {
 
     // ------------------------------------------------------- fabrication
     fabCost: function (g, id) {
-      var c = D.fabrication[id].cost, m = 1 - 0.15 * Math.max(0, built(g, 'workshop') - 1);
-      return { credits: Math.round((c.credits || 0) * m), salvage: Math.round((c.salvage || 0) * m) };
+      // repeatable items with a costStep get dearer with every one already made (the Sentinel chassis)
+      var f = D.fabrication[id], c = f.cost, st = f.costStep || {}, n = g.fabricated[id] || 0;
+      var m = 1 - 0.15 * Math.max(0, built(g, 'workshop') - 1);
+      return { credits: Math.round(((c.credits || 0) + n * (st.credits || 0)) * m), salvage: Math.round(((c.salvage || 0) + n * (st.salvage || 0)) * m) };
     },
     canFabricate: function (g, id) {
       var f = D.fabrication[id];
       if (!has(g, f.tech)) return 'Requires ' + D.techs[f.tech].name;
       if (!f.repeatable && g.fabricated[id]) return 'Already fabricated';
+      if (id === 'sentinel' && Strat.rosterFull(g)) return 'Roster full (' + D.tuning.rosterCap + ')';
       if (!built(g, 'workshop')) return 'Requires a Fabrication Bay';
       if (!canPay(g, Strat.fabCost(g, id))) return 'Need ' + costText(Strat.fabCost(g, id));
       return null;
@@ -162,9 +170,18 @@ XG.Strat = (function () {
       return true;
     },
 
+    // Recruits get dearer with every hire (g.hired; old saves start at 0), and the roster holds rosterCap people and machines.
+    hireCost: function (g) { var T = D.tuning; return Math.min(T.hireMax || T.hireCost, T.hireCost + (T.hireStep || 0) * (g.hired || 0)); },
+    rosterFull: function (g) { return g.soldiers.length >= (D.tuning.rosterCap || 99); },
+    canHire: function (g) {
+      if (Strat.rosterFull(g)) return 'Roster full (' + D.tuning.rosterCap + ')';
+      if (g.credits < Strat.hireCost(g)) return 'Need §' + Strat.hireCost(g);
+      return null;
+    },
     hire: function (g, cls) {
-      if (g.credits < D.tuning.hireCost || cls === 'sentinel') return false;
-      g.credits -= D.tuning.hireCost;
+      if (Strat.canHire(g) || cls === 'sentinel') return false;
+      g.credits -= Strat.hireCost(g);
+      g.hired = (g.hired || 0) + 1;
       var r = S.rng(g), s = S.makeSoldier(g, cls, r); S.saveRng(g, r);
       g.soldiers.push(s);
       S.log(g, 'Recruited ' + D.classes[cls].name + ' ' + s.name + '.');
@@ -185,7 +202,17 @@ XG.Strat = (function () {
     },
     nodeTurnsFor: function (m, kind) { return (Strat.rollOutside(m.seed, m.scenario) ? D.tuning.nodeTurnsOutside : D.tuning.nodeTurns)[kind || m.kind]; },
     scenarioTag: function (m) { return m.scenario === 'node' ? 'NODE' : m.scenario === 'exterminate' ? 'EXTERMINATE' : ''; },
-    difficulty: function (g) { return Math.min(5, 1 + Math.floor((g.day - 1) / 18)); },
+    // Difficulty = how many rows of tuning.difficultyDays the day has reached (1 on day 1; 7 from day 109 by default).
+    difficulty: function (g) {
+      var rows = D.tuning.difficultyDays, n = 0;
+      for (var i = 0; i < rows.length; i++) if (g.day >= rows[i]) n++;
+      return Math.max(1, n);
+    },
+    // What letting a mission expire costs (shown on the mission card, applied in advanceDay).
+    expireCost: function (m) {
+      var P = D.tuning.expirePenalty;
+      return { infection: P.infection, convergence: P.convergence, credits: P.credits || 0 };
+    },
 
     spawnMission: function (g, r, kind) {
       kind = kind || 'purge';
@@ -234,7 +261,7 @@ XG.Strat = (function () {
       var cur = g.research.current;
       if (cur) {
         g.research.progress[cur] = (g.research.progress[cur] || 0) + Strat.researchRate(g);
-        if (g.research.progress[cur] >= D.techs[cur].cost) {
+        if (g.research.progress[cur] >= Strat.techCost(g, cur)) {
           g.research.done.push(cur); g.research.current = null;
           ev.push({ type: 'research', msg: 'Research complete: ' + D.techs[cur].name });
           S.log(g, 'Research complete: ' + D.techs[cur].name + '.');
@@ -258,12 +285,16 @@ XG.Strat = (function () {
         }
       });
 
-      // healing / repair
+      // healing / repair (machines repair for tuning.repairSalvage per HP, as far as the salvage goes)
       var heal = built(g, 'infirmary') ? 2 : 1;
       g.soldiers.forEach(function (s) {
-        var mx = S.stats(g, s).maxHp;
-        if (s.hp < mx) {
-          s.hp = Math.min(mx, s.hp + heal);
+        var mx = S.stats(g, s).maxHp, gain = Math.min(heal, mx - s.hp);
+        if (gain > 0 && D.classes[s.cls].machine && T.repairSalvage) {
+          gain = Math.min(gain, Math.floor(g.salvage / T.repairSalvage));
+          g.salvage -= gain * T.repairSalvage;
+        }
+        if (gain > 0) {
+          s.hp += gain;
           if (s.hp === mx) S.log(g, s.name + ' is fit for duty.');
         }
       });
@@ -278,12 +309,13 @@ XG.Strat = (function () {
       g.missions = g.missions.filter(function (m) {
         if (m.daysLeft === null) return true;
         if (--m.daysLeft > 0) return true;
-        var reg = region(g, m.region);
-        reg.infection = Math.min(100, reg.infection + T.expirePenalty.infection);
-        g.convergence = Math.min(100, g.convergence + T.expirePenalty.convergence);
+        var reg = region(g, m.region), ec = Strat.expireCost(m), lost = Math.min(g.credits, ec.credits);
+        reg.infection = Math.min(100, reg.infection + ec.infection);
+        g.convergence = Math.min(100, g.convergence + ec.convergence);
+        g.credits -= lost; // panic in the region: its government cuts funding at once
         g.stats.expired++;
-        ev.push({ type: 'expire', msg: m.name + ' expired. ' + regionData(m.region).name + ' falls further.' });
-        S.log(g, m.name + ' (' + m.city + ') expired. Convergence +' + T.expirePenalty.convergence + '%.');
+        ev.push({ type: 'expire', msg: m.name + ' expired. ' + regionData(m.region).name + ' falls further' + (lost ? ' and cuts §' + lost + ' of funding' : '') + '.' });
+        S.log(g, m.name + ' (' + m.city + ') expired. Convergence +' + ec.convergence + '%' + (lost ? ', funding -§' + lost : '') + '.');
         return false;
       });
 
@@ -300,6 +332,7 @@ XG.Strat = (function () {
         var vis = Strat.infectionVisible(g);
         var fund = Math.round(g.regions.reduce(function (a, x) { return a + T.fundingPerRegion * (1 - x.infection / 100); }, 0));
         g.credits += fund;
+        if (g.hired) g.hired = Math.max(0, g.hired - (T.hireRecover || 0)); // the recruiting price eases each month
         ev.push({ type: 'funding', msg: 'Monthly funding: §' + fund + (vis ? '' : ' (infection data unavailable)') });
         S.log(g, 'Monthly funding received: §' + fund + '.');
       }
@@ -354,6 +387,13 @@ XG.Strat = (function () {
         if (S.rankIndex(s) > rk) out.promotions.push(s);
       });
 
+      // restock the grenades and medkits used (survivors and the fallen alike), paid in salvage as far as it goes
+      var used = { grenade: 0, medkit: 0 };
+      result.units.forEach(function (u) { if (u.spent) { used.grenade += u.spent.grenade || 0; used.medkit += u.spent.medkit || 0; } });
+      var RS = D.tuning.restock || {};
+      out.used = used;
+      var restockCost = used.grenade * (RS.grenade || 0) + used.medkit * (RS.medkit || 0);
+
       var reg = region(g, m.region);
       if (result.outcome === 'win') {
         g.stats.missionsWon++;
@@ -376,6 +416,9 @@ XG.Strat = (function () {
         S.log(g, m.name + ' failed. Convergence +2%.');
         if (g.convergence >= 100 && !g.over) { g.over = 'defeat'; g.storyQueue.push('defeat'); }
       }
+      out.restock = Math.min(g.salvage, restockCost); // after the rewards, so a won mission pays for its own grenades
+      g.salvage -= out.restock;
+      if (out.restock) S.log(g, 'Restocked ' + [used.grenade ? used.grenade + ' grenade' + (used.grenade > 1 ? 's' : '') : '', used.medkit ? used.medkit + ' medkit' + (used.medkit > 1 ? 's' : '') : ''].filter(Boolean).join(' and ') + ': ' + out.restock + ' salvage.');
       return out;
     }
   };

@@ -164,11 +164,12 @@ XG.UI = (function () {
     var cls = m.kind === 'relay' ? 'story' : m.kind === 'uplink' ? 'final' : '';
     var rew = m.kind === 'uplink' ? 'Ends the war.' : 'Reward: ' + m.reward.salvage + ' salvage' + ', §' + St.missionCredits(m) + ', region infection -' + m.reward.infection + '%. Win fast for up to x' + (XG.DATA.tuning.rewardMaxMult || 3) + ' salvage and credits';
     var ready = g.soldiers.filter(function (s) { return S.available(g, s); }).length;
-    var tag = St.scenarioTag(m);
+    var tag = St.scenarioTag(m), ec = St.expireCost(m);
     return '<div class="mission ' + cls + '"><div class="mh"><span class="mn">' + m.name + (tag ? ' <span class="scen-tag ' + m.scenario + '">' + tag + '</span>' : '') + '</span><span class="' + (m.daysLeft !== null && m.daysLeft <= 1 ? 'bad' : 'dim') + '">' +
       (m.daysLeft === null ? 'story' : m.daysLeft + 'd left') + '</span></div>' +
-      '<div class="dim">' + m.city + ', ' + St.regionData(m.region).name + ' · threat ' + '▮'.repeat(m.diff) + '▯'.repeat(5 - m.diff) + '</div>' +
+      '<div class="dim">' + m.city + ', ' + St.regionData(m.region).name + ' · threat ' + '▮'.repeat(m.diff) + '▯'.repeat(Math.max(0, 5 - m.diff)) + '</div>' +
       '<p>' + m.brief + '<br>' + rew + '</p>' +
+      (m.daysLeft !== null ? '<p class="warn">Ignoring this costs: ' + St.regionData(m.region).name + ' infection +' + ec.infection + '%, Convergence +' + ec.convergence + '%' + (ec.credits ? ', §' + ec.credits + ' funding' : '') + '.</p>' : '') +
       '<button class="primary" data-action="deploy" data-arg="' + m.id + '"' + (ready ? '' : ' disabled title="No operatives fit for duty"') + '>Deploy squad ▸</button></div>';
   }
 
@@ -189,7 +190,7 @@ XG.UI = (function () {
     var rate = St.researchRate(g), cur = g.research.current;
     var head = '<div class="panel" style="margin-bottom:16px"><h2>Research <small>' + rate.toFixed(0) + ' RP/day · labs ' + St.built(g, 'lab') + ' · server farms ' + St.built(g, 'server') + '</small></h2>' +
       (cur ? '<p>Current project: <b>' + D.techs[cur].name + '</b>, ' + St.daysLeft(g, cur) + ' day(s) left.</p><div class="bar"><div style="width:' +
-        Math.round(100 * (g.research.progress[cur] || 0) / D.techs[cur].cost) + '%"></div></div>' : '<p class="warn">No active project. Scientists are drinking coffee and reading the signal again.</p>') + '</div>';
+        Math.round(100 * (g.research.progress[cur] || 0) / St.techCost(g, cur)) + '%"></div></div>' : '<p class="warn">No active project. Scientists are drinking coffee and reading the signal again.</p>') + '</div>';
     var order = { active: 0, available: 1, 'needs-item': 2, 'needs-salvage': 2, locked: 3, done: 4 };
     var ids = Object.keys(D.techs).sort(function (a, b) { return order[St.techState(g, a)] - order[St.techState(g, b)]; });
     return head + '<div class="cards">' + ids.map(function (id) {
@@ -200,9 +201,9 @@ XG.UI = (function () {
       else if (st === 'needs-item') btn = '<span class="warn">Requires a Relay Core</span>';
       else if (st === 'needs-salvage') btn = '<span class="warn">Needs ' + t.salvage + ' salvage</span>';
       else btn = '<span class="dim">Requires ' + t.req.map(function (r) { return D.techs[r].name; }).join(', ') + '</span>';
-      var prog = g.research.progress[id] ? Math.round(100 * g.research.progress[id] / t.cost) : 0;
+      var cost = st === 'done' ? t.cost : St.techCost(g, id), prog = g.research.progress[id] ? Math.round(100 * g.research.progress[id] / cost) : 0;
       return '<div class="card ' + (st === 'needs-item' || st === 'needs-salvage' ? 'locked' : st) + '"><h3>' + t.name + '</h3><p>' + t.desc + '</p>' +
-        '<div class="meta">' + t.cost + ' RP · ~' + Math.ceil(t.cost / rate) + ' days' + (t.salvage ? ' · ' + t.salvage + ' salvage' : '') + (prog && st !== 'done' ? ' · ' + prog + '% done' : '') + '</div>' + btn + '</div>';
+        '<div class="meta">' + cost + ' RP' + (cost > t.cost && st !== 'done' ? ' <span class="dim" title="Every finished tech makes the rest ' + Math.round(100 * D.tuning.techCreep) + '% dearer">(base ' + t.cost + ')</span>' : '') + ' · ~' + Math.ceil(cost / rate) + ' days' + (t.salvage ? ' · ' + t.salvage + ' salvage' : '') + (prog && st !== 'done' ? ' · ' + prog + '% done' : '') + '</div>' + btn + '</div>';
     }).join('') + '</div>';
   }
 
@@ -279,12 +280,13 @@ XG.UI = (function () {
       var st = S.stats(g, s), C = D.classes[s.cls], ok = S.available(g, s);
       var heal = St.built(g, 'infirmary') ? 2 : 1;
       return '<tr><td class="who">' + UI.portrait(s) + s.name + '</td><td>' + C.name + '</td><td>' + S.rankName(s) + ' <span class="dim">(' + s.xp + ' xp)</span></td>' +
-        '<td>' + hpBar(s.hp, st.maxHp) + '</td><td>' + (ok ? '<span class="good">Ready</span>' : '<span class="warn">' + (C.machine ? 'Repairing' : 'Wounded') + ' ' + Math.ceil((st.maxHp - s.hp) / heal) + 'd</span>') + '</td>' +
+        '<td>' + hpBar(s.hp, st.maxHp) + '</td><td>' + (ok ? '<span class="good">Ready</span>' : C.machine && g.salvage < D.tuning.repairSalvage ? '<span class="bad" title="Repairs cost ' + D.tuning.repairSalvage + ' salvage per HP">Repair stalled: no salvage</span>' : '<span class="warn"' + (C.machine ? ' title="Repairs cost ' + D.tuning.repairSalvage + ' salvage per HP"' : '') + '>' + (C.machine ? 'Repairing' : 'Wounded') + ' ' + Math.ceil((st.maxHp - s.hp) / heal) + 'd</span>') + '</td>' +
         '<td>' + st.aim + '</td><td>' + (st.hackSkill ? st.hackSkill + (s.hacks ? ' <span class="dim">(' + s.hacks + ' hacks)</span>' : '') : '<span class="dim">—</span>') + '</td><td>' + s.missions + '</td><td>' + s.kills + '</td></tr>';
     }).join('');
     var hire = ['trooper', 'hacker', 'scientist'].map(function (c) {
-      return '<button data-action="hire" data-arg="' + c + '"' + (g.credits < D.tuning.hireCost ? ' disabled' : '') + ' title="' + D.classes[c].blurb + '">Recruit ' + D.classes[c].name + ' (§' + D.tuning.hireCost + ')</button>';
-    }).join(' ');
+      var why = St.canHire(g);
+      return '<button data-action="hire" data-arg="' + c + '"' + (why ? ' disabled' : '') + ' title="' + (why ? why + '. ' : '') + D.classes[c].blurb + '">Recruit ' + D.classes[c].name + ' (§' + St.hireCost(g) + ')</button>';
+    }).join(' ') + '<span class="dim">Roster ' + g.soldiers.length + '/' + D.tuning.rosterCap + ' · each recruit costs more than the last</span>';
     var mem = g.memorial.length ? '<table><tr><th>Name</th><th>Class</th><th>Fell</th><th>Missions</th><th>Kills</th></tr>' + g.memorial.map(function (s) {
       return '<tr><td>' + s.name + '</td><td>' + D.classes[s.cls].name + '</td><td>Day ' + s.diedDay + ', ' + s.diedAt + '</td><td>' + s.missions + '</td><td>' + s.kills + '</td></tr>';
     }).join('') + '</table>' : '<p class="dim">No names on the wall. Keep it that way.</p>';
@@ -355,6 +357,7 @@ XG.UI = (function () {
       '<p>' + m.name + ' · ' + m.city + '</p>' +
       (win ? '<p>Recovered <b>' + out.salvage + '</b> salvage' + (out.credits ? ' and <b>§' + out.credits + '</b>' : '') + (out.mult > 1 ? ' (x' + out.mult + ' for a fast win)' : '') + '. ' + St.regionData(m.region).name + ' infection ' + out.infection + '%.</p>'
         : '<p class="bad">' + St.regionData(m.region).name + ' infection +' + out.infection + '%. Convergence +2%.' + (m.kind !== 'purge' ? ' The objective remains; you can try again.' : '') + '</p>') +
+      (out.restock ? '<p class="dim">Restocked ' + [out.used.grenade ? out.used.grenade + ' grenade' + (out.used.grenade > 1 ? 's' : '') : '', out.used.medkit ? out.used.medkit + ' medkit' + (out.used.medkit > 1 ? 's' : '') : ''].filter(Boolean).join(' and ') + ': -' + out.restock + ' salvage.</p>' : '') +
       (lines.length ? lines.join('') : '<p class="dim">No casualties, no promotions.</p>') +
       '<div class="modal-actions"><button class="primary" id="res-ok">Return to Command</button></div>');
     $('res-ok').onclick = function () { UI.closeModal(); done(); };
