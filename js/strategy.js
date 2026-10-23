@@ -332,6 +332,7 @@ XG.Strat = (function () {
         var vis = Strat.infectionVisible(g);
         var fund = Math.round(g.regions.reduce(function (a, x) { return a + T.fundingPerRegion * (1 - x.infection / 100); }, 0));
         g.credits += fund;
+        if (g.hired) g.hired = Math.max(0, g.hired - (T.hireRecover || 0)); // the recruiting price eases each month
         ev.push({ type: 'funding', msg: 'Monthly funding: §' + fund + (vis ? '' : ' (infection data unavailable)') });
         S.log(g, 'Monthly funding received: §' + fund + '.');
       }

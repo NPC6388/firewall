@@ -451,7 +451,7 @@ function autoBattle(g, m, squad) {
   check(Strat.techCost(tg, 'squad_size') === 70, 'tech cost starts at its base');
   tg.research.done.push('signal_analysis', 'lattice_grammar');
   check(Strat.techCost(tg, 'squad_size') === Math.round(70 * (1 + 2 * T.techCreep)) && Strat.techCost(tg, 'signal_analysis') === Math.round(40 * (1 + T.techCreep)), 'each finished tech makes the rest 8% dearer (' + Strat.techCost(tg, 'squad_size') + ' RP)');
-  tg.research.current = 'squad_size'; tg.research.progress.squad_size = 70;
+  tg.research.done.push('drone_teardown', 'emp'); tg.research.current = 'squad_size'; tg.research.progress.squad_size = 70; // 4 done: 92 RP
   Strat.advanceDay(tg);
   check(tg.research.current === 'squad_size', 'research needs the crept cost, not the base cost, to finish');
   // E: hire cost rises per hire, roster capped

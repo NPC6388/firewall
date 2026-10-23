@@ -127,13 +127,13 @@ XG.DATA = {
       desc: 'Unlocks fabrication of coil weapons: +1/+2 damage for the whole squad.' },
     lattice_grammar: { name: 'Lattice Grammar', cost: 70, req: ['signal_analysis'], story: 'beat_grammar',
       desc: 'Learn how the Lattice agrees with itself. Hackers can OVERRIDE machines. Traces a Relay.' },
-    firewall: { name: 'Firewall Protocols', cost: 100, req: ['lattice_grammar'],
+    firewall: { name: 'Firewall Protocols', cost: 100, req: ['lattice_grammar'], salvage: 25,
       desc: 'Global patch campaign. Convergence grows 30% slower.' },
     halcyon: { name: 'HALCYON Integration', cost: 90, req: ['lattice_grammar'], story: 'beat_halcyon',
       desc: 'Let HALCYON into the base. Unlocks Server Farms, Sentinel chassis and Overclock in combat.' },
     relay_analysis: { name: 'Relay Core Analysis', cost: 80, req: ['lattice_grammar'], item: 'relay_core',
       desc: 'Study the captured Relay Core. Requires a Relay Core.' },
-    triangulation: { name: 'Uplink Triangulation', cost: 120, req: ['relay_analysis', 'halcyon'], story: 'beat_triangulation',
+    triangulation: { name: 'Uplink Triangulation', cost: 120, req: ['relay_analysis', 'halcyon'], salvage: 30, story: 'beat_triangulation',
       desc: 'Follow the relay traffic home. Reveals the Lattice ground uplink.' }
   },
 
@@ -665,15 +665,16 @@ XG.DATA = {
   // ---------------------------------------------------------- economy
   start: { credits: 220, salvage: 0, convergence: 5 },
   tuning: {
-    researchBase: 10,          // RP per day
-    convBase: 0.25,            // Convergence % per day
+    researchBase: 12,          // RP per day (was 10 before tech cost creep)
+    convBase: 0.24,            // Convergence % per day (was 0.25)
     convPerInfection: 0.0025,  // extra % per day per point of summed infection
     infectionDrift: 0.25,      // infection gained per region per day
     expirePenalty: { infection: 10, convergence: 2, credits: 15 }, // credits: the region's panic cuts funding at once
-    fundingPerRegion: 32,      // credits per month at 0% infection
+    fundingPerRegion: 38,      // credits per month at 0% infection (was 32, before rising hire costs)
     hireCost: 30,              // first recruit; each later one costs hireStep more, up to hireMax
-    hireStep: 15,
-    hireMax: 90,
+    hireStep: 10,
+    hireMax: 75,
+    hireRecover: 2,            // steps the hire price drops back each month (on funding day)
     rosterCap: 8,              // operatives and Sentinels on the roster
     techCreep: 0.08,           // each finished tech makes every remaining one 8% dearer (of its base cost)
     restock: { grenade: 5, medkit: 2 }, // salvage to replace each grenade / medkit used in a mission
@@ -685,7 +686,7 @@ XG.DATA = {
     // Speed bonus on battle rewards (both campaigns): x3 for a win in rewardFast turns or fewer, falling evenly to x1 at rewardSlow.
     rewardFast: 4, rewardSlow: 14, rewardMaxMult: 3,
     missionEvery: [3, 5],
-    missionLife: [4, 6],
+    missionLife: [5, 7],       // was [4, 6]; ignoring a mission now also costs funding
     alertRadius: 11,           // an alerted Lattice unit wakes its whole pod and every other unit within this many tiles (was 7)
     veteranDrone: 3,           // one extra drone once the squad's average rank reaches this (3 = Sergeant)
     // Raid scenarios for ordinary missions (FIREWALL purge, Lattice raid and strike): 'node' (capture / hold a server) or
