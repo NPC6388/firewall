@@ -57,12 +57,11 @@ XG.Tac = (function () {
   function clearTile(b, x, y, ev, cause) {
     var t = tile(b, x, y), p = propOf(b, x, y);
     if (t !== LOW && t !== HIGH) return false;
-    if (p === 'frame') return false; // an empty window frame is part of the wall
-    if (p === 'window') { // a window shatters into an empty frame: still impassable, see-through and half cover (the sill)
+    if (p === 'window' || p === 'frame') { // a window (or an old save's empty frame) breaks open: a gap in the wall you can walk through
       if (b.tileHp) delete b.tileHp[y * b.W + x];
-      b.props[y * b.W + x] = 'frame';
+      b.tiles[y * b.W + x] = FLOOR; b.props[y * b.W + x] = 0; if (b.faces) b.faces[y * b.W + x] = 0;
       ev.push({ t: 'shatter', x: x, y: y });
-      log(b, ev, 'A window shatters.', '');
+      log(b, ev, 'A window shatters. The gap is open.', '');
       return true;
     }
     if ((cause === 'blast' || cause === 'shot') && (p === 'barrier' || p === 'pillar')) return false;
@@ -142,6 +141,15 @@ XG.Tac = (function () {
         var narrow = solidAcross(b, gx + q[0], gy + q[1], q), had = out.filter(function (p) { return p[0] === px && p[1] === py; })[0];
         if (had) { if (!narrow) had[4] = false; }
         else out.push([px, py, o[0], o[1], narrow]);
+      });
+    });
+    // In a doorway (solid on both sides along one axis): step-peek one tile out of either side of the door, seeing
+    // the whole open side from there (walls still block anything behind them).
+    [[1, 0], [0, 1]].forEach(function (o) {
+      if (!solidAcross(b, x + o[0], y + o[1], o) || !solidAcross(b, x - o[0], y - o[1], o)) return;
+      [[o[1], o[0]], [-o[1], -o[0]]].forEach(function (q) {
+        var px = x + q[0], py = y + q[1];
+        if (inB(b, px, py) && !solidAcross(b, px, py, q) && !out.some(function (p) { return p[0] === px && p[1] === py; })) out.push([px, py, q[0], q[1], false]);
       });
     });
     return out;
@@ -1131,7 +1139,7 @@ XG.Tac = (function () {
   var OBJ_HP = { barrel: 1, glass: 1, window: 1 }, OBJ_HP_LOW = 6, OBJ_HP_HIGH = 10, STRAY = 33; // STRAY: % of covered misses that hit the cover
   function explosive(b, x, y) { return propOf(b, x, y) === 'barrel'; }
   function objMax(b, x, y) { var p = propOf(b, x, y); return OBJ_HP[p] || (tile(b, x, y) === HIGH ? OBJ_HP_HIGH : OBJ_HP_LOW); }
-  function destructible(b, x, y) { var t = tile(b, x, y), p = propOf(b, x, y); return (t === LOW || t === HIGH) && p !== 'barrier' && p !== 'pillar' && p !== 'frame'; }
+  function destructible(b, x, y) { var t = tile(b, x, y), p = propOf(b, x, y); return (t === LOW || t === HIGH) && p !== 'barrier' && p !== 'pillar'; }
   // A pseudo-target for the shot code: { obj: true, id: 'o<tile index>', x, y, hp, maxHp, prop, base }, or null when the tile is not shootable.
   function objectAt(b, x, y) {
     if (!inB(b, x, y) || !destructible(b, x, y)) return null;

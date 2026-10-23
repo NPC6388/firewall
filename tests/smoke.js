@@ -828,20 +828,20 @@ function autoBattle(g, m, squad) {
   b.rng.chance = function () { return seq.length ? seq.shift() : false; };
   var evs = Tac.act.shoot(b, front, foe);
   b.rng.chance = real;
-  check(Tac.tile(b, 13, 10) === Tac.LOW && Tac.propOf(b, 13, 10) === 'frame' && foe.hp === 30, 'window: a stray miss shatters it into an empty frame (' + Tac.propOf(b, 13, 10) + ')');
+  check(Tac.tile(b, 13, 10) === Tac.FLOOR && !Tac.propOf(b, 13, 10) && foe.hp === 30, 'window: a stray miss shatters it into an open gap (' + Tac.tile(b, 13, 10) + ')');
   front.x = 13; front.y = 11; foe.x = 13; foe.y = 5;
   check(!!evs && evs.some(function (e) { return e.t === 'shatter'; }), 'window: shattering emits a shatter event');
-  check(Tac.reach(b, front, 4).d[10 * W + 13] < 0 && Tac.hitInfo(b, foe, front).cover === 20 && !Tac.objectAt(b, 13, 10), 'shattered window: still impassable, still half cover, cannot break further');
+  check(Tac.reach(b, front, 4).d[10 * W + 13] > 0 && Tac.hitInfo(b, foe, front).cover === 0 && !Tac.objectAt(b, 13, 10), 'shattered window: an open gap you can walk through, no cover, nothing left to break');
   // a blast shatters a window too; the frame survives the next one
   b.tiles[10 * W + 15] = Tac.LOW; b.props[10 * W + 15] = 'window';
   var evb = [];
-  check(Tac.clearTile(b, 15, 10, evb, 'blast') && Tac.propOf(b, 15, 10) === 'frame' && Tac.tile(b, 15, 10) === Tac.LOW, 'window: a blast shatters it into a frame');
-  check(!Tac.clearTile(b, 15, 10, [], 'blast') && Tac.propOf(b, 15, 10) === 'frame', 'a window frame survives blasts');
+  check(Tac.clearTile(b, 15, 10, evb, 'blast') && Tac.tile(b, 15, 10) === Tac.FLOOR && evb.some(function (e) { return e.t === 'shatter'; }), 'window: a blast shatters it into an open gap');
+  check(Tac.tile(b, 15, 10) === Tac.FLOOR && !Tac.unitAt(b, 15, 10), 'a shattered window can be walked through');
 })();
 
 // Rooms are strong points: a walled room (x 10..18, y 5..13) with two doorways on its east wall, (18,8) and (18,11). A unit inside
-// can be seen or shot only along a real ray through a doorway (from where the shooter stands or leans); a unit in a doorway does
-// not lean; a lean beside a jamb sees only a narrow cone through the gap; fog shows exactly what LOS sees. Solid vs fire-through.
+// can be seen or shot only along a real ray through a doorway (from where the shooter stands or leans); a unit in a doorway
+// step-peeks only out of either side of the door; a lean beside a jamb sees only a narrow cone through the gap; fog shows exactly what LOS sees. Solid vs fire-through.
 (function () {
   var g = S.newGame(25), r = S.rng(g), m = Strat.spawnMission(g, r, 'purge'); S.saveRng(g, r);
   var b = Tac.create(g, Object.assign({}, m, { diff: 1, scenario: 'exterminate' }), g.soldiers.slice(0, 2)), W = b.W;
@@ -874,7 +874,8 @@ function autoBattle(g, m, squad) {
   }
   check(seen > 100 && !leaks.length, 'room: units inside are seen only along a real ray through a doorway (' + seen + ' sightings, leaks: ' + leaks.slice(0, 6).join(' ') + ')');
   tg.x = 40; tg.y = 40;
-  check(Tac.peekSpots(b, X1, 8).length === 0, 'room: a unit standing in a doorway does not lean (it sees by real lines only)');
+  var dps = Tac.peekSpots(b, X1, 8);
+  check(dps.length === 2 && dps.every(function (p) { return p[1] === 8 && (p[0] === X1 - 1 || p[0] === X1 + 1); }), 'room: a unit in a doorway step-peeks out of either side of the door only, never along the wall');
   sh.x = 19; sh.y = 7;
   var deep = [[17, 6], [17, 10], [17, 12], [16, 6], [11, 12]].filter(function (p) { return Tac.los(b, 19, 7, p[0], p[1]); });
   check(!deep.length && Tac.los(b, 19, 7, 14, 8), 'room: a lean beside a door jamb sees straight through the gap, not along the inside of the wall (' + JSON.stringify(deep) + ')');

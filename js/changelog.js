@@ -7,6 +7,8 @@ XG.CHANGELOG = [
    {
     "name": "2026-10-22",
     "items": [
+     "<b>Battle:</b> a unit standing in a doorway can step-peek one tile out of either side of the door, so it sees and shoots along the outside of the wall (and is seen) instead of only along straight lines. It still never sees along the wall.",
+     "<b>Maps:</b> windows break open. A stray miss or a blast shatters a window, leaving an open gap anyone can walk through.",
      "<b>Lattice:</b> your machines now gain +2 aim per mark as well as +1 HP (half of a FIREWALL soldier's +4 aim per rank), so they keep up with veteran five-soldier squads.",
      "<b>Maps:</b> new *outside* map. One large building stands in a yard; the server sits in an inner room. The defenders start inside, dug in near the server; the attackers start out in the yard, well away from every entrance, and must cross it and break in through one of 2-4 doorways. Inside: rooms, corridors, desks and server racks. About 40% of NODE missions (and 15% of EXTERMINATE missions, where the defenders hold the building) use it, in both campaigns, with a 14-turn clock.",
      "<b>Windows:</b> the building's outer walls have windows. You cannot climb through, but you can see and shoot through them. Right in front of one is half cover; beside it, behind the wall, is full cover and you can lean out through it. A stray miss or a blast shatters it into an empty frame that still blocks movement. The building's floor is tiled, so you can tell inside from outside at a glance.",

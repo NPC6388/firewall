@@ -9,6 +9,9 @@ The in-game **Help → Patch notes** tab shows everything from the first `##` he
 ## Unreleased
 
 ### 2026-10-22
+- **Battle:** a unit standing in a doorway can step-peek one tile out of either side of the door, so it sees and shoots
+  along the outside of the wall (and is seen) instead of only along straight lines. It still never sees along the wall.
+- **Maps:** windows break open. A stray miss or a blast shatters a window, leaving an open gap anyone can walk through.
 - **Lattice:** your machines now gain +2 aim per mark as well as +1 HP (half of a FIREWALL soldier's +4 aim per rank), so
   they keep up with veteran five-soldier squads.
 - **Maps:** new *outside* map. One large building stands in a yard; the server sits in an inner room. The defenders start

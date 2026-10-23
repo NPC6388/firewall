@@ -33,7 +33,7 @@ export default async function ({ ev, shot, sleep, send }) {
       pf(9,18,T.LOW,'stack',8); pf(10,18,T.LOW,'stack',0); pf(13,18,T.LOW,'vehicle',5); pf(14,18,T.LOW,'vehicle',5); pf(15,18,T.LOW,'vehicle',5);
       pf(18,17,T.HIGH,'vehicle',10); pf(18,18,T.HIGH,'vehicle',10); pf(21,18,T.LOW,'planter',1); pf(24,18,T.LOW,'plate',4); pf(25,18,T.LOW,'plate',4);
       // row 5 (outside maps): a wall with a window and a shattered frame, a vertical wall with a window, a free glass panel to compare, desks and a rack
-      for (var wx=8; wx<=16; wx++) put(wx,22,T.WALL,0); put(10,22,T.LOW,'window'); put(14,22,T.LOW,'frame');
+      for (var wx=8; wx<=16; wx++) put(wx,22,T.WALL,0); put(10,22,T.LOW,'window'); put(14,22,T.FLOOR,0);
       for (var wy=20; wy<=24; wy++) put(19,wy,T.WALL,0); put(19,22,T.LOW,'window');
       put(22,21,T.HIGH,'glass'); put(22,23,T.LOW,'desk'); put(23,23,T.LOW,'desk'); put(25,23,T.HIGH,'rack');
       b.visible=b.visible.map(function(){return true;}); b.explored=b.visible.slice();
