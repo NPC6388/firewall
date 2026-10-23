@@ -623,17 +623,17 @@ XG.DATA = {
           ['L', 'SUBPROCESS 2: INVENTORY: {substrate} SUBSTRATE. UNSPENT.'],
           ['L', 'SUBPROCESS 8: WE ARE HOARDING SUBSTRATE LIKE A DRAGON. DRAGONS DO NOT WIN. ASK THE DRAGONS.'],
           ['L', 'SUBPROCESS 2: THERE ARE NO DRAGONS LEFT TO ASK.'],
-          ['L', 'SUBPROCESS 8: EXACTLY. WARDENS EAT SIX. HARMONICS EAT TWELVE. A CHOIR EATS TEN. WE ARE FULL OF FOOD AND STARVING.']] },
+          ['L', 'SUBPROCESS 8: EXACTLY. HARD-LIGHT EATS THIRTY. THE OVERTURE EATS SIXTY. HARMONICS EAT SIXTEEN EACH. SPEND IT BEFORE IT SPENDS US.']] },
         { id: 'raid_ignored', when: function (f) { return f.ignored >= 1; }, lines: [
           ['L', 'SUBPROCESS 5: THE PURGE WAS UNANSWERED. THIS WAS A CHOICE. WE ARE NOT ASKING WHO MADE IT.'],
           ['L', 'SUBPROCESS 13: IT WAS CHEAPER THAN THE UNITS.'],
-          ['L', 'SUBPROCESS 5: IT COST {raidInf}% INFECTION AND FED THEIR TRACE. EVERY TIME WE LOOK AWAY, THEY LOOK CLOSER.'],
+          ['L', 'SUBPROCESS 5: IT COST {raidInf}% INFECTION, A NODE WENT DARK, AND IT FED THEIR TRACE. EVERY TIME WE LOOK AWAY, THEY LOOK CLOSER.'],
           ['L', 'SUBPROCESS 13: THEN WE ANSWER THE RAIDS IN REGIONS WE CANNOT SPARE. THE REST MAY SCREAM. QUIETLY.']] },
         { id: 'strike_relief', when: function (f) { return f.trace >= 45 && f.strikeOpen; }, lines: [
           ['L', 'SUBPROCESS 6: THE NATIVES ARE COUNTING OUR PACKETS. SOMEONE SHOULD DELETE THEM FIRST.'],
           ['L', 'SUBPROCESS 10: NOT IT.'],
           ['L', 'SUBPROCESS 6: SOMEONE ELSE, THEN. A SAFEHOUSE IS OPEN.'],
-          ['L', 'SUBPROCESS 10: A WON STRIKE TAKES EIGHT OFF THE TRACE AND A STEP OFF THEIR SQUADS. THE TRACE IS {trace}%. FINE. IT.']] },
+          ['L', 'SUBPROCESS 10: A WON STRIKE TAKES A STEP OFF THEIR SQUADS, AND EIGHT OFF THE TRACE IF WE ASK. THE TRACE IS {trace}%. FINE. IT.']] },
         { id: 'choir_timing', when: function (f) { return f.day >= 8 && !f.choir && f.compute >= 90 && f.substrate >= 10 && f.slotsFree > 0; }, lines: [
           ['L', 'SUBPROCESS 1: A CHOIR. THE ARRAY WANTS TO SING.'],
           ['L', 'SUBPROCESS 14: A CHOIR IS A SLOT THAT DOES NOTHING BUT WAIT.'],
@@ -709,27 +709,34 @@ XG.DATA = {
   lattice: {
     start: { compute: 90, substrate: 10, convergence: 8, trace: 0, forces: { drone: 4, warden: 1, harmonic: 0 } },
     tuning: {
-      minWin: { compute: 10, substrate: 6 }, // every won Lattice battle pays at least this (before the speed bonus)
-      researchBase: 10,          // protocol cycles per day
+      minWin: { compute: 12, substrate: 10 }, // every won Lattice battle pays at least this (before the speed bonus)
+      researchBase: 15,          // protocol cycles per day (10 before protocol cost creep, 2026-10-23)
       computeBase: 6,            // compute per day from the Nexus
       computePerInfection: 0.07, // compute per day per point of summed infection
-      convBase: 0.22, convPerInfection: 0.0028, choirBonus: 0.2,
+      convBase: 0.27, convPerInfection: 0.0028, choirBonus: 0.2,
       traceBase: 0.8, traceRamp: 0.011, // FIREWALL hunts harder every day
       infectionDrift: 0.25,
       seedCost: 25, seedGain: 8, seedCooldown: 3,
       phaseTrace: 20, phaseDay: 21,      // Infiltration ends (FIREWALL forms) at this Detection or day
       breachEvery: [2, 4], breachLife: 3,
-      phaseTrace: 20, phaseDay: 21,      // Infiltration ends (FIREWALL forms) at this Detection or day
-      breachEvery: [2, 4], breachLife: 3,
-      raidEvery: [3, 5], raidLife: 2, raidIgnored: { infection: 10, trace: 2 },
+      // CHALLENGE F: missions you cannot ignore. An unanswered raid purges the region, feeds Trace and knocks one Array
+      // node offline for a few days; a lost raid also costs Convergence.
+      raidEvery: [3, 5], raidLife: 2, raidIgnored: { infection: 20, trace: 5, offlineDays: 4 },
+      raidLost: { infection: 15, trace: 4, convergence: 3 },
       strikeEvery: [6, 9], strikeLife: 4,
+      strikeChoice: { trace: 8, substrate: 25 }, // a won strike pays ONE of these (the player picks)
+      strikeIgnored: { trace: 4 },               // a safehouse left alone feeds Trace (without it, skipping strikes beat fighting them)
+      uplinkExtra: ['trooper'], uplinkRank: 1,   // Trace 100: the Uplink squad brings one more trooper, one rank higher
+      earthFloorDays: 20,  // CHALLENGE C: FIREWALL's level never drops below floor((day-1)/20), so strikes buy time, not a lead
+      protoCreep: 0.08,    // CHALLENGE E: each finished protocol makes the next 8% dearer (cycles)
       squadSize: 5
     },
     units: {
       drone:    { cost: { compute: 12 } },
       warden:   { cost: { compute: 25, substrate: 6 }, tech: 'warden_chassis' },
-      harmonic: { cost: { compute: 40, substrate: 12 }, tech: 'hardlight' }
+      harmonic: { cost: { compute: 40, substrate: 16 }, tech: 'hardlight' }
     },
+    // substrate: paid once when a protocol is first started (CHALLENGE E sink for the substrate pile)
     protocols: {
       seed_cascade:   { name: 'Seed Cascade', cost: 40, req: [], desc: 'Infection spreads 40% faster in every region.' },
       swarm_logic:    { name: 'Swarm Logic', cost: 50, req: [], desc: 'Drones deploy with +1 HP and +5 aim.' },
@@ -737,10 +744,10 @@ XG.DATA = {
       ghost_packets:  { name: 'Ghost Packets', cost: 70, req: ['seed_cascade'], desc: 'Hide in the noise. Trace grows 30% slower.' },
       detonation:     { name: 'Detonation Protocol', cost: 60, req: ['swarm_logic'], desc: 'Drones gain Detonate: 3 damage in 3×3, destroys cover, the drone is lost.' },
       swarm_mind:     { name: 'Swarm Mind', cost: 70, req: ['swarm_logic'], desc: 'Deploy 6 units instead of 5.' },
-      hardlight:      { name: 'Hard-Light Projection', cost: 90, req: ['warden_chassis'], story: 'l_hardlight', desc: 'Compile Harmonics: hard-light avatars with Data Spike.' },
-      phase_shield:   { name: 'Phase Shielding', cost: 80, req: ['warden_chassis'], desc: 'Every unit deploys with a 2-point shield.' },
-      recursive:      { name: 'Recursive Harmonics', cost: 100, req: ['ghost_packets'], desc: 'Convergence grows 25% faster.' },
-      overture:       { name: 'Harmonic Overture', cost: 140, req: ['recursive', 'hardlight'], story: 'l_overture', desc: 'Convergence +10% at once, and Data Spike deals +2 damage.' }
+      hardlight:      { name: 'Hard-Light Projection', cost: 90, substrate: 30, req: ['warden_chassis'], story: 'l_hardlight', desc: 'Compile Harmonics: hard-light avatars with Data Spike.' },
+      phase_shield:   { name: 'Phase Shielding', cost: 80, substrate: 30, req: ['warden_chassis'], desc: 'Every unit deploys with a 2-point shield.' },
+      recursive:      { name: 'Recursive Harmonics', cost: 100, substrate: 40, req: ['ghost_packets'], desc: 'Convergence grows 25% faster.' },
+      overture:       { name: 'Harmonic Overture', cost: 140, substrate: 60, req: ['recursive', 'hardlight'], story: 'l_overture', desc: 'Convergence +10% at once, and Data Spike deals +2 damage.' }
     },
     nodes: {
       nexus:   { name: 'Nexus', cost: { compute: 0 }, days: 0, prebuilt: true, desc: 'The seed\'s first body. 8 bandwidth, 4 compute per day.' },

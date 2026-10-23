@@ -26,6 +26,22 @@ The in-game **Help → Patch notes** tab shows everything from the first `##` he
   Every mission card says what ignoring it costs.
 - **To make room for all that:** missions stay open a day longer (5-7 days), research runs at 12 RP a day base (was 10),
   regional funding is §38 a month per clean region (was §32), and Convergence creeps a touch slower.
+- **Ignored raids hurt:** a FIREWALL raid you leave unanswered now purges 20% infection in that region (was 10%), adds
+  +5% Trace (was +2%) and knocks one of your Array nodes offline for 4 days. Raid and strike briefs end with a line saying
+  what ignoring them costs. Losing a raid also costs 3% Convergence.
+- **Strike rewards are a choice:** a won strike still knocks FIREWALL back a step, and then you pick Trace -8% or +25
+  substrate on the result screen. If you advance time without choosing, you get the Trace cut. A safehouse you leave
+  alone until it goes dark now adds +4% Trace.
+- **The Uplink assault is FIREWALL's best:** when Trace reaches 100%, the squad that comes for the Uplink brings one
+  more trooper and fights one rank above your machines' mark.
+- **FIREWALL keeps climbing:** won strikes still set FIREWALL back, but its rank never drops below one level per 20 days
+  (was 30), so strikes buy you time rather than a permanent lead.
+- **Substrate has a use:** Hard-Light Projection (30), Phase Shielding (30), Recursive Harmonics (40) and Harmonic
+  Overture (60) now cost substrate to start (paid once), and Harmonics cost 16 substrate (was 12). Every won battle pays at
+  least 12 compute and 10 substrate (was 10 and 6).
+- **Protocols get dearer:** each finished protocol makes the next one 8% more expensive in cycles; the cards show the real
+  cost. To match, the Nexus compiles protocols faster (15 cycles a day, was 10) and Convergence grows a little faster
+  (+0.27% a day base, was 0.22%).
 - **Lattice campaign battles:** the FIREWALL squad now uses its abilities against you. Troopers throw grenades into
   clusters of two or more of your units (or at a wounded one in cover), Scientists patch up a neighbour who is down 3+ HP,
   Hackers stun your biggest machine in range, and Sentinels shield whichever soldier is most exposed. They only act on what

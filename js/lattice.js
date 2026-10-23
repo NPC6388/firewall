@@ -6,7 +6,7 @@ XG.Lat = (function () {
 
   function has(g, id) { return g.research.done.indexOf(id) >= 0; }
   function built(g, type) {
-    return g.array.filter(function (b) { return b && b.type === type && b.daysLeft === 0 && !b.demolish; }).length;
+    return g.array.filter(function (b) { return b && b.type === type && b.daysLeft === 0 && !b.demolish && !b.offline; }).length;
   }
   function region(g, id) { return g.regions.filter(function (r) { return r.id === id; })[0]; }
   function regionData(id) { return D.regions.filter(function (r) { return r.id === id; })[0]; }
@@ -80,12 +80,24 @@ XG.Lat = (function () {
       for (var i = 0; i < t.req.length; i++) if (!has(g, t.req[i])) return 'locked';
       return 'available';
     },
+    // cycles needed: each finished protocol makes the next one protoCreep (8%) dearer
+    protoCost: function (g, id) { return Math.round(L.protocols[id].cost * (1 + (L.tuning.protoCreep || 0) * g.research.done.length)); },
+    // substrate is paid once, the first time a protocol starts (switching back later is free)
+    protoSubstrate: function (g, id) { return (g.research.paid || {})[id] ? 0 : L.protocols[id].substrate || 0; },
+    canStartProtocol: function (g, id) {
+      if (Lat.protoState(g, id) !== 'available') return 'Not available';
+      var s = Lat.protoSubstrate(g, id);
+      if (g.substrate < s) return 'Need ' + s + ' substrate';
+      return null;
+    },
     startProtocol: function (g, id) {
-      if (Lat.protoState(g, id) !== 'available') return false;
+      if (Lat.canStartProtocol(g, id)) return false;
+      var s = Lat.protoSubstrate(g, id);
+      if (s) { g.substrate -= s; g.research.paid = g.research.paid || {}; g.research.paid[id] = true; }
       g.research.current = id; return true;
     },
     daysLeft: function (g, id) {
-      return Math.max(1, Math.ceil((L.protocols[id].cost - (g.research.progress[id] || 0)) / Lat.researchRate(g)));
+      return Math.max(1, Math.ceil((Lat.protoCost(g, id) - (g.research.progress[id] || 0)) / Lat.researchRate(g)));
     },
 
     // -------------------------------------------------------------- array
@@ -168,9 +180,9 @@ XG.Lat = (function () {
 
     // ------------------------------------------------------- the AI FIREWALL
     earthLevel: function (g) {
-      // strikes set FIREWALL back, but never below a baseline that rises with time
+      // strikes set FIREWALL back, but never below a baseline that rises with time (earthFloorDays): they buy time, not a lead
       var lvl = Math.floor((g.day - 1) / 18) + Math.floor(g.trace / 50) - g.earth.setbacks;
-      return Math.max(Math.floor((g.day - 1) / 30), Math.min(5, lvl));
+      return Math.min(5, Math.max(Math.floor((g.day - 1) / (L.tuning.earthFloorDays || 30)), lvl));
     },
     earthFlags: function (g) {
       return { coil: g.day >= 50 || g.trace >= 60, armor: g.day >= 40, emp: g.day >= 60 };
@@ -182,19 +194,30 @@ XG.Lat = (function () {
         return { g: { flags: {} }, software: true, level: 0,
           squad: kinds.map(function (k, i) { return { id: -(i + 1), sw: k, name: D.software[k].name }; }) };
       }
-      var r = new XG.RNG(m.seed + 99), lvl = Lat.earthLevel(g);
-      var size = m.kind === 'uplink' ? 6 : g.day >= 35 ? 5 : 4;
-      var fg = { flags: Lat.earthFlags(g) }, xp = D.ranks[lvl].xp;
-      var squad = L.earthSquad.slice(0, size).map(function (cls, i) {
+      var r = new XG.RNG(m.seed + 99), lvl = Lat.earthLevel(g), up = m.kind === 'uplink';
+      // Trace 100 calls FIREWALL's best: the Uplink squad brings uplinkExtra and fights uplinkRank ranks higher
+      // (your machines keep the mark of lvl, so the rank gap is real)
+      var rank = up ? Math.min(5, lvl + (L.tuning.uplinkRank || 0)) : lvl;
+      var list = up ? L.earthSquad.concat(L.tuning.uplinkExtra || []) : L.earthSquad.slice(0, g.day >= 35 ? 5 : 4);
+      var fg = { flags: Lat.earthFlags(g) }, xp = D.ranks[rank].xp;
+      var squad = list.map(function (cls, i) {
         var s = { id: -(i + 1), cls: cls, xp: xp, aimRoll: r.int(-3, 3), hp: 1,
           name: cls === 'sentinel' ? D.sentinelNames[0] : r.pick(D.firstNames) + ' "' + r.pick(D.callsigns) + '" ' + r.pick(D.lastNames) };
         s.hp = S.stats(fg, s).maxHp;
         return s;
       });
-      return { g: fg, squad: squad, level: lvl };
+      return { g: fg, squad: squad, level: lvl, rank: rank };
     },
 
     // ----------------------------------------------------------- missions
+    // the one-line "Ignoring this costs: ..." for a mission brief, or '' when walking away is free
+    ignoreText: function (m) {
+      var SI = L.tuning.strikeIgnored || {};
+      if (m.kind === 'strike') return SI.trace ? 'Trace +' + SI.trace + '% (the safehouse finishes its traffic analysis).' : '';
+      if (m.kind !== 'raid') return '';
+      var T = L.tuning.raidIgnored;
+      return Lat.regionData(m.region).name + ' infection -' + T.infection + '%, Trace +' + T.trace + '%, and one Array node offline for ' + T.offlineDays + ' days.';
+    },
     spawnMission: function (g, r, kind) {
       var id;
       if (kind === 'uplink') id = 'oc';
@@ -214,13 +237,14 @@ XG.Lat = (function () {
         m.scenario = XG.Strat.rollScenario(m.seed);
         m.brief = 'A FIREWALL squad is purging your cell in a ' + m.site + '. Your units start on overwatch. ' + (m.scenario === 'node'
           ? 'Hold your server node for ' + XG.Strat.nodeTurnsFor(m, 'raid') + ' turns' + (XG.Strat.rollOutside(m.seed, m.scenario) ? ', from inside the building' : '') + ': FIREWALL captures it by ending ' + D.tuning.nodeCapture + ' of its turns beside it with none of yours there. Wiping them also wins.'
-          : 'Exterminate: wipe them. No time limit, to the death.') + ' Ignore it and the region loses ' + L.tuning.raidIgnored.infection + '% infection.';
+          : 'Exterminate: wipe them. No time limit, to the death.') + ' Losing it costs ' + L.tuning.raidLost.infection + '% infection, Trace +' + L.tuning.raidLost.trace + '% and Convergence -' + L.tuning.raidLost.convergence + '%.';
+        m.ignore = Lat.ignoreText(m);
       } else if (kind === 'strike') {
         m.name = 'Strike: ' + city + ' safehouse'; m.site = 'FIREWALL safehouse'; m.daysLeft = L.tuning.strikeLife;
         m.scenario = XG.Strat.rollScenario(m.seed);
         m.brief = 'HALCYON\'s traffic leaks from a FIREWALL safehouse. You move first. ' + (m.scenario === 'node'
           ? 'Capture its server node' + (XG.Strat.rollOutside(m.seed, m.scenario) ? ' (inside a building: cross the yard first)' : '') + ' within ' + XG.Strat.nodeTurnsFor(m, 'strike') + ' turns: end ' + D.tuning.nodeCapture + ' of your turns beside it with no FIREWALL unit there (or wipe the squad).'
-          : 'Exterminate: wipe the squad. No time limit.') + ' Win: Trace -8%, +15 substrate, and FIREWALL loses a step.';
+          : 'Exterminate: wipe the squad. No time limit.') + ' Win: FIREWALL loses a step, and you choose Trace -' + L.tuning.strikeChoice.trace + '% or +' + L.tuning.strikeChoice.substrate + ' substrate.';
       } else {
         m.name = 'Hold the Uplink'; m.city = 'Pacific cable landing station'; m.site = 'cable landing station'; m.daysLeft = 2;
         m.brief = 'FIREWALL\'s best squad assaults the Uplink Core. Keep the core alive: wipe the squad. Your units start on overwatch, and the core compiles drones every other turn.';
@@ -233,13 +257,14 @@ XG.Lat = (function () {
     advanceDay: function (g) {
       if (g.over) return [];
       var ev = [], r = rng(g), T = L.tuning;
+      if (g.pendingReward) Lat.claimStrike(g, 'trace'); // an unclaimed strike reward defaults to the Trace cut
       g.day++;
       g.compute += Lat.computeRate(g);
 
       var cur = g.research.current;
       if (cur) {
         g.research.progress[cur] = (g.research.progress[cur] || 0) + Lat.researchRate(g);
-        if (g.research.progress[cur] >= L.protocols[cur].cost) {
+        if (g.research.progress[cur] >= Lat.protoCost(g, cur)) {
           g.research.done.push(cur); g.research.current = null;
           ev.push({ type: 'research', msg: 'Protocol complete: ' + L.protocols[cur].name });
           log(g, 'Protocol complete: ' + L.protocols[cur].name + '.');
@@ -249,6 +274,10 @@ XG.Lat = (function () {
       }
 
       g.array.forEach(function (b, i) {
+        if (b && b.offline > 0 && --b.offline === 0) {
+          delete b.offline;
+          ev.push({ type: 'build', msg: 'Node back online: ' + L.nodes[b.type].name }); log(g, 'Node back online: ' + L.nodes[b.type].name + '.');
+        }
         if (b && b.daysLeft > 0 && --b.daysLeft === 0) {
           ev.push({ type: 'build', msg: 'Node online: ' + L.nodes[b.type].name }); log(g, 'Node online: ' + L.nodes[b.type].name + '.');
         }
@@ -283,12 +312,16 @@ XG.Lat = (function () {
           var reg = region(g, m.region);
           reg.infection = Math.max(0, reg.infection - T.raidIgnored.infection); g.trace = Math.min(100, g.trace + T.raidIgnored.trace);
           g.stats.ignored++;
-          ev.push({ type: 'expire', msg: m.name + ' went unanswered. ' + regionData(m.region).name + ' purged.' });
-          log(g, 'Unanswered raid in ' + m.city + ': infection -' + T.raidIgnored.infection + '%, Trace +' + T.raidIgnored.trace + '%.');
+          var dark = Lat.knockOffline(g, r, T.raidIgnored.offlineDays);
+          ev.push({ type: 'expire', msg: m.name + ' went unanswered. ' + regionData(m.region).name + ' purged.' + (dark ? ' ' + dark + ' offline.' : '') });
+          log(g, 'Unanswered raid in ' + m.city + ': infection -' + T.raidIgnored.infection + '%, Trace +' + T.raidIgnored.trace + '%' +
+            (dark ? ', ' + dark + ' offline for ' + T.raidIgnored.offlineDays + ' days' : '') + '.');
         } else if (m.kind === 'breach') {
           log(g, 'The ' + m.city + ' systems patched themselves before you breached them.');
         } else if (m.kind === 'strike') {
-          log(g, 'The ' + m.city + ' safehouse went dark before you struck.');
+          var SI = T.strikeIgnored || {};
+          if (SI.trace) g.trace = Math.min(100, g.trace + SI.trace);
+          log(g, 'The ' + m.city + ' safehouse went dark before you struck.' + (SI.trace ? ' Its traffic analysis reached FIREWALL: Trace +' + SI.trace + '%.' : ''));
         } else if (!g.over) {
           g.over = 'defeat'; g.storyQueue.push('l_defeat');
           log(g, 'The Uplink fell undefended.');
@@ -323,6 +356,25 @@ XG.Lat = (function () {
       g.rngState = r.s;
       return ev;
     },
+    // an unanswered raid knocks one finished Array node (not the Nexus) offline for `days`; returns its name or ''
+    knockOffline: function (g, r, days) {
+      var cand = [];
+      g.array.forEach(function (b) { if (b && !L.nodes[b.type].prebuilt && b.daysLeft === 0 && !b.demolish && !b.offline) cand.push(b); });
+      if (!cand.length || !days) return '';
+      var b = cand[Math.floor(r.next() * cand.length)];
+      b.offline = days;
+      return L.nodes[b.type].name;
+    },
+    // a won strike pays one reward of the player's choice: 'trace' (Trace -strikeChoice.trace) or 'substrate'
+    claimStrike: function (g, which) {
+      if (!g.pendingReward) return null;
+      var C = L.tuning.strikeChoice, msg;
+      if (which === 'substrate') { g.substrate += C.substrate; msg = 'Strike reward: +' + C.substrate + ' substrate.'; }
+      else { g.trace = Math.max(0, g.trace - C.trace); msg = 'Strike reward: Trace -' + C.trace + '%.'; }
+      delete g.pendingReward;
+      log(g, msg);
+      return msg;
+    },
     advanceUntilEvent: function (g) {
       for (var i = 0; i < 30 && !g.over; i++) {
         var ev = Lat.advanceDay(g);
@@ -352,17 +404,24 @@ XG.Lat = (function () {
         else { reg.infection = Math.max(0, reg.infection - 5); g.trace = Math.min(100, g.trace + 4); out.notes.push('The breach was quarantined. Infection -5%, Detection +4%.'); }
       } else if (m.kind === 'raid') {
         if (won) { g.stats.raidsHeld++; reg.infection = Math.min(100, reg.infection + 8); out.notes.push(Lat.regionData(m.region).name + ' infection +8%.'); }
-        else { g.stats.raidsLost++; reg.infection = Math.max(0, reg.infection - 15); g.trace = Math.min(100, g.trace + 4); out.notes.push(Lat.regionData(m.region).name + ' purged: infection -15%, Trace +4%.'); }
+        else {
+          var RL = L.tuning.raidLost;
+          g.stats.raidsLost++; reg.infection = Math.max(0, reg.infection - RL.infection); g.trace = Math.min(100, g.trace + RL.trace);
+          g.convergence = Math.max(0, g.convergence - RL.convergence);
+          out.notes.push(Lat.regionData(m.region).name + ' purged: infection -' + RL.infection + '%, Trace +' + RL.trace + '%, Convergence -' + RL.convergence + '%.');
+        }
       } else if (m.kind === 'strike') {
-        if (won) { g.stats.strikesWon++; g.trace = Math.max(0, g.trace - 8); g.earth.setbacks++; out.notes.push('Trace -8%. FIREWALL loses a step.'); }
+        // the reward is a choice (Lat.claimStrike): the result screen asks, and advancing time defaults to the Trace cut
+        if (won) { g.stats.strikesWon++; g.earth.setbacks++; g.pendingReward = { kind: 'strike', mission: m.name }; out.choice = L.tuning.strikeChoice; out.notes.push('FIREWALL loses a step.'); }
         else { g.stats.strikesLost++; g.trace = Math.min(100, g.trace + 3); out.notes.push('The strike failed. Trace +3%.'); }
       } else {
         if (won) { g.trace = 55; g.earth.setbacks++; g.storyQueue.push('l_repelled'); out.notes.push('Trace falls to 55%.'); }
         else { g.over = 'defeat'; g.storyQueue.push('l_defeat'); }
       }
-      // battle reward: the kind's base (breach/raid +10 compute, strike +15 substrate), at least minWin, times the speed bonus
+      // battle reward: the kind's base (breach/raid +10 compute), at least minWin, times the speed bonus
+      // (strikes pay their substrate through the choice instead)
       if (won) {
-        var mw = L.tuning.minWin || {}, base = { compute: m.kind === 'breach' || m.kind === 'raid' ? 10 : 0, substrate: m.kind === 'strike' ? 15 : 0 };
+        var mw = L.tuning.minWin || {}, base = { compute: m.kind === 'breach' || m.kind === 'raid' ? 10 : 0, substrate: 0 };
         out.mult = XG.Strat.speedMult(result.turns);
         out.compute = Math.round(Math.max(base.compute, mw.compute || 0) * out.mult);
         var sub = Math.round(Math.max(base.substrate, mw.substrate || 0) * out.mult);
