@@ -1856,6 +1856,7 @@ XG.Tac = (function () {
   // The AI side uses its class abilities (never the person's side, never in training). Targets are limited to what
   // the AI side can see (sideSees), not the fog map. Returns 'end' (the ability ended the turn), 'ap' (it cost 1 AP,
   // keep going) or null (nothing worth doing). Medkit and shield first (1 AP), then grenade, then hack.
+  var BOT_HACK_GAP = 3; // user, 2026-10-23: "the combination of aim deficit and being stunned is terrifying"
   function aiAbility(b, u, foes, ev) {
     if (b.training || u.dummy || u.side === b.human || u.stunned) return null;
     var has = function (id) { return u.abilities.indexOf(id) >= 0 && !abilityBlock(b, u, id); };
@@ -1891,11 +1892,12 @@ XG.Tac = (function () {
       });
       if (best && use(function () { return act.grenade(b, u, best.x, best.y); })) return 'end';
     }
-    if (has('hack')) {
-      // the biggest machine in range and in sight that is not already stunned
+    if (has('hack') && !(b.turn - (u.hackTurn || -99) < BOT_HACK_GAP)) {
+      // the biggest machine in range and in sight that is not already stunned. At most one try every BOT_HACK_GAP turns:
+      // hack has no cooldown, and a bot hacking every turn kept two of the person's machines stunned at all times
       var h = targets(b, u, 'hack').filter(function (t) { return !t.stunned && t.side !== u.side && sideSees(b, u.side, t.x, t.y) && Math.max(10, Math.min(90, u.hackSkill - t.hackDef)) >= 30; })
         .sort(function (a, c) { return c.maxHp - a.maxHp || c.hp - a.hp; })[0];
-      if (h && h.hp >= 4 && use(function () { return act.hack(b, u, h); })) return 'end';
+      if (h && h.hp >= 4 && use(function () { return act.hack(b, u, h); })) { u.hackTurn = b.turn; return 'end'; }
     }
     return null;
   }

@@ -555,6 +555,15 @@ function autoBattle(g, m, squad) {
   ev = Tac.ai(b, hk) || [];
   b.rng.chance = real;
   check(wd.kind === 'warden' && wd.stunned === 2 && ev.some(function (e) { return e.t === 'hack'; }), 'the bot Hacker stuns the biggest machine in range (the Warden)');
+  // next turn it does not stun the next machine: one bot hack every 3 turns (two machines stunned at once was a lock)
+  var hkTurn = b.turn; b.turn = hkTurn + 1; hk.ap = 2; b.rng.chance = function () { return true; };
+  ev = Tac.ai(b, hk) || [];
+  b.rng.chance = real;
+  check(!ev.some(function (e) { return e.t === 'hack'; }) && !lat[1].stunned, 'the bot Hacker waits 3 turns between hacks');
+  b.turn = hkTurn + 3; hk.ap = 2; b.rng.chance = function () { return true; };
+  ev = Tac.ai(b, hk) || [];
+  b.rng.chance = real; b.turn = hkTurn; delete hk.hackTurn;
+  check(ev.some(function (e) { return e.t === 'hack'; }), 'the bot Hacker hacks again 3 turns later');
   reset(); var sn = sc; sn.abilities = ['shoot', 'shield', 'overwatch']; sn.x = 2; sn.y = 2; tr.x = 10; tr.y = 10; lat[1].x = 14; lat[1].y = 10; lat[2].x = 14; lat[2].y = 9;
   ev = Tac.ai(b, sn) || [];
   check(tr.shield === 3 && ev.some(function (e) { return e.t === 'text' && /AEGIS/.test(e.text); }), 'the bot Sentinel shields the most exposed ally');
