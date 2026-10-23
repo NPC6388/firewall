@@ -5,6 +5,17 @@ XG.CHANGELOG = [
   "name": "Unreleased",
   "groups": [
    {
+    "name": "2026-10-23 (FIREWALL campaign: the squeeze)",
+    "items": [
+     "<b>Lattice pods wake together:</b> once one Lattice unit spots your squad, its whole pod comes alive at once, along with anything else within 11 tiles (was 7). Sneaking up on a group is tenser; picking off one sentry no longer splits a pod.",
+     "<b>The Lattice keeps escalating:</b> after day 90 and again after day 108 its cells grow bigger, with Harmonics leading the pods (threat now runs past five bars). Their aim stops rising at day 73; they win by numbers, not by stats.",
+     "<b>Research gets dearer:</b> every tech you finish makes each remaining one 8% more expensive. Research cards show the real cost (and the base cost beside it), so the order you choose matters.",
+     "<b>Recruits cost more each time:</b> the first hire is §30, then §45, §60... up to §90. The roster holds 8 people and Sentinels in all. Losing veterans now hurts.",
+     "<b>Salvage has uses:</b> grenades (5 salvage) and medkits (2) used in a mission are restocked afterwards, Sentinel repairs cost 2 salvage per HP (no salvage, no repair), and each new Sentinel chassis costs more than the last.",
+     "<b>Ignored missions hurt the budget:</b> a mission that expires now also costs §15 of funding as that region panics. Every mission card says what ignoring it costs."
+    ]
+   },
+   {
     "name": "2026-10-23 (challenge-phase1 branch)",
     "items": [
      "<b>Lattice campaign battles:</b> the FIREWALL squad now uses its abilities against you. Troopers throw grenades into clusters of two or more of your units (or at a wounded one in cover), Scientists patch up a neighbour who is down 3+ HP, Hackers stun your biggest machine in range, and Sentinels shield whichever soldier is most exposed. They only act on what their own squad can see. Combat training is unchanged.",

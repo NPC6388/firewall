@@ -8,6 +8,20 @@ The in-game **Help → Patch notes** tab shows everything from the first `##` he
 
 ## Unreleased
 
+### 2026-10-23 (FIREWALL campaign: the squeeze)
+- **Lattice pods wake together:** once one Lattice unit spots your squad, its whole pod comes alive at once, along with
+  anything else within 11 tiles (was 7). Sneaking up on a group is tenser; picking off one sentry no longer splits a pod.
+- **The Lattice keeps escalating:** after day 90 and again after day 108 its cells grow bigger, with Harmonics leading
+  the pods (threat now runs past five bars). Their aim stops rising at day 73; they win by numbers, not by stats.
+- **Research gets dearer:** every tech you finish makes each remaining one 8% more expensive. Research cards show the
+  real cost (and the base cost beside it), so the order you choose matters.
+- **Recruits cost more each time:** the first hire is §30, then §45, §60... up to §90. The roster holds 8 people and
+  Sentinels in all. Losing veterans now hurts.
+- **Salvage has uses:** grenades (5 salvage) and medkits (2) used in a mission are restocked afterwards, Sentinel repairs
+  cost 2 salvage per HP (no salvage, no repair), and each new Sentinel chassis costs more than the last.
+- **Ignored missions hurt the budget:** a mission that expires now also costs §15 of funding as that region panics.
+  Every mission card says what ignoring it costs.
+
 ### 2026-10-23 (challenge-phase1 branch)
 - **Lattice campaign battles:** the FIREWALL squad now uses its abilities against you. Troopers throw grenades into
   clusters of two or more of your units (or at a wounded one in cover), Scientists patch up a neighbour who is down 3+ HP,

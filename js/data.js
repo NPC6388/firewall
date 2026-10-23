@@ -22,7 +22,7 @@ XG.DATA = {
     sentinel: {
       name: 'HALCYON Sentinel', glyph: 'Ω', color: '#c792ff', hp: 8, armor: 1, aim: 65, mobility: 7, weapon: 'pulse', machine: true,
       abilities: ['shoot', 'shield', 'overwatch'],
-      blurb: 'A body for HALCYON. Projects Aegis shields onto allies. Repaired, not healed.'
+      blurb: 'A body for HALCYON. Projects Aegis shields onto allies. Repaired, not healed: repairs cost salvage.'
     }
   },
 
@@ -163,8 +163,8 @@ XG.DATA = {
       desc: '+3 max HP for all human operatives.' },
     coil_weapons: { name: 'Coil Weapons', tech: 'coilguns', cost: { credits: 100, salvage: 30 }, flag: 'coil',
       desc: '+1 min / +2 max damage on every squad weapon.' },
-    sentinel: { name: 'Sentinel Chassis', tech: 'halcyon', cost: { credits: 60, salvage: 20 }, repeatable: true,
-      desc: 'Adds a HALCYON Sentinel to the roster.' }
+    sentinel: { name: 'Sentinel Chassis', tech: 'halcyon', cost: { credits: 60, salvage: 20 }, repeatable: true, costStep: { credits: 20, salvage: 20 },
+      desc: 'Adds a HALCYON Sentinel to the roster. Each chassis costs more than the last.' }
   },
 
   // ---------------------------------------------------------------- world
@@ -669,14 +669,24 @@ XG.DATA = {
     convBase: 0.25,            // Convergence % per day
     convPerInfection: 0.0025,  // extra % per day per point of summed infection
     infectionDrift: 0.25,      // infection gained per region per day
-    expirePenalty: { infection: 10, convergence: 2 },
+    expirePenalty: { infection: 10, convergence: 2, credits: 15 }, // credits: the region's panic cuts funding at once
     fundingPerRegion: 32,      // credits per month at 0% infection
-    hireCost: 30,
+    hireCost: 30,              // first recruit; each later one costs hireStep more, up to hireMax
+    hireStep: 15,
+    hireMax: 90,
+    rosterCap: 8,              // operatives and Sentinels on the roster
+    techCreep: 0.08,           // each finished tech makes every remaining one 8% dearer (of its base cost)
+    restock: { grenade: 5, medkit: 2 }, // salvage to replace each grenade / medkit used in a mission
+    repairSalvage: 2,          // salvage per HP to repair a machine (Sentinel); no salvage, no repair
+    // Enemy escalation: the day each difficulty step begins (difficulty = rows reached). Steps 6-7 add bigger pods with
+    // Harmonics leading them (COMPOSITION in tactical.js); enemy aim stops rising after step 5 (stats never inflate further).
+    difficultyDays: [1, 19, 37, 55, 73, 91, 109],
     minMissionCredits: 15,     // every won mission pays at least this
     // Speed bonus on battle rewards (both campaigns): x3 for a win in rewardFast turns or fewer, falling evenly to x1 at rewardSlow.
     rewardFast: 4, rewardSlow: 14, rewardMaxMult: 3,
     missionEvery: [3, 5],
     missionLife: [4, 6],
+    alertRadius: 11,           // an alerted Lattice unit wakes its whole pod and every other unit within this many tiles (was 7)
     veteranDrone: 3,           // one extra drone once the squad's average rank reaches this (3 = Sergeant)
     // Raid scenarios for ordinary missions (FIREWALL purge, Lattice raid and strike): 'node' (capture / hold a server) or
     // 'exterminate' (no time limit). nodeChance: share of those missions that roll 'node' (seeded by mission.seed).
