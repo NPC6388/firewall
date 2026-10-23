@@ -11,6 +11,14 @@ export default async function ({ ev, shot, sleep }) {
     await ev(`XG.Comms.clear()`);
   }
   await shot('comms-fw');
+  // overheard debate: salvage piling up starts Dr. Okafor and HALCYON arguing; the card walks through every line
+  await ev(`XG.UI.g.salvage = 150; XG.UI.g.debates = { seen: [], last: -99 }; XG.Comms.clear()`);
+  await ev(`XG.UI.isModal() && XG.UI.closeModal()`); await ev(`document.querySelector('[data-action="advance-day"]').click()`); await sleep(400);
+  console.log('FW debate ->', await card(), '| played:', await ev(`JSON.stringify(XG.UI.g.debates.seen)`));
+  await shot('comms-debate');
+  await ev(`document.getElementById('comms').click()`); await sleep(300);
+  console.log('FW debate line 2 ->', await card());
+  await ev(`XG.Comms.clear()`);
   // late game: Convergence 85% should make HALCYON afraid and the Lattice smug (mood 'dire')
   await ev(`XG.UI.g.convergence = 85`);
   for (let i = 0; i < 4; i++) {

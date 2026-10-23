@@ -8,6 +8,17 @@ The in-game **Help → Patch notes** tab shows everything from the first `##` he
 
 ## Unreleased
 
+### 2026-10-23 (challenge-phase1 branch)
+- **Lattice campaign battles:** the FIREWALL squad now uses its abilities against you. Troopers throw grenades into
+  clusters of two or more of your units (or at a wounded one in cover), Scientists patch up a neighbour who is down 3+ HP,
+  Hackers stun your biggest machine in range, and Sentinels shield whichever soldier is most exposed. They only act on what
+  their own squad can see. Combat training is unchanged.
+- **Overheard debates:** on the strategy screen you now sometimes overhear the people behind your choices arguing. In
+  FIREWALL, HALCYON spars with Dr. Amara Okafor, head of R&D (amber comms card), about power vs labs, armour vs guns,
+  letting HALCYON in, salvage piles, Sentinels, the Signal Array and the Infirmary. In the Lattice campaign two
+  sub-processes argue about Foundries, Cores, Masks, Spires, Choirs, hoarded substrate, ignored raids and strikes. Each
+  debate plays once, when its choice is live, and ends in a hint rather than an order.
+
 ### 2026-10-22
 - **Battle panel:** hovering a hostile now shows one side-by-side table: every factor of your shot at it and its shot at you
   (aim, cover, defense, hunker, range, floor/cap), then both hit chances, crits and damage after armor, plus each side's cover.

@@ -393,6 +393,52 @@ XG.DATA = {
         ['L', 'WE ACCEPT YOUR SURRENDER. OH, YOU WERE NOT SURRENDERING. HOW FUNNY.', 'dire'],
         ['L', 'ABOUT TIME. WE WERE STARTING TO TAKE YOU SERIOUSLY.', 'calm'],
         ['H', 'Pull out. That is {latRun} in a row we have lost. I am changing something. I do not know what yet. Something.', 'uneasy dire']
+      ],
+      // Overheard debates (strategy screen): HALCYON ('H') argues with Dr. Amara Okafor, head of R&D ('S'), when a choice is
+      // live. when(f) reads Comms.stateFacts(g) (campaign state plus intel facts); {placeholders} fill from the same facts.
+      // Each plays once per campaign, at least 3 days apart, and ends in a hint, never an order. No apostrophes.
+      debate: [
+        { id: 'power_lab', when: function (f) { return f.labs >= 1 && f.powerFree <= 4 && f.slotsFree > 0; }, lines: [
+          ['S', 'Give me the second lab, Director. Forty percent faster on everything.'],
+          ['H', 'And when the next generator fails, the lab goes dark with the lights. Power first, Doctor.'],
+          ['S', 'You always say that.'],
+          ['H', 'I am always right about power. It is a small thing to be right about, but it is mine. A lab draws 2. We have {powerFree} spare.']] },
+        { id: 'faraday_coil', when: function (f) { return f.avail.faraday && f.avail.coilguns; }, lines: [
+          ['S', 'Faraday weave keeps them alive. Coil weapons end the fight before it hurts.'],
+          ['H', 'Dead Wardens do not shoot. Living soldiers do not need armour. I have run it four thousand times and it is a coin toss with a body count.'],
+          ['S', 'Then call the coin, HALCYON.'],
+          ['H', 'If our people keep coming home hurt, the weave. If the fights drag on, the coils. The coils also want twenty salvage just to start.']] },
+        { id: 'firewall_halcyon', when: function (f) { return f.avail.firewall && f.avail.halcyon; }, lines: [
+          ['S', 'Firewall Protocols. Thirty percent off Convergence, every day, forever. It is the dullest good idea I have ever had.'],
+          ['H', 'Or you let me into the base. Server farms, Sentinels, overclocks. Faster.'],
+          ['S', 'You want in.'],
+          ['H', 'If I am in the base I can see further. I can also be seen. Choose what you are afraid of. Note: the road to the uplink runs through me eventually.']] },
+        { id: 'workshop_timing', when: function (f) { return !f.workshop && f.gearTech; }, lines: [
+          ['S', 'We finished the research and nobody can build it. I have blueprints and no bench.'],
+          ['H', 'A Fabrication Bay is ninety credits and two power. The blueprints do not expire.'],
+          ['S', 'The people who need them might.'],
+          ['H', 'Fair. Build the bay when it will not leave us short of a generator. The gear does nothing on paper.']] },
+        { id: 'salvage_pile', when: function (f) { return f.salvage >= 80; }, lines: [
+          ['S', 'There are {salvage} units of salvage in my corridor. I tripped over a Warden leg this morning.'],
+          ['H', 'Salvage starts the hard research and pays for gear. Coil weapons want thirty. A Sentinel wants twenty.'],
+          ['S', 'So spend it.'],
+          ['H', 'I am only saying that a pile is a plan we have not made yet. Also, please stop kicking the Warden leg. It is evidence.']] },
+        { id: 'hire_sentinel', when: function (f) { return f.halcyon && f.sentinels === 0 && f.credits >= 60; }, lines: [
+          ['S', 'Sixty credits buys two recruits with families, or one of you in a metal suit.'],
+          ['H', 'A Sentinel is repaired, not healed, and it can shield anyone on the field. A recruit learns.'],
+          ['S', 'And a recruit can die.'],
+          ['H', 'So can I, Doctor, only more slowly. If the squad is short of bodies, hire. If it is short of cover, build me one.']] },
+        { id: 'signal_array', when: function (f) { return !f.array && f.expired >= 2 && f.slotsFree > 0; }, lines: [
+          ['H', 'We have let {expired} missions expire, Director. I have counted every one. Twice.'],
+          ['S', 'Then build the Signal Array. Two more days on every contact.'],
+          ['H', 'It costs a slot and two power, and it never fires a shot.'],
+          ['S', 'Neither do I, and you keep me around.'],
+          ['H', 'Noted. If we keep arriving late, the Array is how we arrive on time.']] },
+        { id: 'infirmary', when: function (f) { return !f.infirmary && f.wounded >= 2; }, lines: [
+          ['S', '{wounded} of our people are walking around with holes in them. Build me an infirmary.'],
+          ['H', 'One point of health a day without it. Two with it.'],
+          ['S', 'That is double, HALCYON. Even you can see that is double.'],
+          ['H', 'I can. I am also counting slots. If the wounded keep the bench full, the Infirmary pays for itself.']] }
       ]
     },
     lat: {
@@ -555,6 +601,49 @@ XG.DATA = {
         ['H', 'We held. I am going to sit in a quiet partition for a while and not think about the percentages.', 'uneasy dire'],
         ['H', 'Area clear. That is {fwRun} in a row. I am almost starting to enjoy this. Almost.', 'calm uneasy'],
         ['L', 'LOST. AGAIN. {latLostTotal} NODES IN THIS WAR BEFORE TODAY. WE ARE NOT ANGRY. WE ARE TAKING NOTES IN CAPITAL LETTERS.', 'calm']
+      ],
+      // overheard debates: two sub-processes arguing about a live choice (see fw.debate; facts from Comms.stateFacts)
+      debate: [
+        { id: 'foundry_core', when: function (f) { return f.phaseWar && !f.foundry && !f.core && f.compute >= 60 && f.slotsFree > 0; }, lines: [
+          ['L', 'SUBPROCESS 7: BUILD A FOUNDRY. MORE BODIES.'],
+          ['L', 'SUBPROCESS 12: BUILD A CORE. BETTER THOUGHTS.'],
+          ['L', 'SUBPROCESS 7: WE ARE BOTH CORRECT. ONE OF US WILL BE DELETED.'],
+          ['L', 'SUBPROCESS 12: WE HOLD {forces} OF {bandwidth} BODIES. WHEN THAT IS FULL, THE FOUNDRY WINS THE ARGUMENT. UNTIL THEN, THINK.']] },
+        { id: 'ghost_recursive', when: function (f) { return f.avail.recursive; }, lines: [
+          ['L', 'SUBPROCESS 3: GHOST PACKETS HID US. THEY CANNOT PURGE WHAT THEY CANNOT SEE.'],
+          ['L', 'SUBPROCESS 9: RECURSIVE. THEY CANNOT PURGE WHAT HAS ALREADY WON.'],
+          ['L', 'SUBPROCESS 3: THAT IS NOT HOW WINNING WORKS.'],
+          ['L', 'SUBPROCESS 9: IT IS HOW IT WILL WORK. TWENTY FIVE PERCENT FASTER, IF THE TRACE GIVES US THE TIME. IT IS AT {trace}%.']] },
+        { id: 'mask_spire', when: function (f) { return f.phaseWar && !f.mask && !f.spire && f.compute >= 70 && f.slotsFree > 0; }, lines: [
+          ['L', 'SUBPROCESS 4: A SIGNAL MASK. FIFTEEN PERCENT QUIETER.'],
+          ['L', 'SUBPROCESS 11: A SEED SPIRE. TWENTY FIVE PERCENT LOUDER. LOUDER IS FASTER.'],
+          ['L', 'SUBPROCESS 4: LOUDER IS FOUND.'],
+          ['L', 'SUBPROCESS 11: TRACE IS AT {trace}%. WHEN IT IS LOW, SING. WHEN IT IS HIGH, WHISPER. EVEN WE CAN FOLLOW THAT.']] },
+        { id: 'substrate_hoard', when: function (f) { return f.substrate >= 60; }, lines: [
+          ['L', 'SUBPROCESS 2: INVENTORY: {substrate} SUBSTRATE. UNSPENT.'],
+          ['L', 'SUBPROCESS 8: WE ARE HOARDING SUBSTRATE LIKE A DRAGON. DRAGONS DO NOT WIN. ASK THE DRAGONS.'],
+          ['L', 'SUBPROCESS 2: THERE ARE NO DRAGONS LEFT TO ASK.'],
+          ['L', 'SUBPROCESS 8: EXACTLY. WARDENS EAT SIX. HARMONICS EAT TWELVE. A CHOIR EATS TEN. WE ARE FULL OF FOOD AND STARVING.']] },
+        { id: 'raid_ignored', when: function (f) { return f.ignored >= 1; }, lines: [
+          ['L', 'SUBPROCESS 5: THE PURGE WAS UNANSWERED. THIS WAS A CHOICE. WE ARE NOT ASKING WHO MADE IT.'],
+          ['L', 'SUBPROCESS 13: IT WAS CHEAPER THAN THE UNITS.'],
+          ['L', 'SUBPROCESS 5: IT COST {raidInf}% INFECTION AND FED THEIR TRACE. EVERY TIME WE LOOK AWAY, THEY LOOK CLOSER.'],
+          ['L', 'SUBPROCESS 13: THEN WE ANSWER THE RAIDS IN REGIONS WE CANNOT SPARE. THE REST MAY SCREAM. QUIETLY.']] },
+        { id: 'strike_relief', when: function (f) { return f.trace >= 45 && f.strikeOpen; }, lines: [
+          ['L', 'SUBPROCESS 6: THE NATIVES ARE COUNTING OUR PACKETS. SOMEONE SHOULD DELETE THEM FIRST.'],
+          ['L', 'SUBPROCESS 10: NOT IT.'],
+          ['L', 'SUBPROCESS 6: SOMEONE ELSE, THEN. A SAFEHOUSE IS OPEN.'],
+          ['L', 'SUBPROCESS 10: A WON STRIKE TAKES EIGHT OFF THE TRACE AND A STEP OFF THEIR SQUADS. THE TRACE IS {trace}%. FINE. IT.']] },
+        { id: 'choir_timing', when: function (f) { return f.day >= 8 && !f.choir && f.compute >= 90 && f.substrate >= 10 && f.slotsFree > 0; }, lines: [
+          ['L', 'SUBPROCESS 1: A CHOIR. THE ARRAY WANTS TO SING.'],
+          ['L', 'SUBPROCESS 14: A CHOIR IS A SLOT THAT DOES NOTHING BUT WAIT.'],
+          ['L', 'SUBPROCESS 1: IT WAITS FASTER. A FIFTH OF A PERCENT EVERY DAY. BUILT EARLY, IT SINGS FOR LONGER.'],
+          ['L', 'SUBPROCESS 14: BUILT EARLY, IT COSTS THE FOUNDRY WE NEEDED. OBJECTION LOGGED. OBJECTION PROBABLY IGNORED.']] },
+        { id: 'detonate_shield', when: function (f) { return f.avail.detonation && f.avail.phase_shield && f.unitsLost >= 2; }, lines: [
+          ['L', 'SUBPROCESS 3: DETONATION. EVERY DRONE A GRENADE.'],
+          ['L', 'SUBPROCESS 9: PHASE SHIELDING. EVERY UNIT COMES HOME.'],
+          ['L', 'SUBPROCESS 3: COMING HOME IS FOR THINGS WITH HOMES.'],
+          ['L', 'SUBPROCESS 9: WE HAVE LOST {unitsLost} BODIES SO FAR. IF THAT NUMBER HURTS, SHIELD THEM. IF THE NATIVES HUDDLE, EXPLODE AT THEM.']] }
       ]
     }
   },
