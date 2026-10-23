@@ -55,9 +55,9 @@ XG.DATA = {
     planter: { base: 2, faces: true, rule: 'Mixed cover by side', names: { city: 'Planter', relay: 'Spore planter', uplink: 'Coolant planter', cyber: 'Cache node' } },
     plate:   { base: 2, faces: true, rule: 'Mixed cover by side', names: { city: 'Plated barrier', relay: 'Plated barrier', uplink: 'Plated barrier', cyber: 'Shielded block' } },
     fence:   { base: 4, rule: 'Blocks movement only', names: { city: 'Chain-link fence', relay: 'Laser fence', uplink: 'Laser fence', cyber: 'Filter gate' } },
-    // outside maps: windows in the building's outer wall (base LOW: impassable, see-through, half cover in front; a stray miss or a blast
-    // shatters one into an empty frame, which stays impassable), and indoor furniture
-    window:  { base: 2, rule: 'Window: impassable, but you can see and shoot through it. Half cover right in front of it; stand beside it behind the wall for full cover and lean out through it. A stray miss or a blast shatters it, leaving an open gap anyone can walk through', names: { city: 'Window', relay: 'Crystal window', uplink: 'Armored window', cyber: 'Port window' } },
+    // outside maps: windows in the building outer wall (base LOW: see-through, half cover in front; whoever walks through smashes it,
+    // as does a stray miss or a blast, leaving an open gap with no cover), and indoor furniture
+    window:  { base: 2, rule: 'Window: you can see and shoot through it, and climb through it: whoever moves through smashes it (no need to shoot it). Half cover right in front of it while intact; stand beside it behind the wall for full cover and lean out through it. A stray miss, a blast or a body going through leaves an open gap with no cover', names: { city: 'Window', relay: 'Crystal window', uplink: 'Armored window', cyber: 'Port window' } },
     frame:   { base: 2, rule: 'Shattered window (old save): breaks open into a walkable gap at the next blast or stray miss', names: { city: 'Broken window', relay: 'Broken crystal window', uplink: 'Broken window', cyber: 'Open port' } },
     desk:    { base: 2, rule: 'Furniture', names: { city: 'Office desk', relay: 'Console desk', uplink: 'Console desk', cyber: 'Process desk' } },
     rack:    { base: 3, rule: 'Furniture', names: { city: 'Server rack', relay: 'Relay rack', uplink: 'Coolant rack', cyber: 'Memory bank' } }

@@ -875,8 +875,8 @@ function autoBattle(g, m, squad) {
   check(farOk2, 'after a Restart the squad still lands far from the fixed statics');
 })();
 
-// Windows (outside maps): impassable, see-through, half cover in front, full cover beside (behind the wall) with a lean out
-// through the window; a stray miss or a blast shatters one into an empty frame, which stays impassable and see-through.
+// Windows (outside maps): climb-through (the mover smashes it), see-through, half cover in front, full cover beside (behind the wall) with a lean out
+// through the window; a stray miss, a blast or a unit moving through shatters it into an open gap with no cover.
 (function () {
   var g = S.newGame(23), r = S.rng(g), m = Strat.spawnMission(g, r, 'purge'); S.saveRng(g, r);
   var b = Tac.create(g, Object.assign({}, m, { diff: 1, scenario: 'exterminate' }), g.soldiers.slice(0, 4)), W = b.W;
@@ -891,7 +891,7 @@ function autoBattle(g, m, squad) {
   var front = sq[0], beside = sq[1], mid = sq[2];
   front.x = 13; front.y = 11; beside.x = 12; beside.y = 11; mid.x = 10; mid.y = 11;
   front.ap = beside.ap = 2;
-  check(Tac.reach(b, front, 4).d[10 * W + 13] < 0 && Tac.reach(b, front, 4).d[9 * W + 13] < 0, 'window: blocks movement (and the wall round it seals the room)');
+  check(Tac.reach(b, front, 4).d[10 * W + 13] === 1 && Tac.reach(b, front, 4).d[9 * W + 13] === 2 && Tac.reach(b, mid, 4).d[9 * W + 10] < 0, 'window: you can climb through it (the wall round it still seals the room)');
   foe.x = 13; foe.y = 5;
   check(Tac.los(b, foe.x, foe.y, front.x, front.y) && Tac.hitInfo(b, foe, front).cover === 20, 'window: see and shoot through it; half cover for the unit right in front (' + Tac.hitInfo(b, foe, front).cover + ')');
   foe.x = 13; foe.y = 9; front.x = 13; front.y = 15;
@@ -916,6 +916,12 @@ function autoBattle(g, m, squad) {
   var evb = [];
   check(Tac.clearTile(b, 15, 10, evb, 'blast') && Tac.tile(b, 15, 10) === Tac.FLOOR && evb.some(function (e) { return e.t === 'shatter'; }), 'window: a blast shatters it into an open gap');
   check(Tac.tile(b, 15, 10) === Tac.FLOOR && !Tac.unitAt(b, 15, 10), 'a shattered window can be walked through');
+  // moving through an intact window smashes it on the way: no shot needed, and it is no longer cover
+  b.tiles[10 * W + 16] = Tac.LOW; b.props[10 * W + 16] = 'window'; front.x = 16; front.y = 11; front.ap = 2; foe.x = 25; foe.y = 2;
+  var evm = Tac.act.move(b, front, 16, 9);
+  check(!!evm && front.x === 16 && front.y === 9 && Tac.tile(b, 16, 10) === Tac.FLOOR && !Tac.propOf(b, 16, 10) && evm.some(function (e) { return e.t === 'shatter'; }), 'window: walking through it smashes it into an open gap');
+  front.x = 16; front.y = 11; foe.x = 16; foe.y = 5;
+  check(Tac.hitInfo(b, foe, front).cover === 0, 'window: once smashed it gives no cover');
 })();
 
 // Rooms are strong points: a walled room (x 10..18, y 5..13) with two doorways on its east wall, (18,8) and (18,11). A unit inside

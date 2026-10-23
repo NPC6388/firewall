@@ -61,7 +61,7 @@ XG.Tac = (function () {
       if (b.tileHp) delete b.tileHp[y * b.W + x];
       b.tiles[y * b.W + x] = FLOOR; b.props[y * b.W + x] = 0; if (b.faces) b.faces[y * b.W + x] = 0;
       ev.push({ t: 'shatter', x: x, y: y });
-      log(b, ev, 'A window shatters. The gap is open.', '');
+      if (cause !== 'smash') log(b, ev, 'A window shatters. The gap is open.', '');
       return true;
     }
     if ((cause === 'blast' || cause === 'shot') && (p === 'barrier' || p === 'pillar')) return false;
@@ -214,6 +214,9 @@ XG.Tac = (function () {
   }
   function coverValue(b, tx, ty, fx, fy) { return coverDetail(b, tx, ty, fx, fy).value; }
 
+  // An intact window is in the way only until someone climbs through: the mover smashes it (doMove), so it stops being cover.
+  function smashable(b, x, y) { var p = propOf(b, x, y); return (p === 'window' || p === 'frame') && !unitAt(b, x, y); }
+  function passable(b, x, y) { return free(b, x, y) || (inB(b, x, y) && smashable(b, x, y)); }
   // BFS over 8 directions, no corner cutting. Returns dist array + prev for paths.
   function reach(b, u, maxSteps) {
     var n = b.W * b.H, d = new Array(n).fill(-1), prev = new Array(n).fill(-1), q = [u.y * b.W + u.x];
@@ -224,7 +227,7 @@ XG.Tac = (function () {
       for (var ox = -1; ox <= 1; ox++) for (var oy = -1; oy <= 1; oy++) {
         if (!ox && !oy) continue;
         var nx = cx + ox, ny = cy + oy;
-        if (!free(b, nx, ny)) continue;
+        if (!passable(b, nx, ny)) continue;
         if (ox && oy && (tile(b, cx + ox, cy) !== FLOOR || tile(b, cx, cy + oy) !== FLOOR)) continue;
         var ni = ny * b.W + nx;
         if (d[ni] !== -1) continue;
@@ -1468,8 +1471,13 @@ XG.Tac = (function () {
     var ev = [], seg = [[u.x, u.y]];
     u.ap -= path.length <= u.mobility ? 1 : 2;
     for (var i = 0; i < path.length && u.alive && !b.outcome; i++) {
-      u.x = path[i][0]; u.y = path[i][1]; seg.push(path[i]);
       var sub = [];
+      if (smashable(b, path[i][0], path[i][1])) { // climbing through: the window breaks before the mover steps in
+        ev.push({ t: 'move', id: u.id, path: seg }); seg = [[u.x, u.y]];
+        log(b, ev, u.short + ' smashes through a window.', '');
+        clearTile(b, path[i][0], path[i][1], ev, 'smash');
+      }
+      u.x = path[i][0]; u.y = path[i][1]; seg.push(path[i]);
       reactions(b, u, sub);
       refreshVis(b); checkAlerts(b, sub); checkOutcome(b);
       if (sub.length) {

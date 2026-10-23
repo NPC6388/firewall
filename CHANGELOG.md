@@ -8,7 +8,9 @@ The in-game **Help → Patch notes** tab shows everything from the first `##` he
 
 ## Unreleased
 
-### 2026-10-23 (challenge-phase1 branch)
+### 2026-10-23
+- **Windows:** you can climb straight through a window now, with no need to shoot it first. Whoever goes through smashes it,
+  so it leaves an open gap that is no longer half cover for anyone.
 - **Lattice campaign battles:** the FIREWALL squad now uses its abilities against you. Troopers throw grenades into
   clusters of two or more of your units (or at a wounded one in cover), Scientists patch up a neighbour who is down 3+ HP,
   Hackers stun your biggest machine in range, and Sentinels shield whichever soldier is most exposed. They only act on what
