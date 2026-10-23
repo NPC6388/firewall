@@ -1,6 +1,7 @@
 // FIREWALL: comms chatter. Short HALCYON / LATTICE lines (DATA.comms) that react to play on the strategy map and
 // in battle, shown in a voice card at the bottom left without pausing anything. The only game state it touches is
-// g.intel, the campaign's memory of past battles (learn), which lets lines talk about what actually happened.
+// g.intel, the campaign's memory of past battles (learn), which lets lines talk about what actually happened, and
+// g.debates, which overheard debates have played (nextDebate).
 var XG = globalThis.XG = globalThis.XG || {};
 
 XG.Comms = (function () {
@@ -105,6 +106,7 @@ XG.Comms = (function () {
   // intel (g.intel, optional): a backed intel line is preferred SMART of the time; one whose condition fails never plays.
   function pick(f, event, md, intel) {
     md = md || 'calm';
+    if (event === 'debate') return null; // debates are whole exchanges (nextDebate), not single lines
     var F = facts(intel), all = ((XG.DATA.comms[f] || {})[event] || []).filter(function (l) { return fits(l, md); });
     var smart = all.filter(function (l) { return isIntel(l) && usable(l, F); }), plain = all.filter(function (l) { return !isIntel(l); });
     var pool = smart.length && (!plain.length || Math.random() < SMART) ? smart : plain;
@@ -129,19 +131,67 @@ XG.Comms = (function () {
     var l = queue.shift();
     if (!l) { showing = false; el.classList.add('hidden'); return; }
     showing = true;
-    var lat = l[0] === 'L';
-    el.className = 'voice comms' + (lat ? ' lattice' : '');
-    el.innerHTML = '<div class="who">' + (lat ? 'LATTICE' : 'HALCYON') + ' <span class="dim">· comms</span></div>' + l[1];
+    var lat = l[0] === 'L', doc = l[0] === 'S'; // S = Dr. Amara Okafor, head of R&D (debates only)
+    el.className = 'voice comms' + (lat ? ' lattice' : doc ? ' okafor' : '');
+    el.innerHTML = '<div class="who">' + (lat ? 'LATTICE' : doc ? 'DR. OKAFOR' : 'HALCYON') + ' <span class="dim">· ' + (doc ? 'R&amp;D' : 'comms') + '</span></div>' + l[1];
     el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
     if (XG.Audio) XG.Audio.play(lat ? 'scan' : 'select');
     timer = setTimeout(next, 5000 + l[1].length * 45);
   }
 
+  // ---- overheard debates (DATA.comms.<side>.debate): facts about the campaign state, for debate when() and {placeholders}.
+  // Intel facts (facts(g.intel)) are merged in, so a debate can lean on the battle record too.
+  function stateFacts(g) {
+    var F = facts(g && g.intel), D = XG.DATA;
+    if (!g) return F;
+    var cnt = function (list, type) { return list.filter(function (b) { return b && b.type === type && b.daysLeft === 0 && !b.demolish; }).length; };
+    F.day = g.day; F.avail = {};
+    if (g.faction === 'lattice') {
+      var Lat = XG.Lat, A = g.array;
+      Object.keys(D.lattice.protocols).forEach(function (id) { if (Lat.protoState(g, id) === 'available') F.avail[id] = true; });
+      ['foundry', 'core', 'choir', 'mask', 'spire'].forEach(function (k) { F[k] = cnt(A, k); });
+      F.slotsFree = A.filter(function (b) { return !b; }).length;
+      F.compute = Math.floor(g.compute); F.substrate = Math.floor(g.substrate); F.trace = Math.round(g.trace);
+      F.forces = Lat.forceCount(g); F.bandwidth = Lat.bandwidth(g); F.phaseWar = g.phase === 'war';
+      F.ignored = g.stats.ignored; F.unitsLost = g.stats.unitsLost; F.raidInf = D.lattice.tuning.raidIgnored.infection;
+      F.strikeOpen = g.missions.some(function (m) { return m.kind === 'strike'; });
+    } else {
+      var St = XG.Strat, B = g.base, p = St.power(g);
+      Object.keys(D.techs).forEach(function (id) { if (St.techState(g, id) === 'available' || St.techState(g, id) === 'needs-salvage') F.avail[id] = true; });
+      F.labs = cnt(B, 'lab');
+      ['generator', 'workshop', 'infirmary', 'array', 'server'].forEach(function (k) { F[k] = cnt(B, k); });
+      F.slotsFree = B.filter(function (b) { return !b; }).length; F.powerFree = p.total - p.used;
+      F.credits = g.credits; F.salvage = g.salvage; F.expired = g.stats.expired;
+      F.halcyon = St.has(g, 'halcyon'); F.gearTech = ['emp', 'faraday', 'coilguns'].some(function (t) { return St.has(g, t); });
+      F.sentinels = g.soldiers.filter(function (s) { return s.cls === 'sentinel'; }).length;
+      F.wounded = g.soldiers.filter(function (s) { return s.hp < XG.State.stats(g, s).maxHp; }).length;
+    }
+    return F;
+  }
+  var DEBATE_GAP = 3; // days between two debates
+  // The next debate to play, or null. Marks it played (g.debates: { seen: [ids], last: day }) so each runs once per campaign.
+  function nextDebate(g) {
+    if (!g || g.over) return null;
+    var R = g.debates = g.debates || { seen: [], last: -99 };
+    if (g.day - R.last < DEBATE_GAP) return null;
+    var F = stateFacts(g), list = ((XG.DATA.comms[side(g)] || {}).debate || []).filter(function (d) {
+      return R.seen.indexOf(d.id) < 0 && d.when(F) && d.lines.every(function (l) { return usable(l, F); });
+    });
+    if (!list.length) return null;
+    var d = list[Math.floor(Math.random() * list.length)];
+    R.seen.push(d.id); R.last = g.day;
+    return { id: d.id, lines: d.lines.map(function (l) { return [l[0], fill(l[1], F, l[0] === 'L')]; }) };
+  }
+
   // Strategy: one line per time advance, for the most notable event; a quiet advance still gets chatter
-  // most of the time. Skipped when a story beat (which has its own voice) is about to play.
+  // most of the time. Skipped when a story beat (which has its own voice) is about to play. A due debate replaces the line.
   var ORDER = ['mission', 'expire', 'research', 'build'];
   function strategy(g, events) {
     if (!g || (g.storyQueue && g.storyQueue.length)) return;
+    if (on() && typeof document !== 'undefined') {
+      var dbt = nextDebate(g);
+      if (dbt) { queue = dbt.lines.slice(); clearTimeout(timer); next(); return; }
+    }
     var types = (events || []).map(function (e) { return e.type; });
     var ev = ORDER.filter(function (t) { return types.indexOf(t) >= 0; })[0];
     if (ev || Math.random() < .7) say(g, ev || 'advance');
@@ -156,5 +206,6 @@ XG.Comms = (function () {
   }
   function clear() { queue = []; clearTimeout(timer); showing = false; var el = typeof document !== 'undefined' && document.getElementById('comms'); if (el) el.classList.add('hidden'); }
 
-  return { say: say, strategy: strategy, battle: battle, clear: clear, pick: pick, mood: mood, learn: learn, facts: facts, usable: usable };
+  return { say: say, strategy: strategy, battle: battle, clear: clear, pick: pick, mood: mood, learn: learn, facts: facts, usable: usable,
+    stateFacts: stateFacts, nextDebate: nextDebate, DEBATE_GAP: DEBATE_GAP };
 })();

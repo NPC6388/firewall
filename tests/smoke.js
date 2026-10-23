@@ -18,6 +18,38 @@ function check(cond, msg) { if (!cond) { fails++; console.log('  FAIL: ' + msg);
   });
 });
 
+// Overheard debates: 8 per side, each 2-5 lines (FIREWALL: HALCYON 'H' and Dr. Okafor 'S'; Lattice: 'L' SUBPROCESS lines).
+// One plays when its condition holds, once per campaign, at least DEBATE_GAP days after the last.
+(function () {
+  var C = XG.Comms;
+  ['fw', 'lat'].forEach(function (f) {
+    var list = D.comms[f].debate || [], ids = {};
+    check(list.length === 8, 'comms ' + f + ' has 8 debates (' + list.length + ')');
+    list.forEach(function (d) {
+      check(!ids[d.id] && typeof d.when === 'function' && d.lines.length >= 2 && d.lines.length <= 5, 'debate ' + d.id + ' is well formed'); ids[d.id] = 1;
+      d.lines.forEach(function (l) {
+        check(f === 'fw' ? (l[0] === 'H' || l[0] === 'S') : (l[0] === 'L' && /^SUBPROCESS \d+: /.test(l[1]) && l[1].replace(/\{\w+\}/g, '') === l[1].replace(/\{\w+\}/g, '').toUpperCase()), 'debate line voice ok: ' + d.id);
+        check(l[1].indexOf("'") < 0, 'debate line has no apostrophe: ' + d.id);
+      });
+    });
+  });
+  var g = S.newGame(5); g.day = 10; g.salvage = 10;
+  check(C.nextDebate(g) === null, 'no debate when no condition holds');
+  g.salvage = 100;
+  var d1 = C.nextDebate(g);
+  check(d1 && d1.id === 'salvage_pile' && d1.lines[0][1].indexOf('100') >= 0 && d1.lines[0][0] === 'S', 'the salvage debate plays when salvage piles up, with the amount filled in');
+  g.day = 11; g.stats.expired = 2;
+  check(C.nextDebate(g) === null, 'no second debate within ' + C.DEBATE_GAP + ' days');
+  g.day = 13;
+  var d2 = C.nextDebate(g);
+  check(d2 && d2.id === 'signal_array', 'after the gap, the next debate whose condition holds plays (' + (d2 && d2.id) + ')');
+  g.day = 30;
+  check(C.nextDebate(g) === null, 'a debate never plays twice in a campaign');
+  var lg = XG.Lat.newGame(5); lg.day = 5; lg.compute = 0; lg.substrate = 100;
+  var d3 = C.nextDebate(lg);
+  check(d3 && d3.id === 'substrate_hoard' && /^SUBPROCESS \d+: INVENTORY: 100 /.test(d3.lines[0][1]), 'the Lattice hoarding debate plays at 100 substrate (' + (d3 && d3.lines[0][1]) + ')');
+})();
+
 // Plays a battle with the shared AI on both sides. Returns the battle.
 function autoBattle(g, m, squad) {
   var b = Tac.create(g, m, squad);
