@@ -40,7 +40,12 @@ XG.Tac = (function () {
     if ((t === HIGH || t === LOW) && b.faces && b.faces[y * b.W + x]) return faceTile(b, x, y, dx, dy);
     return t === FLOOR && (u = unitAt(b, x, y)) && u.kind === 'sentinel' ? LOW : t;
   }
-  function free(b, x, y) { return inB(b, x, y) && tile(b, x, y) === FLOOR && !unitAt(b, x, y) && !isServer(b, x, y); }
+  // A downed unit (alive false, downed true) still lies on its tile: nobody can stand there, but it is no unit for anything else.
+  function downedAt(b, x, y) {
+    for (var i = 0; i < b.units.length; i++) { var u = b.units[i]; if (u.downed && u.x === x && u.y === y) return u; }
+    return null;
+  }
+  function free(b, x, y) { return inB(b, x, y) && tile(b, x, y) === FLOOR && !unitAt(b, x, y) && !downedAt(b, x, y) && !isServer(b, x, y); }
   // Node scenario: b.server = { x, y, capture } is the objective. It is not a unit (it cannot be shot, hacked or hurt) and its
   // tile stays FLOOR (so it is never cover), but nobody can stand on it.
   function isServer(b, x, y) { var s = b.server; return !!s && s.x === x && s.y === y; }
@@ -74,7 +79,7 @@ XG.Tac = (function () {
     if (p === 'barrel') {
       ev.push({ t: 'boom', fx: x, fy: y, x: x, y: y, r: 1, kind: 'barrel' });
       log(b, ev, 'An explosive container detonates.', 'bad');
-      b.units.filter(function (u) { return u.alive && cheb(u.x, u.y, x, y) <= 1; }).forEach(function (u) { damage(b, u, 2, ev, null, { ignoreArmor: true, cause: 'is caught in the blast' }); });
+      b.units.filter(function (u) { return (u.alive || u.downed) && cheb(u.x, u.y, x, y) <= 1; }).forEach(function (u) { damage(b, u, 2, ev, null, { ignoreArmor: true, cause: 'is caught in the blast' }); });
       for (var yy = y - 1; yy <= y + 1; yy++) for (var xx = x - 1; xx <= x + 1; xx++) {
         var q = propOf(b, xx, yy);
         if (q === 'barrel' || q === 'glass' || q === 'window') clearTile(b, xx, yy, ev, 'blast'); // chain reaction
@@ -1250,8 +1255,38 @@ XG.Tac = (function () {
     var along = (f[0] * vx + f[1] * vy) * s, across = (f[0] * vy - f[1] * vx) * s;
     return Math.abs(along) >= Math.abs(across) ? (along > 0 ? 'front' : 'rear') : (across > 0 ? 'right' : 'left');
   }
+  // Downed, not dead: in a campaign battle the person's own units (squad soldiers, deployed Lattice machines) drop at 0 HP
+  // instead of dying. A downed unit lies on its tile, cannot act, is no target and does not count as standing; it bleeds out
+  // after DATA.tuning.downed.bleed of its side's turns unless an ally stabilizes it. A blast finishes it, and so does a hit
+  // that overkills by tuning.downed.overkill or more (0 = never). A won battle brings every downed unit home (Tac.result).
+  function downable(b, t) {
+    var T = D.tuning.downed;
+    return !!T && !b.training && t.side === b.human && !t.isStatic && !t.origSide && !!(t.sid || t.deployed);
+  }
+  function down(b, t, ev) {
+    var T = D.tuning.downed, lat = t.side === 'enemy';
+    t.alive = false; t.hp = 0; t.downed = true; t.bleed = T.bleed; t.stable = false;
+    t.overwatch = false; t.hunker = false; t.ap = 0; t.shield = 0;
+    ev.push({ t: 'down', id: t.id, x: t.x, y: t.y });
+    ev.push({ t: 'text', x: t.x, y: t.y, text: lat ? 'DISABLED' : 'DOWN', color: '#ff6b85' });
+    log(b, ev, (t.short || t.name) + (lat ? ' is disabled: its core fails in ' : ' is down and bleeding out: ') + T.bleed + ' turns unless someone stabilizes ' + (lat ? 'it' : 'them') + '.', 'bad');
+  }
+  // End of a side's turn: each of its bleeding units loses a turn; at 0 it dies.
+  function bleedTick(b, side, ev) {
+    b.units.forEach(function (u) {
+      if (!u.downed || u.stable || u.side !== side) return;
+      if (--u.bleed > 0) {
+        ev.push({ t: 'text', x: u.x, y: u.y, text: (u.side === 'enemy' ? 'CORE FAILING ' : 'BLEEDING ') + u.bleed, color: '#ff6b85' });
+        log(b, ev, (u.short || u.name) + (u.bleed === 1 ? ' has one turn left.' : ' has ' + u.bleed + ' turns left.'), 'bad');
+      } else kill(b, u, ev, null, u.side === 'enemy' ? 'fails for good' : 'bleeds out');
+    });
+  }
   function damage(b, t, amount, ev, src, opts) {
     opts = opts || {};
+    if (amount > 0 && t.downed) { // only a blast reaches someone lying on the floor
+      if (opts.blast || opts.splash || opts.cause === 'is caught in the blast') kill(b, t, ev, src, 'is killed where ' + (t.side === 'enemy' ? 'it lies' : 'they lie'));
+      return;
+    }
     if (amount <= 0 || !t.alive) return;
     if (!opts.ignoreArmor && t.armor) amount = Math.max(1, amount - t.armor);
     if (t.shield > 0) {
@@ -1265,12 +1300,14 @@ XG.Tac = (function () {
     }
     if (t.side === 'enemy') alert(b, t, ev);
     if (t.hp <= 0 && (opts.blast || opts.cause === 'is caught in the blast')) bump(obs(b).blast, faction(t));
+    if (t.hp <= 0 && downable(b, t) && !(D.tuning.downed.overkill && t.hp <= -D.tuning.downed.overkill)) return down(b, t, ev);
     if (t.hp <= 0) kill(b, t, ev, src, opts.cause);
   }
 
   function kill(b, t, ev, src, cause) {
-    t.alive = false; t.hp = 0; t.overwatch = false;
-    ev.push({ t: 'death', id: t.id, x: t.x, y: t.y });
+    var was = !!t.downed; // a downed unit that bleeds out or is finished off (the comms say so)
+    t.alive = false; t.hp = 0; t.overwatch = false; t.downed = false;
+    ev.push({ t: 'death', id: t.id, x: t.x, y: t.y, downed: was });
     if (!t.isStatic && obs(b).lost[faction(t)]) bump(obs(b).lost[faction(t)], t.kind);
     var credit = src && (src.creditTo ? unitById(b, src.creditTo) : src);
     if (credit && credit.side === 'player' && credit.sid && t.origSide !== 'player' && (t.side === 'enemy' || t.origSide === 'enemy')) credit.kills++;
@@ -1421,9 +1458,25 @@ XG.Tac = (function () {
     return null;
   }
 
+  // Stabilize is not in any class list: every unit of the person's side has it in a campaign battle (the bar shows it only
+  // while it has a target, see abilityList).
+  function hasAbility(b, u, id) {
+    if (id === 'stabilize') return u.side === b.human && !b.training && !u.isStatic && !u.origSide && !!D.tuning.downed;
+    return u.abilities.indexOf(id) >= 0;
+  }
+  // The unit's abilities as the battle bar lists them: its own, then Stabilize while a bleeding ally lies next to it.
+  function abilityList(b, u) {
+    var list = u.abilities.slice();
+    if (u.alive && hasAbility(b, u, 'stabilize') && targets(b, u, 'stabilize').length) list.push('stabilize');
+    return list;
+  }
   function targets(b, u, id) {
     var A = D.abilities[id];
-    if (u.abilities.indexOf(id) < 0) return [];
+    if (!hasAbility(b, u, id)) return [];
+    if (id === 'stabilize' || id === 'medkit') { // a bleeding ally next to you (a medkit only helps the living kind)
+      var bleeding = b.units.filter(function (t) { return t.downed && !t.stable && t.side === u.side && cheb(u.x, u.y, t.x, t.y) <= 1 && (id === 'stabilize' || !t.machine); });
+      if (id === 'stabilize') return bleeding;
+    }
     if (A.target === 'enemy') {
       var hacked = id === 'shoot' ? b.units.filter(function (t) { return t.alive && t !== u && t.side === u.side && t.override > 0 && hitInfo(b, u, t).ok; }) : [];
       return foesOf(b, u).filter(function (t) {
@@ -1442,7 +1495,7 @@ XG.Tac = (function () {
         if (id === 'medkit') return !t.machine && t.hp < t.maxHp && cheb(u.x, u.y, t.x, t.y) <= 1;
         if (id === 'shield') return true; // HALCYON projects it over the network: any ally, any distance, no line of sight
         return false;
-      });
+      }).concat(id === 'medkit' ? bleeding : []);
     }
     return [];
   }
@@ -1452,6 +1505,16 @@ XG.Tac = (function () {
     if (!inB(b, x, y) || dist(u.x, u.y, x, y) > A.range) return false;
     if (id === 'grenade') return sideSees(b, u.side, x, y);
     return true;
+  }
+
+  // Stop a downed ally's bleed-out. It stays down for the rest of the battle; a win brings it home.
+  function stabilize(b, u, t, ev, how) {
+    var lat = t.side === 'enemy';
+    t.stable = true;
+    ev.push({ t: 'stable', id: t.id, x: t.x, y: t.y, from: u.id });
+    ev.push({ t: 'text', x: t.x, y: t.y, text: 'STABLE', color: '#7dff9b' });
+    log(b, ev, (u.short || u.name) + (how === 'medkit' ? ' uses a medkit on ' : lat ? ' locks down the failing core of ' : ' stabilizes ') + (t.short || t.name) +
+      (lat ? '. It holds until the battle ends.' : '. They will make it if we win.'), 'good');
   }
 
   // Every successful hack (stun, override or sever) permanently adds +1 to the hacker's hack skill.
@@ -1520,7 +1583,7 @@ XG.Tac = (function () {
       var ev = [], emp = b.emp; spend(u, 'grenade');
       ev.push({ t: 'boom', fx: u.x, fy: u.y, x: x, y: y, r: 1, kind: emp ? 'emp' : 'frag' });
       log(b, ev, u.short + ' throws ' + (emp ? 'an EMP' : 'a frag') + ' grenade.', '');
-      var hitList = b.units.filter(function (t) { return t.alive && cheb(t.x, t.y, x, y) <= 1; });
+      var hitList = b.units.filter(function (t) { return (t.alive || t.downed) && cheb(t.x, t.y, x, y) <= 1; });
       hitList.forEach(function (t) {
         var d = emp ? (t.side === 'enemy' && t.machine ? 5 : t.machine ? 2 : 0) : 3;
         damage(b, t, d, ev, u, { ignoreArmor: emp, blast: true });
@@ -1556,6 +1619,7 @@ XG.Tac = (function () {
     },
     medkit: function (b, u, t) {
       if (!canAct(b, u) || abilityBlock(b, u, 'medkit') || targets(b, u, 'medkit').indexOf(t) < 0) return null;
+      if (t.downed) { var sev = []; spend(u, 'medkit'); stabilize(b, u, t, sev, 'medkit'); return after(b, sev); }
       var ev = [], amt = Math.min(4, t.maxHp - t.hp); spend(u, 'medkit'); t.hp += amt;
       ev.push({ t: 'heal', id: t.id, x: t.x, y: t.y, amount: amt, hpAfter: t.hp });
       log(b, ev, u.short + ' patches up ' + t.short + ' (+' + amt + ').', 'good'); return after(b, ev);
@@ -1603,7 +1667,7 @@ XG.Tac = (function () {
       var ev = [], x = u.x, y = u.y; spend(u, 'detonate');
       ev.push({ t: 'boom', fx: x, fy: y, x: x, y: y, r: 1, kind: 'frag' });
       log(b, ev, u.name + ' overloads its cells and detonates.', 'good');
-      b.units.filter(function (t) { return t.alive && t !== u && cheb(t.x, t.y, x, y) <= 1; }).forEach(function (t) { damage(b, t, 3, ev, u, {}); });
+      b.units.filter(function (t) { return (t.alive || t.downed) && t !== u && cheb(t.x, t.y, x, y) <= 1; }).forEach(function (t) { damage(b, t, 3, ev, u, { splash: true }); });
       for (var yy = y - 1; yy <= y + 1; yy++) for (var xx = x - 1; xx <= x + 1; xx++) {
         clearTile(b, xx, yy, ev, 'blast');
       }
@@ -1618,6 +1682,12 @@ XG.Tac = (function () {
     }
   };
 
+  // Stabilize a bleeding ally next to you: 1 AP. Every unit of the person's side has it (hasAbility).
+  act.stabilize = function (b, u, t) {
+    if (!u || !t || !canAct(b, u) || targets(b, u, 'stabilize').indexOf(t) < 0) return null;
+    var ev = []; spend(u, 'stabilize'); stabilize(b, u, t, ev); return after(b, ev);
+  };
+
   // Shoot a destructible object (a tile, not a unit): same cost as Shoot.
   act.shootTile = function (b, u, x, y) {
     if (!u || !canAct(b, u) || u.abilities.indexOf('shoot') < 0) return null;
@@ -1628,7 +1698,7 @@ XG.Tac = (function () {
 
   // Abilities are only usable by units that actually have them.
   Object.keys(act).forEach(function (id) {
-    if (id === 'move' || id === 'overclock' || id === 'shootTile') return;
+    if (id === 'move' || id === 'overclock' || id === 'shootTile' || id === 'stabilize') return;
     var fn = act[id];
     act[id] = function (b, u, a1, a2) { return u && u.abilities.indexOf(id) >= 0 ? fn(b, u, a1, a2) : null; };
   });
@@ -1638,6 +1708,7 @@ XG.Tac = (function () {
     if (b.side !== 'player' || b.outcome) return [];
     var ev = [];
     if (b.nodeAttacker === 'player') { captureTick(b, ev); if (b.outcome) return after(b, ev); }
+    bleedTick(b, 'player', ev);
     b.units.forEach(function (u) {
       if (!u.alive || !u.override) return;
       if (--u.override <= 0) { u.side = 'enemy'; kill(b, u, ev, null, 'is purged by the Lattice'); }
@@ -1678,6 +1749,7 @@ XG.Tac = (function () {
   function startPlayerTurn(b, ev) {
     ev = ev || [];
     if (b.nodeAttacker === 'enemy' && !b.outcome) { captureTick(b, ev); if (b.outcome) { refreshVis(b); return; } }
+    bleedTick(b, 'enemy', ev);
     b.side = 'player'; b.turn++;
     b.units.forEach(function (u) {
       if (!u.alive) return;
@@ -2054,20 +2126,27 @@ XG.Tac = (function () {
   function held(b, u) {
     return b.units.filter(function (t) { return t.alive && t.override > 0 && t.side === u.side && t.origSide && t.origSide !== u.side && t.creditTo === u.id; }).length;
   }
+  // Did the person's side win? FIREWALL needs 'win'; the Lattice wins on FIREWALL's 'loss' or by holding a raid (Lat.latticeWon).
+  function humanWon(b) {
+    var o = b.outcome || 'abort';
+    if (b.human === 'player') return o === 'win';
+    return XG.Lat ? XG.Lat.latticeWon(b.mission.lkind, o, b.mission.scenario || null) : o === 'loss';
+  }
   function result(b) {
+    var won = humanWon(b), home = function (u) { return u.alive || (!!u.downed && won); }; // downed units come home only from a win
     return {
       outcome: b.outcome || 'abort',
       scenario: b.mission.scenario || null, captured: !!b.captured,
       kind: b.mission.lkind || b.mission.kind || null, turns: b.turn, training: !!b.training,
       nodeAttacker: b.server ? b.nodeAttacker : null, obs: b.obs || null,
       salvage: b.outcome === 'win' ? b.salvage : 0,
-      lattice: b.units.filter(function (u) { return u.deployed; }).map(function (u) { return { kind: u.kind, alive: u.alive }; }),
-      humansKilled: b.units.filter(function (u) { return u.sid && !u.alive; }).length,
+      lattice: b.units.filter(function (u) { return u.deployed; }).map(function (u) { return { kind: u.kind, alive: home(u), downed: !!u.downed && won }; }),
+      humansKilled: b.units.filter(function (u) { return u.sid && !home(u); }).length,
       units: b.units.filter(function (u) { return u.sid; }).map(function (u) {
         // spent: grenades / medkits used, which the FIREWALL campaign restocks for salvage
         var spent = {};
         ['grenade', 'medkit'].forEach(function (k) { if (u.abilities.indexOf(k) >= 0) spent[k] = Math.max(0, D.abilities[k].charges - (u.charges[k] || 0)); });
-        return { sid: u.sid, hp: u.hp, alive: u.alive, kills: u.kills, hacks: u.hacks || 0, held: held(b, u), name: u.name, spent: spent };
+        return { sid: u.sid, hp: u.hp, alive: home(u), downed: !!u.downed && won, kills: u.kills, hacks: u.hacks || 0, held: held(b, u), name: u.name, spent: spent };
       })
     };
   }
@@ -2078,7 +2157,7 @@ XG.Tac = (function () {
     create: create, wake: alert, redeploy: redeploy, deploy: deploy, squadRank: squadRank, createLattice: createLattice, createTraining: createTraining, refillAP: refillAP, act: act, endPlayerTurn: endPlayerTurn, enemyStep: enemyStep, ai: ai,
     endTurn: endTurn, aiStep: aiStep,
     reach: reach, pathTo: pathTo, moveRange: moveRange, hitInfo: hitInfo, targets: targets, tileOk: tileOk,
-    abilityBlock: abilityBlock, coverValue: coverValue, coverDetail: coverDetail, los: los, isVisible: isVisible, unitAt: unitAt,
+    abilityBlock: abilityBlock, abilityList: abilityList, hasAbility: hasAbility, humanWon: humanWon, downedAt: downedAt, coverValue: coverValue, coverDetail: coverDetail, los: los, isVisible: isVisible, unitAt: unitAt,
     unitById: unitById, tile: tile, coverTile: coverTile, blocksFire: blocksFire, peekSpots: peekSpots, lineClear: lineClear, LOS_MARGIN: LOS_MARGIN, indoor: indoor, isServer: isServer, zoneState: zoneState, captureTick: captureTick, nodeTurns: nodeTurns, dist: dist, cheb: cheb, checkOutcome: checkOutcome, result: result, abort: abort
   };
 })();

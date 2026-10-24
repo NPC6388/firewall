@@ -112,7 +112,7 @@ XG.State = {
     };
   },
 
-  available: function (g, s) { return s.hp >= XG.State.stats(g, s).maxHp; },
+  available: function (g, s) { return s.hp >= XG.State.stats(g, s).maxHp && !(s.critical > 0); },
 
   log: function (g, msg) {
     g.log.unshift({ day: g.day, msg: msg });

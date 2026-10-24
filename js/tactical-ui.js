@@ -6,7 +6,7 @@ XG.TacUI = (function () {
   var $ = function (id) { return document.getElementById(id); };
   var st = null, cv, ctx, dpr = 1, bound = false;
 
-  var DUR = { move: 85, shot: 260, dmg: 140, heal: 140, text: 110, death: 380, boom: 440, scan: 420, hack: 380, spawn: 280, pause: 1 };
+  var DUR = { move: 85, shot: 260, dmg: 140, heal: 140, text: 110, death: 380, down: 380, stable: 200, boom: 440, scan: 420, hack: 380, spawn: 280, pause: 1 };
 
   function start(g, mission, squad, onDone) { startWith(g, Tac.create(g, mission, squad), onDone); }
   // Runs any prepared battle (FIREWALL or Lattice controlled). b.human says which side the person plays.
@@ -97,7 +97,7 @@ XG.TacUI = (function () {
       else if (e.key === 'h' || e.key === 'H') hunkerAll();
       else if (e.key === 'm' || e.key === 'M') XG.Settings.set('muted', !XG.Settings.get('muted'));
       else if (e.key === '?' || e.key === 'F1') { e.preventDefault(); XG.Help.open(); }
-      else if (/^[1-9]$/.test(e.key)) { var u = selUnit(); if (u && u.abilities[+e.key - 1]) pickAbility(u.abilities[+e.key - 1]); }
+      else if (/^[1-9]$/.test(e.key)) { var u = selUnit(), al = u && Tac.abilityList(st.b, u); if (al && al[+e.key - 1]) pickAbility(al[+e.key - 1]); }
     });
     $('tac-endturn').onclick = endTurn;
     $('tac-overclock').onclick = overclock;
@@ -260,6 +260,11 @@ XG.TacUI = (function () {
     var u = Tac.unitAt(st.b, x, y);
     return u && visibleUnit(u) && !st.hidden[u.id] ? u : null;
   }
+  // A unit standing there, or one of yours lying downed there (Stabilize and medkits target those).
+  function unitOrDownedAt(x, y) {
+    var d = Tac.downedAt(st.b, x, y);
+    return unitAtVisible(x, y) || (d && d.side === HS() ? d : null);
+  }
   function getReach(u) {
     if (!st.reachCache || st.reachCache.id !== u.id || st.reachCache.ap !== u.ap || st.reachCache.x !== u.x || st.reachCache.y !== u.y)
       st.reachCache = { id: u.id, ap: u.ap, x: u.x, y: u.y, r: Tac.reach(st.b, u, Tac.moveRange(u)) };
@@ -283,7 +288,8 @@ XG.TacUI = (function () {
         return;
       }
       if (A.target === 'ally') {
-        if (at && Tac.targets(b, u, st.mode).indexOf(at) >= 0) run(st.mode, at); else cancel();
+        var ad = unitOrDownedAt(t.x, t.y);
+        if (ad && Tac.targets(b, u, st.mode).indexOf(ad) >= 0) run(st.mode, ad); else cancel();
         return;
       }
       if (A.target === 'tile') {
@@ -366,6 +372,7 @@ XG.TacUI = (function () {
       if (ts.length) st.aim = ts[0].t.id;
     }
     if (A.target === 'ally' && id === 'shield' && Tac.targets(st.b, u, id).length === 1) { run(id, u); return; }
+    if (id === 'stabilize' && Tac.targets(st.b, u, id).length === 1) { run(id, Tac.targets(st.b, u, id)[0]); return; }
     hud(); hoverPanel();
   }
   // Second press of the same ability key/button fires it: at the aimed enemy, the hovered ally
@@ -382,7 +389,7 @@ XG.TacUI = (function () {
       ts = Tac.targets(b, u, id);
       var ta = st.aim && Tac.unitById(b, st.aim);
       if (ta && ts.indexOf(ta) >= 0) { run(id, ta); return true; }
-      var ha = h && unitAtVisible(h.x, h.y);
+      var ha = h && unitOrDownedAt(h.x, h.y);
       if (ha && ts.indexOf(ha) >= 0) { run(id, ha); return true; }
       if (ts.length === 1) { run(id, ts[0]); return true; }
     } else if (A.target === 'tile') {
@@ -584,8 +591,8 @@ XG.TacUI = (function () {
       var pips = '';
       for (var i = 0; i < x.maxHp; i++) pips += '<i class="' + (i < x.hp ? '' : 'e') + '"></i>';
       for (var j = 0; j < x.shield; j++) pips += '<i class="s"></i>';
-      var cls = !x.alive ? 'dead' : x.ap <= 0 ? 'spent' : '';
-      var tag = !x.alive ? (lat() ? 'LOST' : 'KIA') : x.override ? '<span class="good">OVERRIDE ' + x.override + '</span>' : (x.overwatch ? 'OW · ' : '') + (x.hunker ? 'HNK · ' : '') + x.ap + ' AP';
+      var cls = x.downed ? 'downed' : !x.alive ? 'dead' : x.ap <= 0 ? 'spent' : '';
+      var tag = x.downed ? (x.stable ? '<span class="warn">STABLE</span>' : '<span class="bad">' + (lat() ? 'FAILING ' : 'BLEED ') + x.bleed + '</span>') : !x.alive ? (lat() ? 'LOST' : 'KIA') : x.override ? '<span class="good">OVERRIDE ' + x.override + '</span>' : (x.overwatch ? 'OW · ' : '') + (x.hunker ? 'HNK · ' : '') + x.ap + ' AP';
       return '<div class="sq ' + cls + (x.id === st.sel ? ' on' : '') + '" data-unit="' + x.id + '"><canvas class="sq-ico" data-ico="' + x.id + '"></canvas><div class="n">' + (x.short || x.name) + '</div>' +
         '<div class="dim">' + tag + '</div><div class="pips">' + pips + '</div></div>';
     }).join('');
@@ -595,7 +602,7 @@ XG.TacUI = (function () {
     });
 
     var ab = '';
-    if (u) u.abilities.forEach(function (id, i) {
+    if (u) Tac.abilityList(b, u).forEach(function (id, i) {
       var A = D.abilities[id], why = Tac.abilityBlock(b, u, id), extra = '';
       if (A.charges) extra = ' (' + (u.charges[id] || 0) + ')';
       var name = id === 'grenade' && b.emp ? 'EMP Grenade' : A.short || A.name; // short label keeps the bar on one row
@@ -631,7 +638,7 @@ XG.TacUI = (function () {
   }
   function modeHint() {
     var A = D.abilities[st.mode];
-    var u = selUnit(), k = u ? u.abilities.indexOf(st.mode) + 1 : 0;
+    var u = selUnit(), k = u ? Tac.abilityList(st.b, u).indexOf(st.mode) + 1 : 0;
     if (st.mode === 'hunker' && u) {
       var ho = hunkerOdds(u), best = ho.reduce(function (m, o) { return o.now > m.now ? o : m; }, { now: -1 });
       return (best.now >= 0 ? 'Hunkered, the best shot on you drops from ' + best.now + '% to ' + best.hunk + '%. ' : 'No visible hostile has a shot at you right now. ') + 'Press ' + k + ' again or Space to confirm. Esc cancels.';
@@ -709,8 +716,15 @@ XG.TacUI = (function () {
     if (!st) return;
     var b = st.b, h = st.hover, u = selUnit(), html = '', ao = aimObject();
     if (ao) h = { x: ao.x, y: ao.y };
-    var focus = st.aim && !ao ? Tac.unitById(b, st.aim) : h ? unitAtVisible(h.x, h.y) : null;
-    if (focus && focus.alive) {
+    var focus = st.aim && !ao ? Tac.unitById(b, st.aim) : h ? unitOrDownedAt(h.x, h.y) : null;
+    if (focus && focus.downed) {
+      var lt = focus.side === 'enemy';
+      html = '<b style="color:' + focus.color + '">' + focus.name + '</b> <span class="bad">' + (lt ? 'DISABLED' : 'DOWN') + '</span><div>' +
+        (focus.stable ? '<span class="warn">Stable.</span> ' + (lt ? 'Its core holds' : 'They hold on') + ' until the battle ends.'
+          : '<span class="bad">' + (lt ? 'Core failing' : 'Bleeding out') + ': ' + focus.bleed + ' turn' + (focus.bleed === 1 ? '' : 's') + ' left.</span>') + '</div>' +
+        '<div class="dim">' + (focus.stable ? '' : 'Any unit of yours next to it (diagonals count) can Stabilize it for 1 AP' + (lt ? '' : '; a medkit works too') + '. ') +
+        'Win the battle and ' + (lt ? 'it is recovered' : 'they come home badly wounded') + '; lose or pull out and ' + (lt ? 'it is lost' : 'they are lost') + '. A blast kills a downed unit.</div>';
+    } else if (focus && focus.alive) {
       html = '<b style="color:' + focus.color + '">' + focus.name + '</b><div>HP ' + focus.hp + '/' + focus.maxHp + (focus.armor ? ' · armor ' + focus.armor : '') + (focus.shield ? ' · shield ' + focus.shield : '') +
         (focus.side === b.human && !focus.isStatic ? ' · <span class="' + (focus.ap ? 'good' : 'dim') + '">' + focus.ap + ' AP left</span>' : '') + '</div>';
       if (focus.side !== b.human) {
@@ -884,7 +898,7 @@ XG.TacUI = (function () {
     if (zs) { var scn = center(zs.x, zs.y); G.server(ctx, zs, scn[0], scn[1], { now: now }); }
     b.units.forEach(function (x) {
       if (st.hidden[x.id]) return;
-      if (!x.alive && !st.dying[x.id] && !(st.cur && st.cur.e.t === 'death' && st.cur.e.id === x.id)) return;
+      if (!x.alive && !x.downed && !st.dying[x.id] && !(st.cur && st.cur.e.t === 'death' && st.cur.e.id === x.id)) return;
       var pos = unitPos(x, now);
       var moving = st.cur && st.cur.e.t === 'move' && st.cur.e.id === x.id;
       var seen = x.side === HS() || b.visible[Math.round(pos[1]) * W + Math.round(pos[0])] || (moving && pathVisible(st.cur.e.path));
@@ -1191,13 +1205,20 @@ XG.TacUI = (function () {
     var seen = function (x, y) { return b.visible[y * W + x]; };
     XG.Tutorial.event(e, b);
     var cm = function (k) { if (XG.Comms) XG.Comms.battle(st.g, b, k); };
-    if (e.t === 'death' && u && !u.isStatic) cm(u.side === HS() ? 'loss' : 'kill');
+    if (e.t === 'death' && u && !u.isStatic) cm(u.side === HS() ? (e.downed ? 'bleedout' : 'loss') : 'kill');
+    else if (e.t === 'down' && u) cm('down');
+    else if (e.t === 'stable' && u) cm('stable');
     else if (e.t === 'dmg' && e.crit && u && u.side !== HS()) cm('crit');
     else if (e.t === 'hack' && Tac.unitById(b, e.from) && Tac.unitById(b, e.from).side === HS()) cm('hack');
     if (e.t === 'dmg') {
       st.flash[e.id] = now;
       if (e.crit) { shake(3, now); A.play('crit'); }
-    } else if (e.t === 'heal') { if ((u && u.side === HS()) || seen(e.x, e.y)) { var hc = center(e.x, e.y); G.FX.heal(L, hc[0], hc[1], now); A.play('heal'); } } // the AI side heals in the fog too
+    } else if (e.t === 'down') {
+      var dn = center(e.x, e.y);
+      if (u && u.machine) { G.FX.wreck(L, dn[0], dn[1], G.rgbOf(u.color), now); A.play('death-machine'); shake(3, now); }
+      else { G.FX.downed(L, dn[0], dn[1], G.rgbOf(u ? u.color : '#ffffff'), now); A.play('death-human'); }
+    } else if (e.t === 'stable') { var sc0 = center(e.x, e.y); G.FX.heal(L, sc0[0], sc0[1], now); A.play('heal'); }
+    else if (e.t === 'heal') { if ((u && u.side === HS()) || seen(e.x, e.y)) { var hc = center(e.x, e.y); G.FX.heal(L, hc[0], hc[1], now); A.play('heal'); } } // the AI side heals in the fog too
     else if (e.t === 'death' && u && (u.side === HS() || seen(e.x, e.y))) {
       var dc = center(e.x, e.y), rgb = G.rgbOf(u.color), soft = !!D.software[u.kind];
       if (u.kind === 'harmonic' || soft) { G.FX.derez(L, dc[0], dc[1], rgb, now); A.play('death-soft'); }
@@ -1233,7 +1254,7 @@ XG.TacUI = (function () {
     if (e.t === 'move') return e.path.length > 1 ? e.path.filter(function (p, i) { return (mine(e.id) || vis(p[0], p[1])) && (i === 0 || i === e.path.length - 1 || !mine(e.id)); }) : [];
     if (e.t === 'shot' || e.t === 'hack') return mine(e.from) || mine(e.to) || vis(e.fx, e.fy) || vis(e.tx, e.ty) ? [[e.fx, e.fy], [e.tx, e.ty]] : [];
     if (e.t === 'boom' || e.t === 'shatter' || e.t === 'debris') return [[e.x, e.y]];
-    if (e.t === 'text' || e.t === 'dmg' || e.t === 'heal' || e.t === 'death' || e.t === 'spawn' || e.t === 'scan') return (e.id && mine(e.id)) || vis(e.x, e.y) ? [[e.x, e.y]] : [];
+    if (e.t === 'text' || e.t === 'dmg' || e.t === 'heal' || e.t === 'death' || e.t === 'down' || e.t === 'stable' || e.t === 'spawn' || e.t === 'scan') return (e.id && mine(e.id)) || vis(e.x, e.y) ? [[e.x, e.y]] : [];
     return [];
   }
 

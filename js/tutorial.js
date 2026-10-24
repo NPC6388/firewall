@@ -258,7 +258,7 @@ XG.Tutorial = (function () {
       command: 'This is the <b>Command</b> view. The red <b>Convergence</b> bar is the clock: at 100% Earth falls. Press <b>Advance time</b> to run days until something happens, then deploy to missions as they appear on the right.',
       research: '<b>Research</b> unlocks gear, abilities and the story. Keep a project running at all times; an idle lab is wasted days.',
       engineering: '<b>Engineering</b>: click an empty slot to build. Labs need power, so put a generator down early. You can cancel a build for a full refund.',
-      barracks: 'The <b>Barracks</b>: wounded operatives heal over days and sit out missions. Recruit more when you can afford it; losing a veteran hurts.',
+      barracks: 'The <b>Barracks</b>: wounded operatives heal over days and sit out missions. Anyone carried out <b>downed</b> spends days in critical care first. Recruit more when you can afford it; losing a veteran hurts.',
       archive: 'The <b>Archive</b> keeps every story beat and your record. The field manual and glossary are here too, and behind the <b>?</b> button.'
     },
     lat: {

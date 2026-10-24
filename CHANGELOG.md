@@ -9,8 +9,17 @@ The in-game **Help → Patch notes** tab shows everything from the first `##` he
 ## Unreleased
 
 ### 2026-10-23
-- **Lattice campaign: wins pay for rebuilding.** Every won battle now pays at least 24 compute and 12 substrate (was 12 and
-  10), before the speed bonus, so a win covers about two fresh drones.
+- **Downed, not dead.** In campaign battles your own units no longer die the moment they hit 0 HP. They go down on
+  their tile, cannot act and are no longer shot at, and they bleed out after 3 of your turns (a Lattice machine's core
+  fails). Any unit of yours next to them (diagonals count) can **Stabilize** them for 1 AP; the button shows up in the
+  battle bar only when it applies, and a medkit works too. A grenade, detonation or exploding barrel kills a downed unit,
+  and so does a hit that would leave them at -3 HP or lower. If nobody of yours is left standing, the battle is lost.
+- **Win, and they come home.** After a won battle every downed soldier is carried out at 1 HP and spends 2 days in
+  critical care before healing (the Barracks shows "Critical"); downed Lattice machines are recovered instead of lost.
+  Lose or pull out and the downed are lost as before. The debrief lists who was carried out apart from the dead.
+  Combat training is unchanged.
+- **Lattice campaign: wins pay for rebuilding.** Every won battle now pays at least 18 compute and 10 substrate (was 12 and
+  10), before the speed bonus. Machines disabled in a won battle now come back, so there is less to rebuild.
 - **Lattice campaign: fewer stun locks.** A FIREWALL Hacker now tries a hack at most once every 3 turns. Before, it could stun a
   fresh machine of yours every turn and keep two of them out of the fight at once.
 - **Windows:** you can climb straight through a window now, with no need to shoot it first. Whoever goes through smashes it,

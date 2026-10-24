@@ -7,7 +7,7 @@ var XG = globalThis.XG = globalThis.XG || {};
 XG.Comms = (function () {
   var recent = [], queue = [], showing = false, lastBattle = 0, timer = null;
   // chance each battle event gets a line, and the gap between optional battle lines (ms)
-  var CHANCE = { start: 1, kill: .5, loss: .9, crit: .5, hack: .7, win: 1, lose: 1 }, GAP = 6000;
+  var CHANCE = { start: 1, kill: .5, loss: .9, crit: .5, hack: .7, win: 1, lose: 1, down: .9, stable: .7, bleedout: 1 }, GAP = 6000;
 
   function on() { return !XG.Settings || XG.Settings.get('comms') !== false; }
   function side(g) { return g && g.faction === 'lattice' ? 'lat' : 'fw'; }
@@ -196,10 +196,10 @@ XG.Comms = (function () {
     var ev = ORDER.filter(function (t) { return types.indexOf(t) >= 0; })[0];
     if (ev || Math.random() < .7) say(g, ev || 'advance');
   }
-  // Battle: start, kill, loss, crit, hack, win, lose. Optional lines keep a gap so they don't pile up.
+  // Battle: start, kill, loss, crit, hack, win, lose, down, stable, bleedout. Optional lines keep a gap so they don't pile up.
   function battle(g, b, event) {
     if (!b || b.training || Math.random() >= (CHANCE[event] || 0)) return;
-    var now = Date.now(), must = event === 'start' || event === 'win' || event === 'lose' || event === 'loss';
+    var now = Date.now(), must = event === 'start' || event === 'win' || event === 'lose' || event === 'loss' || event === 'down' || event === 'bleedout';
     if (!must && now - lastBattle < GAP) return;
     lastBattle = now;
     say(g, event);

@@ -255,7 +255,7 @@ XG.UI = (function () {
     ['cls', 'Class', function (g, s) { return D.classes[s.cls].name; }],
     ['rank', 'Rank', function (g, s) { return s.xp; }],
     ['hp', 'HP', function (g, s) { return s.hp / S.stats(g, s).maxHp; }],
-    ['status', 'Status', function (g, s) { return S.available(g, s) ? 0 : S.stats(g, s).maxHp - s.hp; }],
+    ['status', 'Status', function (g, s) { return S.available(g, s) ? 0 : S.stats(g, s).maxHp - s.hp + (s.critical || 0); }],
     ['aim', 'Aim', function (g, s) { return S.stats(g, s).aim; }],
     ['hack', 'Hack', function (g, s) { return S.stats(g, s).hackSkill || -1; }],
     ['missions', 'Missions', function (g, s) { return s.missions; }],
@@ -280,7 +280,7 @@ XG.UI = (function () {
       var st = S.stats(g, s), C = D.classes[s.cls], ok = S.available(g, s);
       var heal = St.built(g, 'infirmary') ? 2 : 1;
       return '<tr><td class="who">' + UI.portrait(s) + s.name + '</td><td>' + C.name + '</td><td>' + S.rankName(s) + ' <span class="dim">(' + s.xp + ' xp)</span></td>' +
-        '<td>' + hpBar(s.hp, st.maxHp) + '</td><td>' + (ok ? '<span class="good">Ready</span>' : C.machine && g.salvage < D.tuning.repairSalvage ? '<span class="bad" title="Repairs cost ' + D.tuning.repairSalvage + ' salvage per HP">Repair stalled: no salvage</span>' : '<span class="warn"' + (C.machine ? ' title="Repairs cost ' + D.tuning.repairSalvage + ' salvage per HP"' : '') + '>' + (C.machine ? 'Repairing' : 'Wounded') + ' ' + Math.ceil((st.maxHp - s.hp) / heal) + 'd</span>') + '</td>' +
+        '<td>' + hpBar(s.hp, st.maxHp) + '</td><td>' + (ok ? '<span class="good">Ready</span>' : s.critical > 0 ? '<span class="bad" title="Downed in battle and carried out. No healing until critical care is over (' + s.critical + 'd), then ' + (C.machine ? 'repairs' : 'the wounds heal') + ' as usual.">' + (C.machine ? 'Wrecked' : 'Critical') + ' ' + (s.critical + Math.ceil((st.maxHp - s.hp) / heal)) + 'd</span>' : C.machine && g.salvage < D.tuning.repairSalvage ? '<span class="bad" title="Repairs cost ' + D.tuning.repairSalvage + ' salvage per HP">Repair stalled: no salvage</span>' : '<span class="warn"' + (C.machine ? ' title="Repairs cost ' + D.tuning.repairSalvage + ' salvage per HP"' : '') + '>' + (C.machine ? 'Repairing' : 'Wounded') + ' ' + Math.ceil((st.maxHp - s.hp) / heal) + 'd</span>') + '</td>' +
         '<td>' + st.aim + '</td><td>' + (st.hackSkill ? st.hackSkill + (s.hacks ? ' <span class="dim">(' + s.hacks + ' hacks)</span>' : '') : '<span class="dim">—</span>') + '</td><td>' + s.missions + '</td><td>' + s.kills + '</td></tr>';
     }).join('');
     var hire = ['trooper', 'hacker', 'scientist'].map(function (c) {
@@ -350,7 +350,9 @@ XG.UI = (function () {
 
   UI.results = function (out, done) {
     var g = UI.g, m = out.mission, win = out.outcome === 'win';
-    var lines = out.deaths.map(function (s) { return '<div class="bad">✝ ' + s.name + ' (KIA)</div>'; }).concat(out.promotions.map(function (s) {
+    var lines = out.deaths.map(function (s) { return '<div class="bad">✝ ' + s.name + ' (KIA)</div>'; }).concat((out.saved || []).map(function (s) {
+      return '<div class="warn">✚ ' + s.name + ' (downed, carried out: critical care ' + s.critical + 'd)</div>';
+    })).concat(out.promotions.map(function (s) {
       return '<div class="good">▲ ' + s.name + ' promoted to ' + S.rankName(s) + '</div>';
     }));
     UI.modal('<h1 class="' + (win ? 'good' : 'bad') + '">' + (win ? 'MISSION SUCCESS' : out.outcome === 'abort' ? 'SQUAD EXTRACTED' : 'MISSION FAILED') + '</h1>' +

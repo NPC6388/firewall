@@ -389,8 +389,9 @@ XG.Lat = (function () {
     resolveMission: function (g, missionId, result) {
       var m = g.missions.filter(function (x) { return x.id === missionId; })[0];
       var won = Lat.latticeWon(m.kind, result.outcome, result.scenario);
-      var out = { mission: m, won: won, lost: {}, humansKilled: result.humansKilled, substrate: 0, notes: [] };
+      var out = { mission: m, won: won, lost: {}, recovered: {}, humansKilled: result.humansKilled, substrate: 0, notes: [] };
       result.lattice.forEach(function (u) {
+        if (u.alive && u.downed) out.recovered[u.kind] = (out.recovered[u.kind] || 0) + 1; // disabled in a won battle: recovered, not lost
         if (u.alive || !(u.kind in g.forces)) return;
         g.forces[u.kind] = Math.max(0, g.forces[u.kind] - 1); g.stats.unitsLost++;
         out.lost[u.kind] = (out.lost[u.kind] || 0) + 1;

@@ -288,6 +288,7 @@ XG.Strat = (function () {
       // healing / repair (machines repair for tuning.repairSalvage per HP, as far as the salvage goes)
       var heal = built(g, 'infirmary') ? 2 : 1;
       g.soldiers.forEach(function (s) {
+        if (s.critical > 0) { if (--s.critical === 0) S.log(g, s.name + ' is out of critical care.'); return; } // no healing yet
         var mx = S.stats(g, s).maxHp, gain = Math.min(heal, mx - s.hp);
         if (gain > 0 && D.classes[s.cls].machine && T.repairSalvage) {
           gain = Math.min(gain, Math.floor(g.salvage / T.repairSalvage));
@@ -369,7 +370,7 @@ XG.Strat = (function () {
     missionCredits: function (m) { return m.kind === 'uplink' ? 0 : Math.max(D.tuning.minMissionCredits || 0, (m.reward && m.reward.credits) || 0); },
     resolveMission: function (g, missionId, result) {
       var m = g.missions.filter(function (x) { return x.id === missionId; })[0];
-      var out = { mission: m, outcome: result.outcome, deaths: [], promotions: [], salvage: 0, credits: 0, infection: 0 };
+      var out = { mission: m, outcome: result.outcome, deaths: [], saved: [], promotions: [], salvage: 0, credits: 0, infection: 0 };
       result.units.forEach(function (u) {
         var s = g.soldiers.filter(function (x) { return x.id === u.sid; })[0];
         if (!s) return;
@@ -381,7 +382,11 @@ XG.Strat = (function () {
           return;
         }
         var rk = S.rankIndex(s);
-        s.hp = Math.max(1, u.hp); s.missions++; s.kills += u.kills; s.hacks = (s.hacks || 0) + (u.hacks || 0);
+        s.hp = Math.max(1, u.hp); s.missions++;
+        if (u.downed) { // carried out of a won battle: 1 HP and some days in critical care before healing starts
+          s.hp = 1; s.critical = (s.critical || 0) + ((D.tuning.downed && D.tuning.downed.days) || 0); out.saved.push(s);
+          S.log(g, s.name + ' was carried out of ' + m.city + ' alive. Critical care: ' + s.critical + ' days, then a long recovery.');
+        } s.kills += u.kills; s.hacks = (s.hacks || 0) + (u.hacks || 0);
         s.xp += (result.outcome === 'win' ? 1 : 0) + u.kills + (u.held || 0);
         g.stats.kills += u.kills;
         if (S.rankIndex(s) > rk) out.promotions.push(s);

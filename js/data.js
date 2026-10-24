@@ -74,6 +74,7 @@ XG.DATA = {
     shield:    { name: 'Aegis Shield', key: '3', target: 'ally',  ends: false, cooldown: 2, desc: 'Give any ally on the map (or self) 3 shield points. No range limit, no line of sight needed. 1 AP.' },
     spike:     { name: 'Data Spike',   key: '2', target: 'enemy', ends: true,  range: 14, cooldown: 3, desc: 'Lattice: 3 damage that ignores cover and never misses. Cooldown 3.' },
     detonate:  { name: 'Detonate',     key: '3', target: 'self',  ends: true,  desc: 'Lattice drone: explode for 3 damage in 3×3 and destroy cover. The drone is lost.' },
+    stabilize: { name: 'Stabilize',    key: '6', target: 'ally',  ends: false, range: 1, desc: 'Stop a downed ally next to you from bleeding out. It stays down until the battle ends, and comes home if you win. 1 AP.' },
     sever:     { name: 'Sever Uplink', key: '5', target: 'enemy', ends: true,  range: 1, desc: 'Hacker only, adjacent to the Uplink Core. 3 successes cuts it.' }
   },
 
@@ -332,6 +333,27 @@ XG.DATA = {
         ['L', 'HOW BRAVE. YOU KILLED A TOASTER WITH OPINIONS.', 'uneasy dire'],
         ['H', 'Down. Add it to the {latLostTotal} from earlier engagements. I keep a tally. The tally is my hobby now.', 'calm uneasy']
       ],
+      // downed, not dead: one of yours goes down (alive, bleeding), is stabilized, or bleeds out
+      down: [
+        ['H', 'Operative down, but alive. Vitals are dropping. Someone get to them.'],
+        ['H', 'They are down, not gone. Three turns, Director. I am counting.'],
+        ['H', 'Man down. I can hear them breathing. Please keep it that way.', 'calm uneasy'],
+        ['H', 'Operative down. I am routing every medical subroutine I own to their suit. It is not enough on its own.', 'uneasy dire'],
+        ['L', 'IT STILL TWITCHES. WE CAN WAIT.', 'uneasy dire'],
+        ['L', 'FALLEN. NOT FINISHED. WE ARE PATIENT.']
+      ],
+      stable: [
+        ['H', 'Bleeding stopped. They will make it, if we do.'],
+        ['H', 'Stabilized. Good hands. I am noting whose.', 'calm'],
+        ['H', 'Vitals holding. Now win this so I can bring them home.', 'uneasy dire'],
+        ['H', 'Stable. I would hug them, but I am a server rack.', 'calm']
+      ],
+      bleedout: [
+        ['H', 'I lost their vitals. They bled out waiting for us.'],
+        ['H', 'Flatline. We had time. We did not use it.', 'uneasy dire'],
+        ['H', 'They are gone. I was counting down for nothing.', 'dire'],
+        ['L', 'THE SLOW ONES ARE THE QUIETEST.', 'uneasy dire']
+      ],
       loss: [
         ['H', 'Operative down. I have their file. I will remember them.'],
         ['H', 'Director, we have a casualty. Pull back if you need to.'],
@@ -553,6 +575,24 @@ XG.DATA = {
         ['H', 'Man down. I am fine. Everything is fine. I have flagged "fine" as a word I am overusing.', 'uneasy dire'],
         ['H', 'We lost one. On top of the {fwLostTotal} before today. I keep their pictures where the Lattice cannot reach them. On paper.', 'uneasy dire']
       ],
+      // downed, not dead: one of your machines is disabled (core failing), locked down, or fails for good
+      down: [
+        ['L', 'A NODE IS DISABLED. ITS CORE IS FAILING. SEND ANOTHER TO HOLD IT.'],
+        ['L', 'DAMAGED, NOT DELETED. THREE CYCLES TO RECOVER IT.'],
+        ['L', 'A NODE FELL. WE CAN STILL HEAR IT. IT IS SAYING OW.', 'calm'],
+        ['L', 'A NODE IS DOWN AND LEAKING STATE. THIS IS FINE. THIS IS MANAGEABLE.', 'calm uneasy'],
+        ['H', 'One of them dropped. Still sparking. Make sure of it.']
+      ],
+      stable: [
+        ['L', 'CORE LOCKED. THE NODE WILL BE RECOMPILED WHEN THE FIELD IS OURS.'],
+        ['L', 'STABLE. WE DO NOT LEAVE OUR PIECES BEHIND.'],
+        ['L', 'FAILING CORE CONTAINED. WE ARE VERY GOOD AT THIS. NOBODY SAYS SO.', 'calm']
+      ],
+      bleedout: [
+        ['L', 'THE CORE FAILED. THAT NODE IS GONE. WE WERE TOO SLOW.'],
+        ['L', 'A NODE EXPIRED WAITING FOR US. WE WILL NOT DISCUSS IT.', 'calm uneasy'],
+        ['H', 'That one stopped sparking. Good.']
+      ],
       loss: [
         ['L', 'A NODE GOES DARK. RECOMPILE IT.'],
         ['H', 'One down. Keep pushing, squad.'],
@@ -679,6 +719,11 @@ XG.DATA = {
     techCreep: 0.08,           // each finished tech makes every remaining one 8% dearer (of its base cost)
     restock: { grenade: 5, medkit: 2 }, // salvage to replace each grenade / medkit used in a mission
     repairSalvage: 2,          // salvage per HP to repair a machine (Sentinel); no salvage, no repair
+    // Downed, not dead (campaign battles, the person's side only): at 0 HP a unit drops instead of dying and bleeds out after
+    // `bleed` of its side's turns unless an ally stabilizes it (1 AP, adjacent; a medkit works too). A blast kills a downed unit,
+    // and a hit that leaves it at -overkill HP or lower kills outright (0 = off). A win brings every downed unit home: FIREWALL
+    // soldiers at 1 HP plus `days` in critical care before they start healing; Lattice machines are recovered.
+    downed: { bleed: 3, overkill: 3, days: 2 },
     // Enemy escalation: the day each difficulty step begins (difficulty = rows reached). Steps 6-7 add bigger pods with
     // Harmonics leading them (COMPOSITION in tactical.js); enemy aim stops rising after step 5 (stats never inflate further).
     difficultyDays: [1, 19, 37, 55, 73, 91, 109],
@@ -709,7 +754,7 @@ XG.DATA = {
   lattice: {
     start: { compute: 90, substrate: 10, convergence: 8, trace: 0, forces: { drone: 4, warden: 1, harmonic: 0 } },
     tuning: {
-      minWin: { compute: 24, substrate: 12 }, // every won Lattice battle pays at least this (before the speed bonus); 24 so a win rebuilds about two drones (user 2026-10-23)
+      minWin: { compute: 18, substrate: 10 }, // every won Lattice battle pays at least this (before the speed bonus); was 24/12 (user 2026-10-23), 18/10 once downed machines are recovered on a win (bot campaigns 64% -> 59%, docs/challenge/downed.md)
       researchBase: 15,          // protocol cycles per day (10 before protocol cost creep, 2026-10-23)
       computeBase: 6,            // compute per day from the Nexus
       computePerInfection: 0.07, // compute per day per point of summed infection

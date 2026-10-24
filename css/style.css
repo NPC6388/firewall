@@ -215,6 +215,7 @@ table.odds.duel tr.hd td { color: #8fa3b8; font-size: 11px; border-bottom: 1px s
 .sq .pips i { width: 4px; height: 4px; }
 .sq .pips { gap: 1px; margin-top: 2px; }
 .sq.dead .sq-ico { filter: grayscale(1); opacity: .6; }
+.sq.downed { opacity: .7; cursor: default; } .sq.downed .sq-ico { filter: grayscale(.7); }
 .sq .n { color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pips { display: flex; gap: 2px; margin-top: 3px; flex-wrap: wrap; }
 .pips i { width: 7px; height: 6px; background: var(--green); display: block; }

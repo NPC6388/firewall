@@ -782,7 +782,27 @@ XG.Gfx = (function () {
     contrast: { fw: '90,160,255', lat: '255,160,40', hpFw: '#6cb4ff', hpLat: '#ffa133', flank: '#6cb4ff' }
   };
   function pal() { return PALETTES[(XG.Settings && XG.Settings.get('palette')) || 'default'] || PALETTES['default']; }
+  // A downed unit of the person's side: the sprite lies on its side, dimmed, over a dark pool (or a scorch for a machine),
+  // with a badge saying how many turns it has left (BLEED n / FAILING n) or that it is STABLE.
+  function downedUnit(c, u, cx, cy, o) {
+    var now = o.now, pulse = REDUCED ? 1 : .6 + .4 * Math.sin(now / 260), draw = SPRITES[u.kind];
+    c.save(); c.globalAlpha = Math.max(0, o.alpha);
+    c.fillStyle = u.machine ? 'rgba(20,20,24,.55)' : 'rgba(110,8,24,.5)';
+    c.beginPath(); c.ellipse(cx + 3, cy + 5, 15, 8, .2, 0, Math.PI * 2); c.fill();
+    c.save(); c.globalAlpha = Math.max(0, o.alpha) * .6; c.translate(cx + 2, cy + 3); c.rotate(Math.PI / 2 - .25); c.scale(.85, .85);
+    if (draw) draw(c, '#7d8794', 0, 0, u, { now: 0, alpha: 1 });
+    else fallback(c, u, 13);
+    c.restore();
+    var lat = u.side === 'enemy', txt = u.stable ? 'STABLE' : (lat ? 'FAILING ' : 'BLEED ') + u.bleed, w = txt.length * 6 + 6, y0 = Math.max((o.top || 0) + 4, cy - 24);
+    c.font = 'bold 10px "Share Tech Mono", monospace'; c.textAlign = 'center';
+    c.fillStyle = 'rgba(0,0,0,.75)'; c.fillRect(cx - w / 2, y0 - 2, w, 12);
+    c.strokeStyle = u.stable ? 'rgba(125,255,155,.8)' : 'rgba(255,77,109,' + pulse + ')'; c.lineWidth = 1; c.strokeRect(cx - w / 2 + .5, y0 - 1.5, w - 1, 11);
+    c.fillStyle = u.stable ? '#7dff9b' : 'rgba(255,107,133,' + (.5 + .5 * pulse) + ')'; c.fillText(txt, cx, y0 + 7);
+    if (!u.stable) { c.fillStyle = 'rgba(255,77,109,' + (.5 + .5 * pulse) + ')'; c.fillText('✚', cx + 15, cy + 18); }
+    c.restore();
+  }
   function unit(c, u, cx, cy, o) {
+    if (u.downed && !u.alive) return downedUnit(c, u, cx, cy, o);
     var P = pal(), now = o.now, col = u.color, team = u.side === 'player' ? P.fw : P.lat, R = u.isStatic ? 16 : 13;
     var hover = u.kind === 'drone' || u.kind === 'sentinel' || u.kind === 'harmonic', bob = hover && !REDUCED ? Math.sin(now / 320 + u.id) * 2 : 0;
     c.save(); c.globalAlpha = Math.max(0, o.alpha);

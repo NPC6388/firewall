@@ -224,10 +224,12 @@ XG.LUI = (function () {
 
   LUI.results = function (out, done) {
     var m = out.mission, lost = Object.keys(out.lost).map(function (k) { return out.lost[k] + ' × ' + D.enemies[k].name; });
+    var rec = Object.keys(out.recovered || {}).map(function (k) { return out.recovered[k] + ' × ' + D.enemies[k].name; });
     UI.modal('<h1 class="' + (out.won ? 'good' : 'bad') + '">' + (out.won ? 'OPERATION SUCCEEDED' : 'OPERATION FAILED') + '</h1><p>' + m.name + '</p>' +
       '<p>' + out.notes.join(' ') + '</p>' +
       '<p>' + (m.kind === 'breach' ? 'Programs purged' : 'Humans harmonized') + ': <b>' + out.humansKilled + '</b> · substrate recovered: <b>' + out.substrate + '</b></p>' +
       '<p class="' + (lost.length ? 'bad' : 'dim') + '">' + (lost.length ? 'Destroyed: ' + lost.join(', ') + '.' : 'No units lost.') + '</p>' +
+      (rec.length ? '<p class="warn">Disabled but recovered from the field: ' + rec.join(', ') + '.</p>' : '') +
       (out.choice && UI.g.pendingReward ? '<h2>Choose the strike reward</h2>' + strikeChoice(UI.g, true) :
         '<div class="modal-actions"><button class="primary" id="lres-ok">Return to the Network</button></div>'));
     if (out.choice && UI.g.pendingReward) {

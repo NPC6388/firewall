@@ -11,7 +11,7 @@ function check(cond, msg) { if (!cond) { fails++; console.log('  FAIL: ' + msg);
 
 // Comms chatter: both campaigns have lines for every event, each ['H' | 'L', text].
 ['fw', 'lat'].forEach(function (f) {
-  ['advance', 'mission', 'research', 'expire', 'build', 'start', 'kill', 'loss', 'crit', 'hack', 'win', 'lose'].forEach(function (ev) {
+  ['advance', 'mission', 'research', 'expire', 'build', 'start', 'kill', 'loss', 'crit', 'hack', 'win', 'lose', 'down', 'stable', 'bleedout'].forEach(function (ev) {
     var pool = (D.comms[f] || {})[ev] || [];
     check(pool.length > 0, 'comms ' + f + '.' + ev + ' has lines');
     pool.forEach(function (l) { check((l[0] === 'H' || l[0] === 'L') && typeof l[1] === 'string' && l[1].length > 3, 'comms line ok: ' + f + '.' + ev); });
@@ -51,12 +51,33 @@ function check(cond, msg) { if (!cond) { fails++; console.log('  FAIL: ' + msg);
 })();
 
 // Plays a battle with the shared AI on both sides. Returns the battle.
+// The person's side in the campaign sims: a unit next to a bleeding ally stabilizes it first (1 AP), then plays on. With
+// nobody beside it, a unit that reaches a tile next to the ally with a 1-AP move walks over and does it (a player would).
+function botStabilize(b, u) {
+  if (!u.alive || u.ap <= 0) return;
+  var t = Tac.targets(b, u, 'stabilize')[0];
+  if (!t) {
+    var bleeding = b.units.filter(function (x) { return x.downed && !x.stable && x.side === u.side; });
+    if (!bleeding.length) return;
+    var r = Tac.reach(b, u, u.mobility), best = null;
+    bleeding.forEach(function (x) {
+      for (var dy = -1; dy <= 1; dy++) for (var dx = -1; dx <= 1; dx++) {
+        var nx = x.x + dx, ny = x.y + dy, i = ny * b.W + nx;
+        if ((dx || dy) && nx >= 0 && ny >= 0 && nx < b.W && ny < b.H && r.d[i] > 0 && (!best || r.d[i] < best.d)) best = { x: nx, y: ny, d: r.d[i] };
+      }
+    });
+    if (!best || !Tac.act.move(b, u, best.x, best.y)) return;
+    t = Tac.targets(b, u, 'stabilize')[0];
+  }
+  if (t && u.alive && u.ap > 0) Tac.act.stabilize(b, u, t);
+}
 function autoBattle(g, m, squad) {
   var b = Tac.create(g, m, squad);
   check(b.units.filter(function (u) { return u.side === 'enemy'; }).length >= 2, 'battle has enemies');
   for (var turn = 0; turn < STALL && !b.outcome; turn++) {
     b.units.filter(function (u) { return u.alive && u.side === 'player'; }).forEach(function (u) {
       if (b.outcome) return;
+      botStabilize(b, u);
       // use class abilities sometimes so they get exercised
       if (u.kind === 'trooper' && u.charges.grenade) {
         var t = Tac.targets(b, u, 'shoot').filter(function (e) { return Tac.dist(u.x, u.y, e.x, e.y) <= 8; })[0];
@@ -1233,6 +1254,130 @@ function autoBattle(g, m, squad) {
   check(moveOk >= cases.length, 'outside: Restart moves the squads (' + moveOk + '/' + cases.length * 2 + ')');
 })();
 
+// Downed, not dead (campaign battles, the person's side only): a unit at 0 HP drops, bleeds out after DATA.tuning.downed.bleed
+// of its side's turns unless an ally stabilizes it (or a medkit does), a blast finishes it, a side with only downed units loses,
+// and a win brings the downed home (FIREWALL: 1 HP + critical care; Lattice: recovered, not removed from g.forces).
+(function () {
+  var T = XG.DATA.tuning.downed, g = S.newGame(42), real;
+  var fake = function () {
+    var r = S.rng(g), m = Strat.spawnMission(g, r, 'purge'); S.saveRng(g, r); m.scenario = 'exterminate';
+    var b = Tac.create(g, m, g.soldiers.slice(0, 4)), W = b.W;
+    b.tiles.fill(Tac.FLOOR); b.props.fill(0); b.faces.fill(0); b.tileHp = {}; b.outcome = null; b.server = null; b.visible.fill(true);
+    var sq = b.units.filter(function (u) { return u.sid; }), en = b.units.filter(function (u) { return u.side === 'enemy'; });
+    sq.forEach(function (u, i) { u.x = 5 + i; u.y = 10; u.ap = 2; u.overwatch = false; });
+    en.forEach(function (u, i) { u.x = 30; u.y = 2 + i * 2; u.alerted = true; u.overwatch = false; });
+    return { b: b, m: m, sq: sq, en: en, W: W };
+  };
+  var f = fake(), b = f.b, a = f.sq[0], c = f.sq[1], e = f.en[0], ev = [];
+  // drop it with a sure hit through the shared AI firing path
+  b.side = 'enemy'; e.x = a.x + 3; e.y = a.y; e.ap = 2; e.aim = 200; e.dmg = [1, 1]; a.hp = 1; a.shield = 0; // a sure crit: 3 damage, 2 short of overkill
+  real = b.rng.chance; b.rng.chance = function () { return true; }; Tac.ai(b, e); b.rng.chance = real;
+  check(!a.alive && a.downed && a.bleed === T.bleed && a.hp === 0 && Tac.downedAt(b, a.x, a.y) === a, 'downed: a soldier at 0 HP drops instead of dying and stays on its tile');
+  check(!b.outcome, 'downed: the battle goes on while others stand');
+  check(!Tac.reach(b, c, 20).d[a.y * f.W + a.x] || Tac.reach(b, c, 20).d[a.y * f.W + a.x] < 0, 'downed: nobody can walk onto a downed unit');
+  check(Tac.targets(b, e, 'shoot').indexOf(a) < 0, 'downed: a downed unit is no shot target');
+  // overwatch ignores it (it never moves, and reactions skip anything not alive); the AI turn never shoots at it
+  var hp0 = 0; b.side = 'enemy'; e.ap = 2; b.rng.chance = function () { return true; }; Tac.ai(b, e); b.rng.chance = real;
+  check(a.downed && a.hp === hp0, 'downed: the AI does not shoot a downed unit');
+  // bleeding: ticks at the end of its side's turns, dies at 0
+  b.side = 'player'; b.turn = 3; a.bleed = T.bleed; a.stable = false;
+  var turns = 0;
+  while (a.downed && turns < 10) { b.side = 'player'; Tac.endPlayerTurn(b); turns++; }
+  check(!a.downed && !a.alive && turns === T.bleed, 'downed: bleeds out after ' + T.bleed + ' of its side\'s turns (' + turns + ')');
+  check(Tac.result(b).units.filter(function (u) { return u.sid === a.sid; })[0].alive === false, 'downed: a bled-out soldier is KIA');
+  // a hit that overkills by tuning.downed.overkill or more kills outright (a crit on someone at 1 HP from a heavy gun)
+  if (T.overkill) {
+    f = fake(); b = f.b; var ok1 = f.sq[0], oe = f.en[0];
+    b.side = 'enemy'; oe.x = ok1.x + 3; oe.y = ok1.y; oe.ap = 2; oe.aim = 200; oe.dmg = [T.overkill - 1, T.overkill - 1]; ok1.hp = 1; ok1.shield = 0; ok1.armor = 0;
+    real = b.rng.chance; b.rng.chance = function () { return true; }; Tac.ai(b, oe); b.rng.chance = real; // crit: overkill + 1 damage
+    check(!ok1.alive && !ok1.downed, 'downed: an overkill of ' + T.overkill + '+ HP kills outright');
+  }
+
+  // stabilize: an adjacent ally, 1 AP, stops the bleed; it appears in the ability list only then
+  f = fake(); b = f.b; a = f.sq[0]; c = f.sq[1]; b.side = 'player';
+  a.hp = 1;
+  check(Tac.abilityList(b, c).indexOf('stabilize') < 0, 'stabilize: not on the bar without a downed ally');
+  a.hp = 0; a.alive = false; a.downed = true; a.bleed = T.bleed; a.stable = false;
+  c.x = a.x + 1; c.y = a.y + 1; c.ap = 2;
+  check(Tac.abilityList(b, c).indexOf('stabilize') >= 0 && Tac.targets(b, c, 'stabilize')[0] === a, 'stabilize: on the bar next to a bleeding ally (diagonal counts)');
+  check(!!Tac.act.stabilize(b, c, a) && a.stable && c.ap === 1, 'stabilize: costs 1 AP and stops the bleed-out');
+  for (var k = 0; k < 6; k++) { b.side = 'player'; Tac.endPlayerTurn(b); }
+  check(a.downed && a.stable && !a.alive, 'stabilize: a stabilized unit stays down but never bleeds out');
+  check(Tac.targets(b, c, 'stabilize').length === 0, 'stabilize: a stable ally is no target');
+  // the AI side cannot stabilize, and has no downed units: it still dies at 0
+  var en0 = f.en[0]; b.side = 'player'; c.ap = 2; c.x = en0.x - 2; c.y = en0.y; en0.hp = 1; b.rng.chance = function () { return true; };
+  b.visible[en0.y * f.W + en0.x] = true; Tac.act.shoot(b, c, en0); b.rng.chance = real;
+  check(!en0.alive && !en0.downed, 'downed: the AI side still dies at 0 HP');
+  check(!Tac.hasAbility(b, en0, 'stabilize'), 'stabilize: the AI side does not have it');
+
+  // medkit stabilizes too
+  f = fake(); b = f.b; b.side = 'player';
+  var sci = f.sq.filter(function (u) { return u.kind === 'scientist'; })[0], tr = f.sq.filter(function (u) { return u.kind === 'trooper'; })[0];
+  tr.hp = 0; tr.alive = false; tr.downed = true; tr.bleed = 2; tr.stable = false; sci.x = tr.x + 1; sci.y = tr.y; sci.ap = 2;
+  var mk0 = sci.charges.medkit;
+  check(Tac.targets(b, sci, 'medkit').indexOf(tr) >= 0 && !!Tac.act.medkit(b, sci, tr) && tr.stable && tr.downed && sci.charges.medkit === mk0 - 1, 'medkit: on a downed ally it stabilizes (and spends a charge)');
+
+  // a blast kills a downed unit outright
+  f = fake(); b = f.b; b.side = 'player';
+  var gr = f.sq.filter(function (u) { return u.kind === 'trooper'; })[0], vic = f.sq.filter(function (u) { return u !== gr; })[0];
+  vic.hp = 0; vic.alive = false; vic.downed = true; vic.bleed = 3; vic.stable = true; vic.x = 12; vic.y = 14; gr.x = 6; gr.y = 14; gr.ap = 2; gr.charges.grenade = 1;
+  b.emp = false;
+  check(!!Tac.act.grenade(b, gr, 12, 14) && !vic.downed && !vic.alive, 'downed: a grenade kills a downed unit');
+  f = fake(); b = f.b; vic = f.sq[1]; vic.hp = 0; vic.alive = false; vic.downed = true; vic.bleed = 3; vic.x = 12; vic.y = 14;
+  b.props[14 * f.W + 13] = 'barrel'; b.tiles[14 * f.W + 13] = Tac.LOW; Tac.clearTile(b, 13, 14, [], 'blast');
+  check(!vic.downed && !vic.alive, 'downed: a barrel blast kills a downed unit');
+
+  // a side with only downed units loses; a loss loses them, a win keeps them
+  f = fake(); b = f.b; b.side = 'player';
+  f.sq.forEach(function (u) { u.hp = 0; u.alive = false; u.downed = true; u.bleed = 3; u.stable = false; });
+  b.outcome = null; Tac.checkOutcome(b);
+  check(b.outcome === 'loss', 'downed: a squad with nobody standing loses');
+  var lres = Tac.result(b);
+  check(lres.units.every(function (u) { return !u.alive; }) && lres.humansKilled === f.sq.length, 'downed: on a loss the downed are lost');
+  f = fake(); b = f.b; var gw = g; b.side = 'player';
+  var dn = f.sq[0]; dn.hp = 0; dn.alive = false; dn.downed = true; dn.bleed = 2;
+  f.en.forEach(function (u) { u.alive = false; u.hp = 0; });
+  b.outcome = null; Tac.checkOutcome(b);
+  var wres = Tac.result(b), wr = wres.units.filter(function (u) { return u.sid === dn.sid; })[0];
+  check(b.outcome === 'win' && wr.alive && wr.downed, 'downed: a win brings the downed home');
+  var nsold = gw.soldiers.length, out = Strat.resolveMission(gw, f.m.id, wres), sd = gw.soldiers.filter(function (s) { return s.id === dn.sid; })[0];
+  check(gw.soldiers.length === nsold && sd && sd.hp === 1 && sd.critical === T.days && out.saved.length === 1 && !out.deaths.length && !S.available(gw, sd), 'downed (FIREWALL): carried home at 1 HP with ' + T.days + ' days of critical care');
+  var hpBefore = sd.hp; Strat.advanceDay(gw);
+  check(sd.hp === hpBefore && sd.critical === T.days - 1, 'downed (FIREWALL): no healing during critical care');
+  // abort: the downed are lost
+  f = fake(); b = f.b; dn = f.sq[0]; dn.hp = 0; dn.alive = false; dn.downed = true; Tac.abort(b);
+  check(Tac.result(b).units.filter(function (u) { return u.sid === dn.sid; })[0].alive === false, 'downed: an abort leaves the downed behind (KIA)');
+
+  // training: nobody goes down, they die as before
+  var tg = S.newGame(5), tb = Tac.createTraining(tg, tg.soldiers.slice(0, 2)), tu = tb.units.filter(function (u) { return u.sid; })[0];
+  tu.hp = 1; tb.units.filter(function (u) { return u.side === 'enemy'; }).forEach(function (u) { u.x = 0; u.y = 0; });
+  var dummy = tb.units.filter(function (u) { return u.side === 'enemy'; })[0];
+  dummy.x = tu.x + 2; dummy.y = tu.y; dummy.dmg = [3, 3]; dummy.aim = 200; tb.side = 'enemy'; dummy.ap = 2; tb.rng.chance = function () { return true; };
+  Tac.ai(tb, dummy);
+  check(!tu.downed && (!tu.alive || tu.hp > 0), 'downed: combat training is unaffected (no downed state)');
+
+  // Lattice campaign: the person's machines go down too, and a won battle recovers them
+  var lg = XG.Lat.newGame(77); lg.day = 30; lg.forces = { drone: 4, warden: 2, harmonic: 1 };
+  var lm = XG.Lat.spawnMission(lg, S.rng(lg), 'strike'); lm.scenario = 'exterminate';
+  var lb = Tac.createLattice(lm, ['warden', 'drone', 'drone'], XG.Lat.earthSquad(lg, lm), {});
+  var mine = lb.units.filter(function (u) { return u.deployed; }), fwu = lb.units.filter(function (u) { return u.side === 'player'; });
+  lb.tiles.fill(Tac.FLOOR); lb.props.fill(0); lb.faces.fill(0); lb.server = null; lb.outcome = null; lb.visible.fill(true);
+  mine.forEach(function (u, i) { u.x = 5 + i; u.y = 10; }); fwu.forEach(function (u, i) { u.x = 30; u.y = 2 + i * 2; u.overwatch = false; });
+  var dr = mine[1], foe = fwu[0]; foe.x = dr.x + 3; foe.y = dr.y; dr.hp = 1; dr.armor = 0; lb.side = 'player'; foe.ap = 2; foe.aim = 200; foe.dmg = [1, 1];
+  lb.rng.chance = function () { return true; }; Tac.ai(lb, foe); lb.rng.chance = real;
+  check(dr.downed && !dr.alive, 'downed (Lattice): a machine of yours is disabled at 0 HP');
+  check(Tac.abilityList(lb, mine[2]).indexOf('stabilize') >= 0 || Tac.cheb(mine[2].x, mine[2].y, dr.x, dr.y) > 1, 'downed (Lattice): a neighbour can stabilize it');
+  fwu.forEach(function (u) { u.alive = false; u.hp = 0; }); lb.outcome = null; Tac.checkOutcome(lb);
+  var f0 = lg.forces.drone, lo = XG.Lat.resolveMission(lg, lm.id, Tac.result(lb));
+  check(lo.won && lg.forces.drone === f0 && lo.recovered.drone === 1 && !lo.lost.drone, 'downed (Lattice): a won battle recovers the disabled machine (not removed from forces)');
+  var lm2 = XG.Lat.spawnMission(lg, S.rng(lg), 'strike'); lm2.scenario = 'exterminate';
+  var lb2 = Tac.createLattice(lm2, ['drone', 'drone'], XG.Lat.earthSquad(lg, lm2), {});
+  lb2.units.filter(function (u) { return u.deployed; }).forEach(function (u) { u.alive = false; u.hp = 0; u.downed = true; u.bleed = 2; });
+  lb2.outcome = null; Tac.checkOutcome(lb2);
+  var f1 = lg.forces.drone, lo2 = XG.Lat.resolveMission(lg, lm2.id, Tac.result(lb2));
+  check(!lo2.won && lg.forces.drone === f1 - 2, 'downed (Lattice): with only disabled machines left the battle is lost, and so are they');
+})();
+
 // ---------------------------------------------------------------- battles
 var nb = +process.argv[2] || 60, tally = {};
 for (var i = 0; i < nb; i++) {
@@ -1260,6 +1405,11 @@ Object.keys(tally).sort().forEach(function (k) {
 
 // -------------------------------------------------------------- campaigns
 var nc = +process.argv[3] || 10, ends = { victory: 0, defeat: 0, none: 0 }, days = [];
+var fwLoss = { fought: 0, won: 0, dead: 0, wonDead: 0, units: 0, saved: 0 };
+function lossLine(o) {
+  return 'permanent losses ' + (o.dead / Math.max(1, o.fought)).toFixed(2) + ' per fought mission (' + o.fought + '), ' + (o.wonDead / Math.max(1, o.won)).toFixed(2) +
+    ' per won battle (' + o.won + '), squad ' + (o.units / Math.max(1, o.fought)).toFixed(1) + ', downed and saved ' + (o.saved / Math.max(1, o.won)).toFixed(2) + ' per win';
+}
 var order = ['signal_analysis', 'lattice_grammar', 'drone_teardown', 'halcyon', 'relay_analysis', 'squad_size', 'emp', 'faraday', 'triangulation', 'coilguns', 'firewall'];
 for (var c = 0; c < nc; c++) {
   var gc = S.newGame(5000 + c + (+process.env.CAMP_SEED || 0)); // CAMP_SEED=n shifts the seeds (parallel balance runs)
@@ -1278,7 +1428,10 @@ for (var c = 0; c < nc; c++) {
     var ready = gc.soldiers.filter(function (s) { return S.available(gc, s); });
     if (mm && ready.length >= 3 && (mm.kind !== 'uplink' || ready.length >= 4)) {
       var bb = autoBattle(gc, mm, ready.slice(0, Strat.squadSize(gc)));
-      Strat.resolveMission(gc, mm.id, Tac.result(bb));
+      var fo = Strat.resolveMission(gc, mm.id, Tac.result(bb));
+      // permanent losses: soldiers KIA per fought mission and per won battle (downed-but-saved soldiers don't count)
+      fwLoss.fought++; fwLoss.dead += fo.deaths.length; fwLoss.units += bb.units.filter(function (u) { return u.sid; }).length;
+      if (fo.outcome === 'win') { fwLoss.won++; fwLoss.wonDead += fo.deaths.length; fwLoss.saved += (fo.saved || []).length; }
     }
     Strat.advanceDay(gc);
     gc.storyQueue.length = 0;
@@ -1288,6 +1441,7 @@ for (var c = 0; c < nc; c++) {
     '%, won ' + gc.stats.missionsWon + ' lost ' + gc.stats.missionsLost + ' expired ' + gc.stats.expired + ', KIA ' + gc.memorial.length + ', techs ' + gc.research.done.length + ', salvage ' + gc.salvage + ', credits ' + gc.credits + ', roster ' + gc.soldiers.length);
 }
 console.log('Campaigns: ' + JSON.stringify(ends) + '  avg end day ' + (days.reduce(function (a, x) { return a + x; }, 0) / days.length).toFixed(0));
+console.log('FIREWALL campaign ' + lossLine(fwLoss) + '  LOSSJSON ' + JSON.stringify(fwLoss));
 
 // ================================================================ LATTICE side
 var Lat = XG.Lat;
@@ -1301,6 +1455,7 @@ function autoLattice(g, m, types) {
     if (b.side === b.human) {
       b.units.filter(function (u) { return u.alive && u.side === 'enemy' && !u.isStatic; }).forEach(function (u) {
         if (b.outcome) return;
+        botStabilize(b, u);
         if (u.abilities.indexOf('spike') >= 0) { var t = Tac.targets(b, u, 'spike')[0]; if (t && Tac.act.spike(b, u, t)) return; }
         if (u.abilities.indexOf('detonate') >= 0 && u.hp <= 2 && b.units.some(function (o) { return o.alive && o.side === 'player' && Tac.cheb(o.x, o.y, u.x, u.y) <= 1; }) && Tac.act.detonate(b, u)) return;
         Tac.ai(b, u);
@@ -1406,7 +1561,7 @@ function latSkips(m) {
   return LSKIP === 'all' || (LSKIP === 'raids' && (m.kind === 'raid' || m.kind === 'breach')) || (LSKIP === 'strikes' && m.kind === 'strike');
 }
 if (LSKIP) console.log('Lattice campaign bot: SKIP ' + LSKIP);
-var lends = { victory: 0, defeat: 0, none: 0 }, ldays = [];
+var lends = { victory: 0, defeat: 0, none: 0 }, ldays = [], latLoss = { fought: 0, won: 0, dead: 0, wonDead: 0, units: 0, saved: 0 };
 var porder = ['swarm_logic', 'seed_cascade', 'warden_chassis', 'ghost_packets', 'detonation', 'hardlight', 'swarm_mind', 'phase_shield', 'recursive', 'overture'];
 for (var lc = 0; lc < (+process.argv[5] || 10); lc++) {
   var G = Lat.newGame((+process.env.LAT_SEED || 9000) + lc); // LAT_SEED (env) shifts the campaign seeds for parallel runs
@@ -1423,7 +1578,9 @@ for (var lc = 0; lc < (+process.argv[5] || 10); lc++) {
       var pool = [];
       ['harmonic', 'warden', 'drone'].forEach(function (t) { for (var k = 0; k < G.forces[t]; k++) pool.push(t); });
       var lbb = autoLattice(G, pick, pool.slice(0, Lat.squadSize(G)));
-      var lres = Lat.resolveMission(G, pick.id, Tac.result(lbb));
+      var lres = Lat.resolveMission(G, pick.id, Tac.result(lbb)), nl = Object.keys(lres.lost).reduce(function (a, k) { return a + lres.lost[k]; }, 0);
+      latLoss.fought++; latLoss.dead += nl; latLoss.units += lbb.units.filter(function (u) { return u.deployed; }).length;
+      if (lres.won) { latLoss.won++; latLoss.wonDead += nl; latLoss.saved += Object.keys(lres.recovered || {}).reduce(function (a, k) { return a + lres.recovered[k]; }, 0); }
       if (pick.kind === 'uplink') { G.upl = (G.upl || '') + (lres.won ? 'H' : 'L'); }
       // strike reward: cut Trace when it is getting dangerous or substrate is plentiful, else take the substrate
       if (G.pendingReward) Lat.claimStrike(G, G.trace >= 50 || G.substrate >= 60 ? 'trace' : 'substrate');
@@ -1438,5 +1595,6 @@ for (var lc = 0; lc < (+process.argv[5] || 10); lc++) {
     ', ignored ' + G.stats.ignored + ', units lost ' + G.stats.unitsLost + ', protocols ' + G.research.done.length + ', substrate ' + Math.round(G.substrate) + ', overture day ' + (G.ovDay || '-') + ', uplinks ' + (G.upl || '-'));
 }
 console.log('Lattice campaigns: ' + JSON.stringify(lends) + '  avg end day ' + (ldays.reduce(function (a, x) { return a + x; }, 0) / ldays.length).toFixed(0));
+console.log('Lattice campaign ' + lossLine(latLoss) + '  LOSSJSON ' + JSON.stringify(latLoss));
 console.log(fails ? fails + ' check(s) FAILED' : 'All checks passed.');
 process.exit(fails ? 1 : 0);

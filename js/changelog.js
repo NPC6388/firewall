@@ -7,7 +7,9 @@ XG.CHANGELOG = [
    {
     "name": "2026-10-23",
     "items": [
-     "<b>Lattice campaign: wins pay for rebuilding.</b> Every won battle now pays at least 24 compute and 12 substrate (was 12 and 10), before the speed bonus, so a win covers about two fresh drones.",
+     "<b>Downed, not dead.</b> In campaign battles your own units no longer die the moment they hit 0 HP. They go down on their tile, cannot act and are no longer shot at, and they bleed out after 3 of your turns (a Lattice machine's core fails). Any unit of yours next to them (diagonals count) can <b>Stabilize</b> them for 1 AP; the button shows up in the battle bar only when it applies, and a medkit works too. A grenade, detonation or exploding barrel kills a downed unit, and so does a hit that would leave them at -3 HP or lower. If nobody of yours is left standing, the battle is lost.",
+     "<b>Win, and they come home.</b> After a won battle every downed soldier is carried out at 1 HP and spends 2 days in critical care before healing (the Barracks shows \"Critical\"); downed Lattice machines are recovered instead of lost. Lose or pull out and the downed are lost as before. The debrief lists who was carried out apart from the dead. Combat training is unchanged.",
+     "<b>Lattice campaign: wins pay for rebuilding.</b> Every won battle now pays at least 18 compute and 10 substrate (was 12 and 10), before the speed bonus. Machines disabled in a won battle now come back, so there is less to rebuild.",
      "<b>Lattice campaign: fewer stun locks.</b> A FIREWALL Hacker now tries a hack at most once every 3 turns. Before, it could stun a fresh machine of yours every turn and keep two of them out of the fight at once.",
      "<b>Windows:</b> you can climb straight through a window now, with no need to shoot it first. Whoever goes through smashes it, so it leaves an open gap that is no longer half cover for anyone.",
      "<b>Lattice pods wake together:</b> once one Lattice unit spots your squad, its whole pod comes alive at once, along with anything else within 11 tiles (was 7). Sneaking up on a group is tenser; picking off one sentry no longer splits a pod.",
