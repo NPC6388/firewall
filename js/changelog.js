@@ -5,6 +5,12 @@ XG.CHANGELOG = [
   "name": "Unreleased",
   "groups": [
    {
+    "name": "2026-10-24",
+    "items": [
+     "<b>Line of sight through windows:</b> a unit leaning out behind a window now only sees out level with itself or toward the side it leans. A drone tucked in a room corner can no longer spot (or shoot) someone standing below the building corner outside. Leaning round the open end of a wall is unchanged."
+    ]
+   },
+   {
     "name": "2026-10-23",
     "items": [
      "<b>Downed, not dead.</b> In campaign battles your own units no longer die the moment they hit 0 HP. They go down on their tile, cannot act and are no longer shot at, and they bleed out after 3 of your turns (a Lattice machine's core fails). Any unit of yours next to them (diagonals count) can <b>Stabilize</b> them for 1 AP; the button shows up in the battle bar only when it applies, and a medkit works too. A grenade, detonation or exploding barrel kills a downed unit, and so does a hit that would leave them at -3 HP or lower. If nobody of yours is left standing, the battle is lost.",

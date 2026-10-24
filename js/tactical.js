@@ -184,12 +184,20 @@ XG.Tac = (function () {
     });
     return out;
   }
+  // A lean only shows what is level with the leaning unit or on the side it leans toward (user, 2026-10-24: a drone in a
+  // room corner leaning up behind a window must not see down past the building's corner, below its own row).
+  // Only for a lean that looks out through a window (the tile past the lean, beside the cover, is a window); leaning round the
+  // open end of a wall still sees across at any angle.
+  function leanSide(b, p, ux, uy, tx, ty) {
+    var w = propOf(b, p[0] + p[2], p[1] + p[3]);
+    return (w !== 'window' && w !== 'frame') || (tx - ux) * (p[0] - ux) + (ty - uy) * (p[1] - uy) >= 0;
+  }
   function los(b, ax, ay, bx, by) {
     if (lineClear(b, ax, ay, bx, by)) return true;
-    var A = peekSpots(b, ax, ay), i, j;
+    var A = peekSpots(b, ax, ay).filter(function (p) { return leanSide(b, p, ax, ay, bx, by); }), i, j;
     for (i = 0; i < A.length; i++) if (lineClear(b, A[i][0], A[i][1], bx, by)) return true;
     if (!unitAt(b, bx, by)) return false; // only a unit leans; an empty tile is seen or not from where you stand
-    var B = peekSpots(b, bx, by);
+    var B = peekSpots(b, bx, by).filter(function (p) { return leanSide(b, p, bx, by, ax, ay); });
     for (i = 0; i < B.length; i++) if (lineClear(b, ax, ay, B[i][0], B[i][1])) return true;
     for (i = 0; i < A.length; i++) for (j = 0; j < B.length; j++) // both lean out (two units behind tall cover facing each other)
       if (lineClear(b, A[i][0], A[i][1], B[j][0], B[j][1])) return true;
@@ -1105,7 +1113,7 @@ XG.Tac = (function () {
       for (var x = Math.max(0, x0 - SIGHT); x <= Math.min(b.W - 1, x0 + SIGHT); x++) {
         if (dist(x0, y0, x, y) > SIGHT) continue;
         var ok = lineClear(b, x0, y0, x, y);
-        for (var i = 0; !ok && i < A.length; i++) ok = lineClear(b, A[i][0], A[i][1], x, y);
+        for (var i = 0; !ok && i < A.length; i++) ok = leanSide(b, A[i], x0, y0, x, y) && lineClear(b, A[i][0], A[i][1], x, y);
         if (ok) out.push(y * b.W + x);
       }
     cache.at[k] = out;

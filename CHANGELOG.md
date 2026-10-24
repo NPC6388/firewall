@@ -8,6 +8,11 @@ The in-game **Help → Patch notes** tab shows everything from the first `##` he
 
 ## Unreleased
 
+### 2026-10-24
+- **Line of sight through windows:** a unit leaning out behind a window now only sees out level with itself or toward the
+  side it leans. A drone tucked in a room corner can no longer spot (or shoot) someone standing below the building corner
+  outside. Leaning round the open end of a wall is unchanged.
+
 ### 2026-10-23
 - **Downed, not dead.** In campaign battles your own units no longer die the moment they hit 0 HP. They go down on
   their tile, cannot act and are no longer shot at, and they bleed out after 3 of your turns (a Lattice machine's core

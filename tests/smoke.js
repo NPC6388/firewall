@@ -1187,6 +1187,28 @@ function autoBattle(g, m, squad) {
   check(!Tac.lineClear(b, unit.x, unit.y, probe.x, probe.y), 'room arrows: a rack still blocks the line straight through it');
 })();
 
+// The user's "more los info" screens (2026-10-24): a drone in a room's inside SW corner, a window up-left of it in the west
+// wall, the user's unit outside below the building's corner beside a tall pillar. Leaning up behind the window, the drone sees
+// out along its own row and above, but not down past the corner: a window lean only shows tiles level with the unit or on
+// its lean side.
+(function () {
+  var g = S.newGame(26), r = S.rng(g), m = Strat.spawnMission(g, r, 'purge'); S.saveRng(g, r);
+  var b = Tac.create(g, Object.assign({}, m, { diff: 1, scenario: 'exterminate' }), g.soldiers.slice(0, 2)), W = b.W;
+  b.tiles.fill(Tac.FLOOR); b.props.fill(0); b.faces.fill(0); b.tileHp = {}; b.outcome = null; delete b.outside;
+  var OX = 14, OY = 12, P = function (dx, dy, t, p) { b.tiles[(OY + dy) * W + OX + dx] = t; b.props[(OY + dy) * W + OX + dx] = p || 0; };
+  for (var y = -7; y <= 1; y++) P(-1, y, Tac.WALL);
+  for (var x = -1; x <= 6; x++) P(x, 1, Tac.WALL);
+  P(-1, -1, Tac.LOW, 'window'); P(-1, -4, Tac.LOW, 'window');
+  P(-4, 2, Tac.HIGH, 'pillar'); P(-4, 3, Tac.HIGH, 'pillar'); P(-4, 4, Tac.HIGH, 'pillar');
+  var red = b.units.filter(function (u) { return u.side === 'enemy'; })[0], blue = b.units[0];
+  b.units = [red, blue]; red.alive = blue.alive = true; red.x = OX; red.y = OY; blue.x = OX - 5; blue.y = OY + 2;
+  check(!Tac.los(b, red.x, red.y, blue.x, blue.y) && !Tac.los(b, blue.x, blue.y, red.x, red.y), 'window lean: the drone in the corner and the unit below the building corner cannot see each other');
+  var row1 = [-2, -4, -6, -8].filter(function (dx) { return Tac.los(b, OX, OY, OX + dx, OY + 1); });
+  check(!row1.length, 'window lean: nothing outside level with the south wall is seen (' + row1 + ')');
+  var band = [[-2, 0], [-6, 0], [-8, 0], [-2, -1], [-6, -2], [-5, -3], [-4, -4], [-8, -5]].filter(function (p) { return !Tac.los(b, OX, OY, OX + p[0], OY + p[1]); });
+  check(!band.length, 'window lean: the drone still sees out along its own row and up through the window (' + JSON.stringify(band) + ')');
+})();
+
 // Outside maps: one building holds the server (node) or the defenders (exterminate); the attackers land in the yard.
 (function () {
   var Lat = XG.Lat, g = S.newGame(24), L = Math.max(Tac.MAP_W, Tac.MAP_H), lg = Lat.newGame(77); lg.day = 30;
